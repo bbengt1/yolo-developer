@@ -1,0 +1,104 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+YOLO Developer is an autonomous multi-agent AI development system using the BMad Method. It orchestrates specialized AI agents (Analyst, PM, Architect, Dev, SM, TEA) through a LangGraph-based orchestration engine to autonomously handle software development tasks.
+
+**Current Status:** Epic 1 (Project Initialization & Configuration) is complete. Epic 2 (Memory & Context Layer) is next.
+
+## Build, Test, and Lint Commands
+
+```bash
+# Install dependencies
+uv sync --all-extras
+
+# Run all tests
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=src/yolo_developer --cov-report=term-missing
+
+# Run a single test file
+uv run pytest tests/unit/config/test_schema.py
+
+# Run a specific test
+uv run pytest tests/unit/config/test_schema.py::TestYoloConfig::test_method_name -v
+
+# Type checking
+uv run mypy src/yolo_developer
+
+# Linting and formatting
+uv run ruff check src tests
+uv run ruff format src tests
+
+# CLI entry point
+uv run yolo --help
+```
+
+## Architecture
+
+### Core Components
+
+The system uses a **LangGraph-based multi-agent orchestration** pattern:
+
+```
+src/yolo_developer/
+├── agents/         # Individual agent modules (analyst, pm, architect, dev, sm, tea)
+├── orchestrator/   # LangGraph graph definition, state schema, node functions
+├── memory/         # Vector store (ChromaDB) and graph store integration
+├── gates/          # Quality gate framework with blocking mechanism
+├── audit/          # Decision logging and traceability
+├── config/         # Pydantic configuration with YAML + env var support
+├── cli/            # Typer CLI interface
+├── sdk/            # Python SDK for programmatic access
+└── mcp/            # FastMCP server for external integration
+```
+
+### Configuration System (Implemented)
+
+Configuration uses a three-layer priority system: **defaults → YAML → environment variables**
+
+```python
+from yolo_developer.config import load_config, YoloConfig
+config = load_config()  # Loads from ./yolo.yaml with env var overrides
+```
+
+Environment variables use `YOLO_` prefix with `__` as nested delimiter:
+- `YOLO_PROJECT_NAME` - Project name (required)
+- `YOLO_LLM__CHEAP_MODEL` - Model for routine tasks
+- `YOLO_LLM__OPENAI_API_KEY` - API key (secrets only via env vars)
+- `YOLO_QUALITY__TEST_COVERAGE_THRESHOLD` - Quality threshold (0.0-1.0)
+
+API keys (`openai_api_key`, `anthropic_api_key`) are stored as `SecretStr` and **never** included in config exports.
+
+### Test Organization
+
+```
+tests/
+├── unit/           # Unit tests (config/, agents/, gates/, etc.)
+├── integration/    # Integration tests
+├── e2e/            # End-to-end tests
+└── fixtures/       # Shared test fixtures and mocks
+```
+
+## BMad Workflow System
+
+This project uses the BMad Method for AI-assisted development. Workflows are in `_bmad/bmm/workflows/`:
+
+- `/bmad:bmm:workflows:create-story` - Create next story from backlog
+- `/bmad:bmm:workflows:dev-story` - Implement a story using red-green-refactor TDD
+- `/bmad:bmm:workflows:code-review` - Adversarial code review
+- `/bmad:bmm:workflows:sprint-planning` - Sprint status tracking
+
+Sprint status is tracked in `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+
+## Code Style Requirements
+
+- Use `from __future__ import annotations` in all Python files
+- Export public API from `__init__.py` files
+- Use `ConfigurationError` for all config-related errors
+- Include full paths in error messages for debugging
+- Run `ruff check`, `ruff format`, and `mypy` before committing
+- mypy is configured with `strict = true`
