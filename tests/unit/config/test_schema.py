@@ -362,6 +362,147 @@ class TestConfigModuleExports:
         assert MemoryConfig is not None
 
 
+class TestLLMConfigAPIKeys:
+    """Tests for LLMConfig API key fields (Story 1.6 - Task 1)."""
+
+    def test_llm_config_has_openai_api_key_field(self) -> None:
+        """Verify LLMConfig has openai_api_key field."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig()
+        assert hasattr(config, "openai_api_key")
+        assert config.openai_api_key is None  # Default is None
+
+    def test_llm_config_has_anthropic_api_key_field(self) -> None:
+        """Verify LLMConfig has anthropic_api_key field."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig()
+        assert hasattr(config, "anthropic_api_key")
+        assert config.anthropic_api_key is None  # Default is None
+
+    def test_openai_api_key_is_secret_str_type(self) -> None:
+        """Verify openai_api_key uses SecretStr for masking."""
+        from pydantic import SecretStr
+
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(openai_api_key="sk-test-key-12345")
+        assert config.openai_api_key is not None
+        assert isinstance(config.openai_api_key, SecretStr)
+
+    def test_anthropic_api_key_is_secret_str_type(self) -> None:
+        """Verify anthropic_api_key uses SecretStr for masking."""
+        from pydantic import SecretStr
+
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(anthropic_api_key="sk-ant-test-key")
+        assert config.anthropic_api_key is not None
+        assert isinstance(config.anthropic_api_key, SecretStr)
+
+    def test_openai_api_key_get_secret_value(self) -> None:
+        """Verify openai_api_key value is accessible via get_secret_value()."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(openai_api_key="sk-test-key-12345")
+        assert config.openai_api_key is not None
+        assert config.openai_api_key.get_secret_value() == "sk-test-key-12345"
+
+    def test_anthropic_api_key_get_secret_value(self) -> None:
+        """Verify anthropic_api_key value is accessible via get_secret_value()."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(anthropic_api_key="sk-ant-test-key")
+        assert config.anthropic_api_key is not None
+        assert config.anthropic_api_key.get_secret_value() == "sk-ant-test-key"
+
+    def test_openai_api_key_masked_in_repr(self) -> None:
+        """Verify openai_api_key is masked in repr output (AC4)."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(openai_api_key="sk-secret-key")
+        repr_output = repr(config)
+        assert "sk-secret-key" not in repr_output
+        assert "**********" in repr_output or "SecretStr" in repr_output
+
+    def test_anthropic_api_key_masked_in_repr(self) -> None:
+        """Verify anthropic_api_key is masked in repr output (AC4)."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(anthropic_api_key="sk-ant-secret")
+        repr_output = repr(config)
+        assert "sk-ant-secret" not in repr_output
+        assert "**********" in repr_output or "SecretStr" in repr_output
+
+    def test_api_key_fields_have_descriptions(self) -> None:
+        """Verify API key fields have Field descriptions."""
+        from yolo_developer.config.schema import LLMConfig
+
+        assert LLMConfig.model_fields["openai_api_key"].description is not None
+        assert LLMConfig.model_fields["anthropic_api_key"].description is not None
+        assert "env" in LLMConfig.model_fields["openai_api_key"].description.lower()
+        assert "env" in LLMConfig.model_fields["anthropic_api_key"].description.lower()
+
+
+class TestYoloConfigAPIKeyValidation:
+    """Tests for API key validation warnings (Story 1.6 - AC5)."""
+
+    def test_validate_api_keys_method_exists(self) -> None:
+        """Verify YoloConfig has validate_api_keys method."""
+        from yolo_developer.config.schema import YoloConfig
+
+        config = YoloConfig(project_name="test")
+        assert hasattr(config, "validate_api_keys")
+        assert callable(config.validate_api_keys)
+
+    def test_validate_api_keys_returns_warnings_when_no_keys(self) -> None:
+        """Verify validate_api_keys returns warnings when no API keys are set (AC5)."""
+        from yolo_developer.config.schema import YoloConfig
+
+        config = YoloConfig(project_name="test")
+        warnings = config.validate_api_keys()
+
+        assert isinstance(warnings, list)
+        assert len(warnings) > 0
+        assert any("api key" in w.lower() for w in warnings)
+
+    def test_validate_api_keys_returns_empty_when_openai_set(self) -> None:
+        """Verify no warnings when OpenAI API key is set."""
+        from yolo_developer.config.schema import LLMConfig, YoloConfig
+
+        config = YoloConfig(
+            project_name="test",
+            llm=LLMConfig(openai_api_key="sk-test-key"),
+        )
+        warnings = config.validate_api_keys()
+
+        assert len(warnings) == 0
+
+    def test_validate_api_keys_returns_empty_when_anthropic_set(self) -> None:
+        """Verify no warnings when Anthropic API key is set."""
+        from yolo_developer.config.schema import LLMConfig, YoloConfig
+
+        config = YoloConfig(
+            project_name="test",
+            llm=LLMConfig(anthropic_api_key="sk-ant-test"),
+        )
+        warnings = config.validate_api_keys()
+
+        assert len(warnings) == 0
+
+    def test_validate_api_keys_no_error_on_missing_keys(self) -> None:
+        """Verify missing API keys do NOT raise an error (AC5)."""
+        from yolo_developer.config.schema import YoloConfig
+
+        # Should not raise - just returns warnings
+        config = YoloConfig(project_name="test")
+        warnings = config.validate_api_keys()
+
+        # It's a warning, not an error
+        assert isinstance(warnings, list)
+
+
 class TestSchemaCodeQuality:
     """Tests for code quality requirements."""
 

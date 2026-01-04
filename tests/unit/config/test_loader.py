@@ -424,6 +424,123 @@ memory:
         assert config.memory.graph_store_type == "json"
 
 
+class TestAPIKeyLoading:
+    """Tests for API key loading from environment variables (Story 1.6)."""
+
+    def test_api_key_loaded_from_env_openai(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """API key is loaded from environment variable (AC3)."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-test-key-12345")
+        config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is not None
+        assert config.llm.openai_api_key.get_secret_value() == "sk-test-key-12345"
+
+    def test_api_key_loaded_from_env_anthropic(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Anthropic API key is loaded from environment variable (AC3)."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__ANTHROPIC_API_KEY", "sk-ant-test-key")
+        config = load_config(yaml_file)
+
+        assert config.llm.anthropic_api_key is not None
+        assert config.llm.anthropic_api_key.get_secret_value() == "sk-ant-test-key"
+
+    def test_api_key_masked_in_config_repr(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """API key is masked in repr output (AC4)."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-secret-key")
+        config = load_config(yaml_file)
+
+        repr_output = repr(config.llm)
+        assert "sk-secret-key" not in repr_output
+        assert "**********" in repr_output or "SecretStr" in repr_output
+
+    def test_api_key_not_in_str_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """API key is not exposed in str output (AC4)."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-secret-key")
+        config = load_config(yaml_file)
+
+        str_output = str(config.llm)
+        assert "sk-secret-key" not in str_output
+
+    def test_multiple_api_keys_loaded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Multiple API keys can be loaded simultaneously."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-openai-key")
+        monkeypatch.setenv("YOLO_LLM__ANTHROPIC_API_KEY", "sk-anthropic-key")
+        config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is not None
+        assert config.llm.anthropic_api_key is not None
+        assert config.llm.openai_api_key.get_secret_value() == "sk-openai-key"
+        assert config.llm.anthropic_api_key.get_secret_value() == "sk-anthropic-key"
+
+    def test_api_key_none_when_not_set(self, tmp_path: Path) -> None:
+        """API key is None when not set in environment."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is None
+        assert config.llm.anthropic_api_key is None
+
+    def test_missing_api_key_logs_warning_on_load(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Missing API keys log a warning during load_config (AC5)."""
+        import logging
+
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        with caplog.at_level(logging.WARNING):
+            load_config(yaml_file)
+
+        # Should have logged a warning about missing API keys
+        assert len(caplog.records) > 0
+        warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("api key" in msg.lower() for msg in warning_messages)
+
+    def test_no_warning_logged_when_api_key_set(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """No warning logged when API key is configured (AC5)."""
+        import logging
+
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+        monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-test-key")
+
+        with caplog.at_level(logging.WARNING):
+            load_config(yaml_file)
+
+        # Should NOT have logged any API key warnings
+        warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert not any("api key" in msg.lower() for msg in warning_messages)
+
+
 class TestLoaderCodeQuality:
     """Tests for code quality requirements."""
 

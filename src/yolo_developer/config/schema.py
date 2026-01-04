@@ -3,16 +3,54 @@
 This module defines the strongly-typed configuration schema per ADR-008.
 Configuration is validated at system boundaries using Pydantic v2.
 
-Environment variables follow the pattern:
-- YOLO_PROJECT_NAME for top-level fields
-- YOLO_LLM__CHEAP_MODEL for nested fields (using __ delimiter)
+Environment Variable Pattern
+-----------------------------
+Environment variables use the ``YOLO_`` prefix with ``__`` as the nested delimiter:
+
+- ``YOLO_PROJECT_NAME``: Project name (required)
+- ``YOLO_LLM__CHEAP_MODEL``: LLM model for routine tasks
+- ``YOLO_LLM__PREMIUM_MODEL``: LLM model for complex reasoning
+- ``YOLO_LLM__BEST_MODEL``: LLM model for critical decisions
+- ``YOLO_LLM__OPENAI_API_KEY``: OpenAI API key (secrets only via env vars)
+- ``YOLO_LLM__ANTHROPIC_API_KEY``: Anthropic API key (secrets only via env vars)
+- ``YOLO_QUALITY__TEST_COVERAGE_THRESHOLD``: Test coverage threshold (0.0-1.0)
+- ``YOLO_QUALITY__CONFIDENCE_THRESHOLD``: Confidence threshold (0.0-1.0)
+- ``YOLO_MEMORY__PERSIST_PATH``: Memory persistence directory
+- ``YOLO_MEMORY__VECTOR_STORE_TYPE``: Vector store type (chromadb)
+- ``YOLO_MEMORY__GRAPH_STORE_TYPE``: Graph store type (json, neo4j)
+
+Configuration Priority Order
+----------------------------
+Configuration values are resolved in the following order (later overrides earlier):
+
+1. Defaults (defined in schema)
+2. YAML file (yolo.yaml)
+3. Environment variables
+
+API Key Security
+----------------
+API keys (openai_api_key, anthropic_api_key) are:
+
+- Set via environment variables ONLY (never in YAML files)
+- Stored as SecretStr for automatic masking in logs/repr
+- Accessible via ``.get_secret_value()`` method when needed
+- Never written to config file exports
+
+Example Usage
+-------------
+>>> from yolo_developer.config import load_config
+>>> config = load_config()
+>>> config.llm.cheap_model
+'gpt-4o-mini'
+>>> if config.llm.openai_api_key:
+...     api_key = config.llm.openai_api_key.get_secret_value()
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +74,16 @@ class LLMConfig(BaseModel):
     best_model: str = Field(
         default="claude-opus-4-5-20251101",
         description="LLM model for critical decisions requiring highest quality",
+    )
+
+    # API keys - read from env only, masked in output (Story 1.6)
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="OpenAI API key (set via YOLO_LLM__OPENAI_API_KEY env var)",
+    )
+    anthropic_api_key: SecretStr | None = Field(
+        default=None,
+        description="Anthropic API key (set via YOLO_LLM__ANTHROPIC_API_KEY env var)",
     )
 
 
@@ -88,16 +136,25 @@ class YoloConfig(BaseSettings):
     Inherits from pydantic_settings.BaseSettings for environment variable support.
 
     Environment Variable Mapping:
-    - YOLO_PROJECT_NAME: Project name (required)
-    - YOLO_LLM__CHEAP_MODEL: Override cheap_model
-    - YOLO_LLM__PREMIUM_MODEL: Override premium_model
-    - YOLO_QUALITY__TEST_COVERAGE_THRESHOLD: Override test coverage threshold
-    - YOLO_MEMORY__PERSIST_PATH: Override memory persistence path
+        - YOLO_PROJECT_NAME: Project name (required)
+        - YOLO_LLM__CHEAP_MODEL: Override cheap_model
+        - YOLO_LLM__PREMIUM_MODEL: Override premium_model
+        - YOLO_LLM__BEST_MODEL: Override best_model
+        - YOLO_LLM__OPENAI_API_KEY: OpenAI API key (secrets via env only)
+        - YOLO_LLM__ANTHROPIC_API_KEY: Anthropic API key (secrets via env only)
+        - YOLO_QUALITY__TEST_COVERAGE_THRESHOLD: Override test coverage threshold
+        - YOLO_QUALITY__CONFIDENCE_THRESHOLD: Override confidence threshold
+        - YOLO_MEMORY__PERSIST_PATH: Override memory persistence path
+        - YOLO_MEMORY__VECTOR_STORE_TYPE: Override vector store type
+        - YOLO_MEMORY__GRAPH_STORE_TYPE: Override graph store type
 
     Example:
         >>> config = YoloConfig(project_name="my-project")
         >>> config.llm.cheap_model
         'gpt-4o-mini'
+        >>> warnings = config.validate_api_keys()
+        >>> if warnings:
+        ...     print("Warning: No API keys configured")
     """
 
     model_config = SettingsConfigDict(
@@ -124,3 +181,30 @@ class YoloConfig(BaseSettings):
         default_factory=MemoryConfig,
         description="Memory and storage configuration",
     )
+
+    def validate_api_keys(self) -> list[str]:
+        """Validate API key configuration and return warnings.
+
+        Checks if any API keys are configured. If no API keys are set,
+        returns a warning message. This is a warning, not an error,
+        because API keys may be set later via SDK or at runtime.
+
+        Returns:
+            List of warning messages. Empty list if at least one API key is configured.
+
+        Example:
+            >>> config = YoloConfig(project_name="my-project")
+            >>> warnings = config.validate_api_keys()
+            >>> if warnings:
+            ...     for warning in warnings:
+            ...         print(f"Warning: {warning}")
+        """
+        warnings: list[str] = []
+
+        if self.llm.openai_api_key is None and self.llm.anthropic_api_key is None:
+            warnings.append(
+                "No API keys configured. Set YOLO_LLM__OPENAI_API_KEY or "
+                "YOLO_LLM__ANTHROPIC_API_KEY environment variable for LLM operations."
+            )
+
+        return warnings

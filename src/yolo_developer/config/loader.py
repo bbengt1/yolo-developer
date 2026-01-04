@@ -66,7 +66,14 @@ def load_config(config_path: Path | None = None) -> YoloConfig:
     # Merge with environment variables (env vars take priority)
     merged_data = _merge_with_env_vars(yaml_data)
 
-    return _create_config(merged_data)
+    config = _create_config(merged_data)
+
+    # Validate API keys and log warnings (AC5 - Story 1.6)
+    api_key_warnings = config.validate_api_keys()
+    for warning in api_key_warnings:
+        logger.warning(warning)
+
+    return config
 
 
 def _load_yaml_file(path: Path) -> dict[str, Any]:
