@@ -1,0 +1,211 @@
+# Sprint Status - yolo-developer
+# Generated: 2026-01-04
+# Project: yolo-developer
+# Tracking System: file-system
+# Story Location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-04
+project: yolo-developer
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Project Initialization & Configuration (8 stories)
+  epic-1: in-progress
+  1-1-initialize-python-project-with-uv: done
+  1-2-create-project-directory-structure: backlog
+  1-3-set-up-code-quality-tooling: backlog
+  1-4-implement-configuration-schema-with-pydantic: backlog
+  1-5-load-configuration-from-yaml-files: backlog
+  1-6-support-environment-variable-overrides: backlog
+  1-7-validate-configuration-on-load: backlog
+  1-8-export-and-import-project-configurations: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Memory & Context Layer (8 stories)
+  epic-2: backlog
+  2-1-create-memory-store-protocol: backlog
+  2-2-implement-chromadb-vector-storage: backlog
+  2-3-implement-json-graph-storage: backlog
+  2-4-context-preservation-across-handoffs: backlog
+  2-5-session-persistence: backlog
+  2-6-project-pattern-learning: backlog
+  2-7-historical-decision-queries: backlog
+  2-8-project-isolation: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Quality Gate Framework (9 stories)
+  epic-3: backlog
+  3-1-create-quality-gate-decorator: backlog
+  3-2-implement-testability-gate: backlog
+  3-3-implement-ac-measurability-gate: backlog
+  3-4-implement-architecture-validation-gate: backlog
+  3-5-implement-definition-of-done-gate: backlog
+  3-6-implement-confidence-scoring: backlog
+  3-7-configure-quality-thresholds: backlog
+  3-8-generate-gate-failure-reports: backlog
+  3-9-track-gate-metrics-over-time: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Seed Input & Validation (7 stories)
+  epic-4: backlog
+  4-1-parse-natural-language-seed-documents: backlog
+  4-2-cli-seed-command-implementation: backlog
+  4-3-ambiguity-detection: backlog
+  4-4-clarification-question-generation: backlog
+  4-5-sop-constraint-validation: backlog
+  4-6-semantic-validation-reports: backlog
+  4-7-quality-threshold-rejection: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Analyst Agent (7 stories)
+  epic-5: backlog
+  5-1-create-analyst-agent-node: backlog
+  5-2-requirement-crystallization: backlog
+  5-3-missing-requirement-identification: backlog
+  5-4-requirement-categorization: backlog
+  5-5-implementability-validation: backlog
+  5-6-contradiction-flagging: backlog
+  5-7-escalation-to-pm: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: PM Agent (7 stories)
+  epic-6: backlog
+  6-1-create-pm-agent-node: backlog
+  6-2-transform-requirements-to-stories: backlog
+  6-3-ac-testability-validation: backlog
+  6-4-story-prioritization: backlog
+  6-5-dependency-identification: backlog
+  6-6-epic-breakdown: backlog
+  6-7-escalation-to-analyst: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Architect Agent (8 stories)
+  epic-7: backlog
+  7-1-create-architect-agent-node: backlog
+  7-2-12-factor-design-generation: backlog
+  7-3-adr-generation: backlog
+  7-4-quality-attribute-evaluation: backlog
+  7-5-risk-identification: backlog
+  7-6-tech-stack-constraint-design: backlog
+  7-7-atam-review: backlog
+  7-8-pattern-matching-to-codebase: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: Dev Agent (8 stories)
+  epic-8: backlog
+  8-1-create-dev-agent-node: backlog
+  8-2-maintainable-code-generation: backlog
+  8-3-unit-test-generation: backlog
+  8-4-integration-test-generation: backlog
+  8-5-documentation-generation: backlog
+  8-6-dod-validation: backlog
+  8-7-pattern-following: backlog
+  8-8-communicative-commits: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9: TEA Agent (8 stories)
+  epic-9: backlog
+  9-1-create-tea-agent-node: backlog
+  9-2-coverage-validation: backlog
+  9-3-test-suite-execution: backlog
+  9-4-confidence-scoring: backlog
+  9-5-risk-categorization: backlog
+  9-6-testability-audit: backlog
+  9-7-deployment-blocking: backlog
+  9-8-gap-analysis-reports: backlog
+  epic-9-retrospective: optional
+
+  # Epic 10: Orchestration & SM Agent (16 stories)
+  epic-10: backlog
+  10-1-create-langgraph-workflow: backlog
+  10-2-sm-agent-node-implementation: backlog
+  10-3-sprint-planning: backlog
+  10-4-task-delegation: backlog
+  10-5-health-monitoring: backlog
+  10-6-circular-logic-detection: backlog
+  10-7-conflict-mediation: backlog
+  10-8-agent-handoff-management: backlog
+  10-9-sprint-progress-tracking: backlog
+  10-10-emergency-protocols: backlog
+  10-11-priority-scoring: backlog
+  10-12-velocity-tracking: backlog
+  10-13-context-injection: backlog
+  10-14-human-escalation: backlog
+  10-15-rollback-coordination: backlog
+  10-16-health-telemetry-dashboard-data: backlog
+  epic-10-retrospective: optional
+
+  # Epic 11: Audit Trail & Observability (8 stories)
+  epic-11: backlog
+  11-1-decision-logging: backlog
+  11-2-requirement-traceability: backlog
+  11-3-human-readable-audit-view: backlog
+  11-4-audit-export: backlog
+  11-5-cross-agent-correlation: backlog
+  11-6-token-cost-tracking: backlog
+  11-7-audit-filtering: backlog
+  11-8-auto-adr-generation: backlog
+  epic-11-retrospective: optional
+
+  # Epic 12: CLI Interface (9 stories)
+  epic-12: backlog
+  12-1-typer-cli-setup: backlog
+  12-2-yolo-init-command: backlog
+  12-3-yolo-seed-command: backlog
+  12-4-yolo-run-command: backlog
+  12-5-yolo-status-command: backlog
+  12-6-yolo-logs-command: backlog
+  12-7-yolo-tune-command: backlog
+  12-8-yolo-config-command: backlog
+  12-9-real-time-activity-display: backlog
+  epic-12-retrospective: optional
+
+  # Epic 13: Python SDK (6 stories)
+  epic-13: backlog
+  13-1-sdk-client-class: backlog
+  13-2-programmatic-init-seed-run: backlog
+  13-3-audit-trail-access: backlog
+  13-4-configuration-api: backlog
+  13-5-agent-hooks: backlog
+  13-6-event-emission: backlog
+  epic-13-retrospective: optional
+
+  # Epic 14: MCP Integration (6 stories)
+  epic-14: backlog
+  14-1-fastmcp-server-setup: backlog
+  14-2-yolo-seed-mcp-tool: backlog
+  14-3-yolo-run-mcp-tool: backlog
+  14-4-yolo-status-mcp-tool: backlog
+  14-5-yolo-audit-mcp-tool: backlog
+  14-6-claude-code-compatibility: backlog
+  epic-14-retrospective: optional
