@@ -10,7 +10,7 @@ from rich.panel import Panel
 console = Console()
 
 # PEP 621 compliant pyproject.toml template
-PYPROJECT_TEMPLATE = '''[project]
+PYPROJECT_TEMPLATE = """[project]
 name = "{name}"
 version = "0.1.0"
 description = "Autonomous multi-agent AI development system using BMad Method"
@@ -84,9 +84,9 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-'''
+"""
 
-README_TEMPLATE = '''# {name}
+README_TEMPLATE = """# {name}
 
 Autonomous multi-agent AI development system using BMad Method.
 
@@ -108,16 +108,14 @@ yolo --help
 uv sync --all-extras
 uv run pytest
 ```
-'''
+"""
 
 
 def validate_python_version() -> bool:
     """Validate Python version is >= 3.10."""
     major, minor = sys.version_info[:2]
     if major < 3 or (major == 3 and minor < 10):
-        console.print(
-            f"[red]Error: Python 3.10+ required. Found {major}.{minor}[/red]"
-        )
+        console.print(f"[red]Error: Python 3.10+ required. Found {major}.{minor}[/red]")
         return False
     return True
 

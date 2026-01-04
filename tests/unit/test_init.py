@@ -1,8 +1,11 @@
 """Unit tests for the init command."""
 
+from __future__ import annotations
+
 import sys
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import patch
 
 from yolo_developer.cli.commands.init import (
@@ -55,7 +58,7 @@ class TestPyprojectTemplate:
 class TestRequiredDependencies:
     """Tests for required dependencies in template."""
 
-    REQUIRED_DEPS = [
+    REQUIRED_DEPS: ClassVar[list[str]] = [
         "langgraph>=1.0.5",
         "langchain-core",
         "langchain-anthropic",
@@ -218,9 +221,7 @@ class TestCreatePyprojectToml:
         """Test that file contains author information."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            create_pyproject_toml(
-                project_path, "test-project", "John Doe", "john@example.com"
-            )
+            create_pyproject_toml(project_path, "test-project", "John Doe", "john@example.com")
             content = (project_path / "pyproject.toml").read_text()
             assert "John Doe" in content
             assert "john@example.com" in content
@@ -302,9 +303,7 @@ class TestRunUvSync:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
             with patch("subprocess.run") as mock_run:
-                mock_run.side_effect = subprocess.CalledProcessError(
-                    1, "uv", stderr="error"
-                )
+                mock_run.side_effect = subprocess.CalledProcessError(1, "uv", stderr="error")
                 result = run_uv_sync(project_path)
                 assert result is False
 
@@ -326,9 +325,7 @@ class TestInitCommand:
         """Test that init_command creates a complete project structure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir) / "test-project"
-            with patch(
-                "yolo_developer.cli.commands.init.run_uv_sync", return_value=True
-            ):
+            with patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True):
                 init_command(
                     path=str(project_path),
                     name="test-project",
@@ -347,9 +344,7 @@ class TestInitCommand:
         """Test that init_command creates pyproject.toml with correct name."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir) / "my-project"
-            with patch(
-                "yolo_developer.cli.commands.init.run_uv_sync", return_value=True
-            ):
+            with patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True):
                 init_command(
                     path=str(project_path),
                     name="my-cool-project",
@@ -364,9 +359,7 @@ class TestInitCommand:
         """Test that init_command uses default author info when not provided."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir) / "default-project"
-            with patch(
-                "yolo_developer.cli.commands.init.run_uv_sync", return_value=True
-            ):
+            with patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True):
                 init_command(path=str(project_path))
 
             content = (project_path / "pyproject.toml").read_text()

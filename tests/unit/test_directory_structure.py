@@ -1,7 +1,10 @@
 """Unit tests for directory structure creation (Story 1.2)."""
 
+from __future__ import annotations
+
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 
 from yolo_developer.cli.commands.init import (
     create_conftest,
@@ -13,7 +16,7 @@ from yolo_developer.cli.commands.init import (
 class TestSourceModulesCreated:
     """Tests that all 12 source modules are created per architecture spec."""
 
-    EXPECTED_MODULES = [
+    EXPECTED_MODULES: ClassVar[list[str]] = [
         "cli",
         "sdk",
         "mcp",
@@ -92,16 +95,14 @@ class TestGatesGatesSubdirectory:
             project_path = Path(tmpdir)
             create_directory_structure(project_path)
 
-            init_file = (
-                project_path / "src" / "yolo_developer" / "gates" / "gates" / "__init__.py"
-            )
+            init_file = project_path / "src" / "yolo_developer" / "gates" / "gates" / "__init__.py"
             assert init_file.is_file()
 
 
 class TestTestDirectoriesCreated:
     """Tests for test directory structure."""
 
-    EXPECTED_TEST_DIRS = [
+    EXPECTED_TEST_DIRS: ClassVar[list[str]] = [
         "unit",
         "unit/agents",
         "unit/gates",
