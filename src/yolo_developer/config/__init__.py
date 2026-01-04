@@ -7,10 +7,16 @@ Example:
     >>> config = load_config()  # Loads from ./yolo.yaml if it exists
     >>> config.llm.cheap_model
     'gpt-4o-mini'
+
+Export/Import Example:
+    >>> from yolo_developer.config import export_config, import_config
+    >>> export_config(config, Path("exported.yaml"))
+    >>> import_config(Path("exported.yaml"), Path("yolo.yaml"))
 """
 
 from __future__ import annotations
 
+from yolo_developer.config.export import export_config, import_config
 from yolo_developer.config.loader import ConfigurationError, load_config
 from yolo_developer.config.schema import (
     LLMConfig,
@@ -32,6 +38,8 @@ __all__ = [
     "ValidationIssue",
     "ValidationResult",
     "YoloConfig",
+    "export_config",
+    "import_config",
     "load_config",
     "validate_config",
 ]

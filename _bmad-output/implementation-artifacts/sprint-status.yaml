@@ -40,7 +40,7 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: Project Initialization & Configuration (8 stories)
-  epic-1: in-progress
+  epic-1: done
   1-1-initialize-python-project-with-uv: done
   1-2-create-project-directory-structure: done
   1-3-set-up-code-quality-tooling: done
@@ -48,7 +48,7 @@ development_status:
   1-5-load-configuration-from-yaml-files: done
   1-6-support-environment-variable-overrides: done
   1-7-validate-configuration-on-load: done
-  1-8-export-and-import-project-configurations: backlog
+  1-8-export-and-import-project-configurations: done
   epic-1-retrospective: optional
 
   # Epic 2: Memory & Context Layer (8 stories)
