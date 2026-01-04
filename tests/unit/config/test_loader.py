@@ -519,9 +519,12 @@ class TestAPIKeyLoading:
             load_config(yaml_file)
 
         # Should have logged a warning about missing API keys
+        # New format: "llm.openai_api_key: OpenAI models configured..."
         assert len(caplog.records) > 0
         warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("api key" in msg.lower() for msg in warning_messages)
+        assert any(
+            "openai" in msg.lower() or "anthropic" in msg.lower() for msg in warning_messages
+        )
 
     def test_no_warning_logged_when_api_key_set(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -530,15 +533,20 @@ class TestAPIKeyLoading:
         import logging
 
         yaml_file = tmp_path / "yolo.yaml"
+        # Set both API keys to avoid any provider-specific warnings
         yaml_file.write_text("project_name: test-project\n")
         monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-test-key")
+        monkeypatch.setenv("YOLO_LLM__ANTHROPIC_API_KEY", "sk-ant-test-key")
 
         with caplog.at_level(logging.WARNING):
             load_config(yaml_file)
 
-        # Should NOT have logged any API key warnings
+        # Should NOT have logged any API key warnings (OpenAI or Anthropic)
         warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
-        assert not any("api key" in msg.lower() for msg in warning_messages)
+        api_key_warnings = [
+            msg for msg in warning_messages if "openai" in msg.lower() or "anthropic" in msg.lower()
+        ]
+        assert len(api_key_warnings) == 0
 
 
 class TestLoaderCodeQuality:

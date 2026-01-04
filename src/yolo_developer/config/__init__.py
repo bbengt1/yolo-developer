@@ -18,12 +18,20 @@ from yolo_developer.config.schema import (
     QualityConfig,
     YoloConfig,
 )
+from yolo_developer.config.validators import (
+    ValidationIssue,
+    ValidationResult,
+    validate_config,
+)
 
 __all__ = [
     "ConfigurationError",
     "LLMConfig",
     "MemoryConfig",
     "QualityConfig",
+    "ValidationIssue",
+    "ValidationResult",
     "YoloConfig",
     "load_config",
+    "validate_config",
 ]

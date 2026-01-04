@@ -47,7 +47,7 @@ development_status:
   1-4-implement-configuration-schema-with-pydantic: done
   1-5-load-configuration-from-yaml-files: done
   1-6-support-environment-variable-overrides: done
-  1-7-validate-configuration-on-load: backlog
+  1-7-validate-configuration-on-load: done
   1-8-export-and-import-project-configurations: backlog
   epic-1-retrospective: optional
 

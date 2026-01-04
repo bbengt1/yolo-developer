@@ -19,6 +19,7 @@ import yaml
 from pydantic import ValidationError
 
 from yolo_developer.config.schema import YoloConfig
+from yolo_developer.config.validators import validate_config
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,17 @@ def load_config(config_path: Path | None = None) -> YoloConfig:
 
     config = _create_config(merged_data)
 
-    # Validate API keys and log warnings (AC5 - Story 1.6)
-    api_key_warnings = config.validate_api_keys()
-    for warning in api_key_warnings:
-        logger.warning(warning)
+    # Run comprehensive validation (Story 1.7)
+    validation_result = validate_config(config)
+
+    # Raise ConfigurationError if any validation errors exist
+    if not validation_result.is_valid:
+        error_messages = [f"  {err.field}: {err.message}" for err in validation_result.errors]
+        raise ConfigurationError("Configuration validation failed:\n" + "\n".join(error_messages))
+
+    # Log warnings for non-fatal validation issues (e.g., missing API keys)
+    for warning in validation_result.warnings:
+        logger.warning("%s: %s", warning.field, warning.message)
 
     return config
 
