@@ -1,6 +1,6 @@
 # Story 1.6: Support Environment Variable Overrides
 
-Status: review
+Status: done
 
 ## Story
 
