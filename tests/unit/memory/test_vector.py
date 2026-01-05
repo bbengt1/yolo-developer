@@ -325,3 +325,207 @@ class TestPersistence:
         assert results[0].key == "persist-key"
         assert results[0].content == "Persistent content"
         assert results[0].metadata == {"persisted": "true"}
+
+
+class TestStoreDecision:
+    """Tests for store_decision method."""
+
+    @pytest.mark.asyncio
+    async def test_store_decision_stores_with_embedding(self, tmp_path: Any) -> None:
+        """store_decision should store decision content for semantic search."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+        decision = Decision(
+            agent="analyst",
+            summary="Chose REST over GraphQL",
+            rationale="Simpler implementation for MVP",
+        )
+
+        key = await memory.store_decision(decision)
+
+        assert key is not None
+        assert key.startswith("decision-analyst-")
+
+    @pytest.mark.asyncio
+    async def test_store_decision_searchable_by_summary(self, tmp_path: Any) -> None:
+        """Stored decisions should be searchable by summary content."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+        decision = Decision(
+            agent="architect",
+            summary="Selected PostgreSQL as database",
+            rationale="Better for complex queries and ACID compliance",
+        )
+
+        await memory.store_decision(decision)
+
+        # Should be searchable
+        results = await memory.search_similar("PostgreSQL database", k=1)
+        assert len(results) == 1
+        assert "PostgreSQL" in results[0].content
+
+    @pytest.mark.asyncio
+    async def test_store_decision_preserves_metadata(self, tmp_path: Any) -> None:
+        """store_decision should preserve decision metadata."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+        decision = Decision(
+            agent="pm",
+            summary="Prioritized security features",
+            rationale="User requirement for compliance",
+            related_artifacts=("req-001", "req-002"),
+        )
+
+        await memory.store_decision(decision)
+
+        results = await memory.search_similar("security features", k=1)
+        assert len(results) == 1
+        assert results[0].metadata["type"] == "decision"
+        assert results[0].metadata["agent"] == "pm"
+        assert "timestamp" in results[0].metadata
+
+    @pytest.mark.asyncio
+    async def test_store_decision_with_graph_store(self, tmp_path: Any) -> None:
+        """store_decision should store relationships when graph_store provided."""
+        from yolo_developer.memory import ChromaMemory, JSONGraphStore
+        from yolo_developer.orchestrator import Decision
+
+        graph_path = tmp_path / "graph.json"
+        graph = JSONGraphStore(persist_path=str(graph_path))
+        memory = ChromaMemory(persist_directory=str(tmp_path), graph_store=graph)
+
+        decision = Decision(
+            agent="dev",
+            summary="Used async pattern",
+            rationale="Performance requirement",
+            related_artifacts=("story-001", "req-003"),
+        )
+
+        key = await memory.store_decision(decision)
+
+        # Should have stored relationships
+        related = await graph.get_related(key)
+        assert len(related) >= 2
+        assert "story-001" in related
+        assert "req-003" in related
+
+
+class TestQueryDecisions:
+    """Tests for query_decisions method."""
+
+    @pytest.mark.asyncio
+    async def test_query_decisions_returns_only_decisions(self, tmp_path: Any) -> None:
+        """query_decisions should return only decision-type results."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+
+        # Store a regular embedding
+        await memory.store_embedding(
+            key="req-001",
+            content="User authentication requirement",
+            metadata={"type": "requirement"},
+        )
+
+        # Store a decision
+        decision = Decision(
+            agent="analyst",
+            summary="OAuth2 for authentication",
+            rationale="Industry standard",
+        )
+        await memory.store_decision(decision)
+
+        # Query decisions should only return decisions
+        results = await memory.query_decisions("authentication", k=5)
+
+        assert len(results) == 1
+        assert results[0].metadata["type"] == "decision"
+
+    @pytest.mark.asyncio
+    async def test_query_decisions_filters_by_agent(self, tmp_path: Any) -> None:
+        """query_decisions should filter by agent when specified."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+
+        # Store decisions from different agents
+        await memory.store_decision(
+            Decision(agent="analyst", summary="Analysis decision", rationale="reason")
+        )
+        await memory.store_decision(Decision(agent="pm", summary="PM decision", rationale="reason"))
+        await memory.store_decision(
+            Decision(agent="analyst", summary="Another analysis", rationale="reason")
+        )
+
+        # Query with agent filter
+        results = await memory.query_decisions("decision", agent="analyst", k=5)
+
+        assert len(results) == 2
+        for result in results:
+            assert result.metadata["agent"] == "analyst"
+
+    @pytest.mark.asyncio
+    async def test_query_decisions_respects_k_limit(self, tmp_path: Any) -> None:
+        """query_decisions should respect the k parameter."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+
+        # Store multiple decisions
+        for i in range(5):
+            await memory.store_decision(
+                Decision(agent="dev", summary=f"Decision {i}", rationale="reason")
+            )
+
+        results = await memory.query_decisions("decision", k=2)
+
+        assert len(results) <= 2
+
+    @pytest.mark.asyncio
+    async def test_query_decisions_returns_empty_when_no_decisions(self, tmp_path: Any) -> None:
+        """query_decisions should return empty list when no decisions stored."""
+        from yolo_developer.memory import ChromaMemory
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+
+        # Store only regular embeddings
+        await memory.store_embedding(
+            key="doc-001",
+            content="Some document",
+            metadata={"type": "document"},
+        )
+
+        results = await memory.query_decisions("document", k=5)
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_query_decisions_semantic_search(self, tmp_path: Any) -> None:
+        """query_decisions should use semantic search for matching."""
+        from yolo_developer.memory import ChromaMemory
+        from yolo_developer.orchestrator import Decision
+
+        memory = ChromaMemory(persist_directory=str(tmp_path))
+
+        await memory.store_decision(
+            Decision(
+                agent="architect",
+                summary="Microservices architecture selected",
+                rationale="Scalability and team autonomy",
+            )
+        )
+
+        # Should find via semantic match, not exact text
+        results = await memory.query_decisions("distributed services", k=1)
+
+        assert len(results) == 1
+        assert "microservices" in results[0].content.lower()

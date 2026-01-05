@@ -22,10 +22,15 @@ Example:
 Security Note:
     The persist_directory should be within the project's .yolo directory
     to ensure proper isolation between projects.
+
+Thread Safety:
+    This class uses an asyncio.Lock to ensure thread-safe access to the
+    ChromaDB collection in concurrent async contexts.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
@@ -40,6 +45,7 @@ from tenacity import (
 )
 
 from yolo_developer.memory.protocol import MemoryResult
+from yolo_developer.orchestrator.context import Decision
 
 if TYPE_CHECKING:
     from yolo_developer.memory.graph import JSONGraphStore
@@ -152,6 +158,7 @@ class ChromaMemory:
             metadata={"hnsw:space": "cosine"},  # Use cosine similarity
         )
         self._graph_store = graph_store
+        self._lock = asyncio.Lock()  # Protect concurrent access to collection
 
     @_chromadb_retry
     def _upsert(
@@ -215,8 +222,9 @@ class ChromaMemory:
             # Convert Any values to ChromaDB-compatible types
             metadatas = cast(Metadatas, [dict(metadata)])
 
-        # Use retry-wrapped method for transient error handling
-        self._upsert(key, content, metadatas)
+        # Use lock to protect concurrent access, retry-wrapped for transient errors
+        async with self._lock:
+            self._upsert(key, content, metadatas)
 
     async def search_similar(
         self,
@@ -242,13 +250,15 @@ class ChromaMemory:
             Scores are converted from ChromaDB's cosine distance (0-2 range,
             lower = more similar) to similarity (higher = more similar).
         """
-        # Handle empty collection case (uses retry-wrapped method)
-        count = self._count()
-        if count == 0:
-            return []
+        # Use lock to protect concurrent access
+        async with self._lock:
+            # Handle empty collection case (uses retry-wrapped method)
+            count = self._count()
+            if count == 0:
+                return []
 
-        # Use retry-wrapped method for transient error handling
-        results = self._query(query, min(k, count))
+            # Use retry-wrapped method for transient error handling
+            results = self._query(query, min(k, count))
 
         # Convert to MemoryResult objects
         memory_results: list[MemoryResult] = []
@@ -317,3 +327,119 @@ class ChromaMemory:
                     "relation": relation,
                 },
             )
+
+    async def store_decision(
+        self,
+        decision: Decision,
+    ) -> str:
+        """Store a decision for later semantic retrieval.
+
+        Stores the decision content with its metadata for semantic search.
+        If a graph store is configured, also stores relationships to
+        related artifacts.
+
+        Args:
+            decision: The Decision dataclass instance to store.
+
+        Returns:
+            The key used to store the decision (format: decision-{agent}-{timestamp}).
+
+        Example:
+            >>> from yolo_developer.orchestrator import Decision
+            >>> from yolo_developer.memory import ChromaMemory
+            >>>
+            >>> memory = ChromaMemory(persist_directory=".yolo/memory")
+            >>> decision = Decision(
+            ...     agent="analyst",
+            ...     summary="Selected REST API",
+            ...     rationale="Simpler for MVP",
+            ... )
+            >>> key = await memory.store_decision(decision)
+            >>> print(key)
+            decision-analyst-2024-01-01T12:00:00+00:00
+        """
+        # Ensure we have a proper Decision instance
+        if not isinstance(decision, Decision):
+            raise TypeError(f"Expected Decision, got {type(decision).__name__}")
+
+        # Generate unique key based on agent and timestamp
+        key = f"decision-{decision.agent}-{decision.timestamp.isoformat()}"
+
+        # Create content from summary and rationale for semantic search
+        content = f"{decision.summary}: {decision.rationale}"
+
+        # Build metadata
+        metadata: dict[str, Any] = {
+            "type": "decision",
+            "agent": decision.agent,
+            "timestamp": decision.timestamp.isoformat(),
+        }
+
+        # Store related artifacts as comma-separated string (ChromaDB doesn't support lists)
+        if decision.related_artifacts:
+            metadata["related_artifacts"] = ",".join(decision.related_artifacts)
+
+        # Store the embedding
+        await self.store_embedding(key=key, content=content, metadata=metadata)
+
+        # Store relationships in graph if configured
+        if self._graph_store is not None and decision.related_artifacts:
+            for artifact in decision.related_artifacts:
+                await self._graph_store.store_relationship(
+                    source=key,
+                    target=artifact,
+                    relation="relates_to",
+                )
+
+        logger.debug(
+            "Stored decision",
+            extra={
+                "key": key,
+                "agent": decision.agent,
+                "related_artifacts": decision.related_artifacts,
+            },
+        )
+
+        return key
+
+    async def query_decisions(
+        self,
+        query: str,
+        agent: str | None = None,
+        k: int = 5,
+    ) -> list[MemoryResult]:
+        """Query decisions semantically.
+
+        Searches for decisions matching the query using semantic similarity.
+        Results can be filtered by agent and are limited to k results.
+
+        Args:
+            query: Semantic search query text.
+            agent: Optional filter to only return decisions by this agent.
+            k: Maximum number of results to return. Defaults to 5.
+
+        Returns:
+            List of matching MemoryResult objects, filtered to only decisions.
+
+        Example:
+            >>> from yolo_developer.memory import ChromaMemory
+            >>>
+            >>> memory = ChromaMemory(persist_directory=".yolo/memory")
+            >>> results = await memory.query_decisions("database choice", agent="architect")
+            >>> for result in results:
+            ...     print(f"{result.key}: {result.metadata['agent']}")
+        """
+        # Over-fetch to account for filtering, but cap to prevent excessive queries
+        # Multiplier of 3 handles typical filtering, cap of 100 prevents abuse
+        fetch_k = min(k * 3, max(k + 50, 100))
+        results = await self.search_similar(query, k=fetch_k)
+
+        # Filter to only decisions
+        decision_results = [r for r in results if r.metadata.get("type") == "decision"]
+
+        # Filter by agent if specified
+        if agent is not None:
+            decision_results = [r for r in decision_results if r.metadata.get("agent") == agent]
+
+        # Return up to k results
+        return decision_results[:k]
