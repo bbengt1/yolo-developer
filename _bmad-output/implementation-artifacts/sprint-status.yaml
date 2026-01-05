@@ -67,7 +67,7 @@ development_status:
   epic-3: in-progress
   3-1-create-quality-gate-decorator: done
   3-2-implement-testability-gate: done
-  3-3-implement-ac-measurability-gate: backlog
+  3-3-implement-ac-measurability-gate: done
   3-4-implement-architecture-validation-gate: backlog
   3-5-implement-definition-of-done-gate: backlog
   3-6-implement-confidence-scoring: backlog
