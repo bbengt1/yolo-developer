@@ -21,9 +21,9 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from yolo_developer.memory.analyzers.naming import NamingAnalyzer
 from yolo_developer.memory.analyzers.structure import StructureAnalyzer
@@ -150,9 +150,7 @@ class PatternLearner:
         )
 
         # Step 1: Scan the codebase
-        scan_result = await self._scanner.scan(
-            root_path, progress_callback=progress_callback
-        )
+        scan_result = await self._scanner.scan(root_path, progress_callback=progress_callback)
 
         if not scan_result.files:
             logger.info(
@@ -250,7 +248,7 @@ class PatternLearner:
                     "Cache hit for patterns by type",
                     extra={"pattern_type": pattern_type.value},
                 )
-                return entry.data
+                return cast(list[CodePattern], entry.data)
 
         # Cache miss - fetch from store
         patterns = await self._pattern_store.get_patterns_by_type(pattern_type)
@@ -304,9 +302,7 @@ class PatternLearner:
         else:
             # Search each pattern type and combine results
             for pattern_type in pattern_types:
-                type_patterns = await self._pattern_store.get_patterns_by_type(
-                    pattern_type
-                )
+                type_patterns = await self._pattern_store.get_patterns_by_type(pattern_type)
                 all_patterns.extend(type_patterns)
 
         # Sort by confidence (descending)

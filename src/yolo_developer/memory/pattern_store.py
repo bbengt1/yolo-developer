@@ -208,9 +208,7 @@ class ChromaPatternStore:
             # Reconstruct CodePattern from metadata
             try:
                 pattern = self._metadata_to_pattern(metadata)
-                pattern_results.append(
-                    PatternResult(pattern=pattern, similarity=similarity)
-                )
+                pattern_results.append(PatternResult(pattern=pattern, similarity=similarity))
             except Exception as e:
                 logger.warning(
                     "Failed to reconstruct pattern from metadata",

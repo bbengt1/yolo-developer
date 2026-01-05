@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
 from yolo_developer.memory.pattern_store import ChromaPatternStore
+from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
 
 
 class TestChromaPatternStoreInit:
@@ -94,9 +94,7 @@ class TestStorePattern:
         assert id1 == id2
 
     @pytest.mark.asyncio
-    async def test_store_multiple_patterns(
-        self, store: ChromaPatternStore
-    ) -> None:
+    async def test_store_multiple_patterns(self, store: ChromaPatternStore) -> None:
         """Test storing multiple different patterns."""
         pattern1 = CodePattern(
             pattern_type=PatternType.NAMING_FUNCTION,
@@ -172,9 +170,7 @@ class TestSearchPatterns:
             assert isinstance(result.similarity, float)
 
     @pytest.mark.asyncio
-    async def test_search_filters_by_type(
-        self, populated_store: ChromaPatternStore
-    ) -> None:
+    async def test_search_filters_by_type(self, populated_store: ChromaPatternStore) -> None:
         """Test search can filter by pattern type."""
         results = await populated_store.search_patterns(
             pattern_type=PatternType.NAMING_FUNCTION,
@@ -186,18 +182,14 @@ class TestSearchPatterns:
             assert result.pattern.pattern_type == PatternType.NAMING_FUNCTION
 
     @pytest.mark.asyncio
-    async def test_search_respects_k_parameter(
-        self, populated_store: ChromaPatternStore
-    ) -> None:
+    async def test_search_respects_k_parameter(self, populated_store: ChromaPatternStore) -> None:
         """Test search respects k parameter."""
         results = await populated_store.search_patterns(query="naming", k=1)
 
         assert len(results) <= 1
 
     @pytest.mark.asyncio
-    async def test_search_returns_empty_list_no_matches(
-        self, store: ChromaPatternStore
-    ) -> None:
+    async def test_search_returns_empty_list_no_matches(self, store: ChromaPatternStore) -> None:
         """Test search returns empty list when no patterns stored."""
         results = await store.search_patterns(query="anything")
 
@@ -257,9 +249,7 @@ class TestGetPatternsByType:
         self, populated_store: ChromaPatternStore
     ) -> None:
         """Test getting patterns by type returns matching patterns."""
-        results = await populated_store.get_patterns_by_type(
-            PatternType.NAMING_FUNCTION
-        )
+        results = await populated_store.get_patterns_by_type(PatternType.NAMING_FUNCTION)
 
         assert len(results) == 2
         for pattern in results:
@@ -270,9 +260,7 @@ class TestGetPatternsByType:
         self, populated_store: ChromaPatternStore
     ) -> None:
         """Test getting patterns returns empty list when no matches."""
-        results = await populated_store.get_patterns_by_type(
-            PatternType.STRUCTURE_DIRECTORY
-        )
+        results = await populated_store.get_patterns_by_type(PatternType.STRUCTURE_DIRECTORY)
 
         assert results == []
 
@@ -345,12 +333,8 @@ class TestProjectIsolation:
         await store2.store_pattern(pattern2)
 
         # Verify isolation
-        project1_patterns = await store1.get_patterns_by_type(
-            PatternType.NAMING_FUNCTION
-        )
-        project2_patterns = await store2.get_patterns_by_type(
-            PatternType.NAMING_FUNCTION
-        )
+        project1_patterns = await store1.get_patterns_by_type(PatternType.NAMING_FUNCTION)
+        project2_patterns = await store2.get_patterns_by_type(PatternType.NAMING_FUNCTION)
 
         assert len(project1_patterns) == 1
         assert project1_patterns[0].value == "snake_case"

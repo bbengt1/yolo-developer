@@ -17,6 +17,7 @@ from yolo_developer.memory.analyzers.naming import (
     NamingAnalyzer,
     detect_style,
 )
+from yolo_developer.memory.analyzers.structure import StructureAnalyzer
 from yolo_developer.memory.patterns import CodePattern, PatternType
 
 
@@ -177,18 +178,14 @@ class order_handler:
         assert patterns == []
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_snake_case_functions(
-        self, snake_case_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_snake_case_functions(self, snake_case_codebase: Path) -> None:
         """Test analyzer detects snake_case function naming."""
         analyzer = NamingAnalyzer()
         files = list(snake_case_codebase.rglob("*.py"))
         patterns = await analyzer.analyze(files)
 
         # Should detect function naming pattern
-        function_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION
-        ]
+        function_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION]
         assert len(function_patterns) == 1
 
         pattern = function_patterns[0]
@@ -198,18 +195,14 @@ class order_handler:
         assert "get_user" in pattern.examples
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_pascal_case_classes(
-        self, pascal_case_classes: Path
-    ) -> None:
+    async def test_analyze_detects_pascal_case_classes(self, pascal_case_classes: Path) -> None:
         """Test analyzer detects PascalCase class naming."""
         analyzer = NamingAnalyzer()
         files = list(pascal_case_classes.rglob("*.py"))
         patterns = await analyzer.analyze(files)
 
         # Should detect class naming pattern
-        class_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_CLASS
-        ]
+        class_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_CLASS]
         assert len(class_patterns) == 1
 
         pattern = class_patterns[0]
@@ -225,9 +218,7 @@ class order_handler:
         patterns = await analyzer.analyze(files)
 
         # With mixed naming, confidence should be lower
-        function_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION
-        ]
+        function_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION]
         if function_patterns:
             # Confidence should be 0.5 (1 snake_case, 1 camelCase)
             assert function_patterns[0].confidence == 0.5
@@ -256,9 +247,7 @@ def valid_function():
         patterns = await analyzer.analyze(files)
 
         # Should still return patterns from valid file
-        function_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION
-        ]
+        function_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION]
         assert len(function_patterns) == 1
         assert "valid_function" in function_patterns[0].examples
 
@@ -266,26 +255,20 @@ def valid_function():
     async def test_analyze_limits_examples(self, tmp_path: Path) -> None:
         """Test analyzer limits examples to prevent bloat."""
         # Create a file with many functions
-        funcs = "\n".join(
-            [f"def func_{i}():\n    pass\n" for i in range(20)]
-        )
+        funcs = "\n".join([f"def func_{i}():\n    pass\n" for i in range(20)])
         (tmp_path / "many_funcs.py").write_text(funcs)
 
         analyzer = NamingAnalyzer()
         files = list(tmp_path.rglob("*.py"))
         patterns = await analyzer.analyze(files)
 
-        function_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION
-        ]
+        function_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_FUNCTION]
         assert len(function_patterns) == 1
         # Examples should be limited to 10
         assert len(function_patterns[0].examples) <= 10
 
     @pytest.mark.asyncio
-    async def test_analyze_returns_code_pattern_instances(
-        self, snake_case_codebase: Path
-    ) -> None:
+    async def test_analyze_returns_code_pattern_instances(self, snake_case_codebase: Path) -> None:
         """Test analyzer returns proper CodePattern instances."""
         analyzer = NamingAnalyzer()
         files = list(snake_case_codebase.rglob("*.py"))
@@ -322,18 +305,14 @@ class MyClass:
         return tmp_path
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_variable_naming(
-        self, variable_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_variable_naming(self, variable_codebase: Path) -> None:
         """Test analyzer can detect variable naming patterns."""
         analyzer = NamingAnalyzer()
         files = list(variable_codebase.rglob("*.py"))
         patterns = await analyzer.analyze(files)
 
         # Should detect variable naming (if implemented)
-        variable_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.NAMING_VARIABLE
-        ]
+        _variable_patterns = [p for p in patterns if p.pattern_type == PatternType.NAMING_VARIABLE]
         # Note: Variable naming detection is more complex,
         # so we just verify the analyzer doesn't crash
         # Full implementation may or may not detect variables
@@ -343,8 +322,6 @@ class MyClass:
 # ==============================================================================
 # Structure Analyzer Tests
 # ==============================================================================
-
-from yolo_developer.memory.analyzers.structure import StructureAnalyzer
 
 
 class TestStructureAnalyzer:
@@ -454,144 +431,102 @@ from . import config
         patterns = await analyzer.analyze(src_layout_codebase)
 
         # Should detect directory structure pattern
-        dir_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY
-        ]
+        dir_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY]
         assert len(dir_patterns) >= 1
 
         # Check for src layout detection
-        src_pattern = next(
-            (p for p in dir_patterns if p.name == "directory_layout"), None
-        )
+        src_pattern = next((p for p in dir_patterns if p.name == "directory_layout"), None)
         assert src_pattern is not None
         assert src_pattern.value == "src_layout"
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_flat_layout(
-        self, flat_layout_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_flat_layout(self, flat_layout_codebase: Path) -> None:
         """Test analyzer detects flat directory layout."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(flat_layout_codebase)
 
         # Should detect directory structure pattern
-        dir_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY
-        ]
+        dir_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY]
         assert len(dir_patterns) >= 1
 
         # Check for flat layout detection
-        layout_pattern = next(
-            (p for p in dir_patterns if p.name == "directory_layout"), None
-        )
+        layout_pattern = next((p for p in dir_patterns if p.name == "directory_layout"), None)
         assert layout_pattern is not None
         assert layout_pattern.value == "flat_layout"
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_test_prefix_pattern(
-        self, test_prefix_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_test_prefix_pattern(self, test_prefix_codebase: Path) -> None:
         """Test analyzer detects test_*.py naming pattern."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(test_prefix_codebase)
 
         # Should detect test file pattern
-        file_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE
-        ]
+        file_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE]
         assert len(file_patterns) >= 1
 
-        test_pattern = next(
-            (p for p in file_patterns if p.name == "test_file_pattern"), None
-        )
+        test_pattern = next((p for p in file_patterns if p.name == "test_file_pattern"), None)
         assert test_pattern is not None
         assert test_pattern.value == "test_prefix"
         assert test_pattern.confidence >= 0.9
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_test_suffix_pattern(
-        self, test_suffix_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_test_suffix_pattern(self, test_suffix_codebase: Path) -> None:
         """Test analyzer detects *_test.py naming pattern."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(test_suffix_codebase)
 
         # Should detect test file pattern
-        file_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE
-        ]
+        file_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE]
         assert len(file_patterns) >= 1
 
-        test_pattern = next(
-            (p for p in file_patterns if p.name == "test_file_pattern"), None
-        )
+        test_pattern = next((p for p in file_patterns if p.name == "test_file_pattern"), None)
         assert test_pattern is not None
         assert test_pattern.value == "test_suffix"
         assert test_pattern.confidence >= 0.9
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_absolute_imports(
-        self, absolute_imports_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_absolute_imports(self, absolute_imports_codebase: Path) -> None:
         """Test analyzer detects absolute import style."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(absolute_imports_codebase)
 
         # Should detect import style pattern
-        import_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.IMPORT_STYLE
-        ]
+        import_patterns = [p for p in patterns if p.pattern_type == PatternType.IMPORT_STYLE]
         assert len(import_patterns) >= 1
 
-        import_pattern = next(
-            (p for p in import_patterns if p.name == "import_style"), None
-        )
+        import_pattern = next((p for p in import_patterns if p.name == "import_style"), None)
         assert import_pattern is not None
         assert import_pattern.value == "absolute"
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_relative_imports(
-        self, relative_imports_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_relative_imports(self, relative_imports_codebase: Path) -> None:
         """Test analyzer detects relative import style."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(relative_imports_codebase)
 
         # Should detect import style pattern
-        import_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.IMPORT_STYLE
-        ]
+        import_patterns = [p for p in patterns if p.pattern_type == PatternType.IMPORT_STYLE]
         assert len(import_patterns) >= 1
 
-        import_pattern = next(
-            (p for p in import_patterns if p.name == "import_style"), None
-        )
+        import_pattern = next((p for p in import_patterns if p.name == "import_style"), None)
         assert import_pattern is not None
         assert import_pattern.value == "relative"
 
     @pytest.mark.asyncio
-    async def test_analyze_detects_tests_directory(
-        self, src_layout_codebase: Path
-    ) -> None:
+    async def test_analyze_detects_tests_directory(self, src_layout_codebase: Path) -> None:
         """Test analyzer detects tests directory location."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(src_layout_codebase)
 
         # Should detect test directory pattern
-        dir_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY
-        ]
+        dir_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_DIRECTORY]
 
-        test_dir_pattern = next(
-            (p for p in dir_patterns if p.name == "test_directory"), None
-        )
+        test_dir_pattern = next((p for p in dir_patterns if p.name == "test_directory"), None)
         assert test_dir_pattern is not None
         assert test_dir_pattern.value == "tests"
 
     @pytest.mark.asyncio
-    async def test_analyze_returns_code_pattern_instances(
-        self, src_layout_codebase: Path
-    ) -> None:
+    async def test_analyze_returns_code_pattern_instances(self, src_layout_codebase: Path) -> None:
         """Test analyzer returns proper CodePattern instances."""
         analyzer = StructureAnalyzer()
         patterns = await analyzer.analyze(src_layout_codebase)
@@ -618,13 +553,9 @@ from . import config
         patterns = await analyzer.analyze(tmp_path)
 
         # Should detect test file pattern with lower confidence
-        file_patterns = [
-            p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE
-        ]
+        file_patterns = [p for p in patterns if p.pattern_type == PatternType.STRUCTURE_FILE]
 
-        test_pattern = next(
-            (p for p in file_patterns if p.name == "test_file_pattern"), None
-        )
+        test_pattern = next((p for p in file_patterns if p.name == "test_file_pattern"), None)
         if test_pattern:
             # 2 out of 3 use test_ prefix, so confidence ~0.67
             assert test_pattern.confidence < 1.0

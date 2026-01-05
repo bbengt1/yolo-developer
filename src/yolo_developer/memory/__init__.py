@@ -18,6 +18,12 @@ Exports:
     PatternLearningResult: Result of pattern learning process.
     CodebaseScanner: Scans codebases for source files.
     ScanResult: Result of scanning a codebase.
+    Decision: Dataclass for agent decisions.
+    DecisionType: Enum of decision categories.
+    DecisionResult: Dataclass for decision search results.
+    DecisionFilter: Filter criteria for decision queries.
+    ChromaDecisionStore: ChromaDB-backed decision storage.
+    DecisionQueryEngine: High-level interface for decision queries.
 
 Example:
     >>> from yolo_developer.memory import MemoryStore, MemoryResult, ChromaMemory
@@ -46,6 +52,16 @@ Example:
 
 from __future__ import annotations
 
+from yolo_developer.memory.decision_queries import DecisionQueryEngine
+from yolo_developer.memory.decision_store import ChromaDecisionStore
+from yolo_developer.memory.decisions import (
+    VALID_AGENT_TYPES,
+    Decision,
+    DecisionFilter,
+    DecisionResult,
+    DecisionType,
+    validate_agent_type,
+)
 from yolo_developer.memory.graph import (
     JSONGraphError,
     JSONGraphStore,
@@ -60,11 +76,18 @@ from yolo_developer.memory.scanner import CodebaseScanner, ScanResult
 from yolo_developer.memory.vector import ChromaDBError, ChromaMemory
 
 __all__ = [
+    "VALID_AGENT_TYPES",
     "ChromaDBError",
+    "ChromaDecisionStore",
     "ChromaMemory",
     "ChromaPatternStore",
     "CodePattern",
     "CodebaseScanner",
+    "Decision",
+    "DecisionFilter",
+    "DecisionQueryEngine",
+    "DecisionResult",
+    "DecisionType",
     "JSONGraphError",
     "JSONGraphStore",
     "MemoryResult",
@@ -76,4 +99,5 @@ __all__ = [
     "Relationship",
     "RelationshipResult",
     "ScanResult",
+    "validate_agent_type",
 ]

@@ -154,9 +154,7 @@ def test_process_order():
         assert "structure_directory" in result.pattern_types_found
 
     @pytest.mark.asyncio
-    async def test_learn_from_empty_codebase(
-        self, learner: PatternLearner, tmp_path: Path
-    ) -> None:
+    async def test_learn_from_empty_codebase(self, learner: PatternLearner, tmp_path: Path) -> None:
         """Test learning from empty directory."""
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
@@ -187,9 +185,7 @@ def test_process_order():
         def on_progress(current: int, total: int) -> None:
             progress_calls.append((current, total))
 
-        await learner.learn_from_codebase(
-            sample_codebase, progress_callback=on_progress
-        )
+        await learner.learn_from_codebase(sample_codebase, progress_callback=on_progress)
 
         assert len(progress_calls) > 0
 
@@ -224,22 +220,16 @@ class UserService:
         return learner
 
     @pytest.mark.asyncio
-    async def test_search_patterns_returns_results(
-        self, learned_patterns: PatternLearner
-    ) -> None:
+    async def test_search_patterns_returns_results(self, learned_patterns: PatternLearner) -> None:
         """Test searching for patterns."""
         results = await learned_patterns.search_patterns(query="function naming")
 
         assert len(results) > 0
 
     @pytest.mark.asyncio
-    async def test_get_patterns_by_type(
-        self, learned_patterns: PatternLearner
-    ) -> None:
+    async def test_get_patterns_by_type(self, learned_patterns: PatternLearner) -> None:
         """Test getting patterns by type."""
-        patterns = await learned_patterns.get_patterns_by_type(
-            PatternType.NAMING_FUNCTION
-        )
+        patterns = await learned_patterns.get_patterns_by_type(PatternType.NAMING_FUNCTION)
 
         assert len(patterns) > 0
         assert all(p.pattern_type == PatternType.NAMING_FUNCTION for p in patterns)
@@ -332,9 +322,7 @@ def test_get_user():
                 assert patterns[i].confidence >= patterns[i + 1].confidence
 
     @pytest.mark.asyncio
-    async def test_get_relevant_patterns_respects_k(
-        self, learned_patterns: PatternLearner
-    ) -> None:
+    async def test_get_relevant_patterns_respects_k(self, learned_patterns: PatternLearner) -> None:
         """Test k parameter limits results."""
         patterns = await learned_patterns.get_relevant_patterns(
             context="naming",

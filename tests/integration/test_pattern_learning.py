@@ -212,9 +212,7 @@ class TestUserService:
         await learner.learn_from_codebase(sample_codebase)
 
         # Retrieve function naming patterns
-        function_patterns = await learner.get_patterns_by_type(
-            PatternType.NAMING_FUNCTION
-        )
+        function_patterns = await learner.get_patterns_by_type(PatternType.NAMING_FUNCTION)
         assert len(function_patterns) > 0
         assert function_patterns[0].value == "snake_case"
 
@@ -396,9 +394,7 @@ class TestIncrementalLearning:
     """Integration tests for incremental pattern learning."""
 
     @pytest.mark.asyncio
-    async def test_incremental_learning_updates_patterns(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_incremental_learning_updates_patterns(self, tmp_path: Path) -> None:
         """Test that learning again updates existing patterns."""
         persist_dir = str(tmp_path / "patterns")
         project = tmp_path / "project"

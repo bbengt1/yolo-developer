@@ -34,21 +34,23 @@ logger = logging.getLogger(__name__)
 DEFAULT_EXTENSIONS: frozenset[str] = frozenset({".py"})
 
 # Default directory/file patterns to ignore during scanning
-DEFAULT_IGNORE: frozenset[str] = frozenset({
-    "__pycache__",
-    ".git",
-    "node_modules",
-    ".venv",
-    ".tox",
-    "build",
-    "dist",
-    ".eggs",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "htmlcov",
-    "*.egg-info",
-})
+DEFAULT_IGNORE: frozenset[str] = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        "node_modules",
+        ".venv",
+        ".tox",
+        "build",
+        "dist",
+        ".eggs",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "htmlcov",
+        "*.egg-info",
+    }
+)
 
 
 @dataclass

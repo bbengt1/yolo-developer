@@ -31,6 +31,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from yolo_developer.memory.decisions import (
+        Decision,
+        DecisionFilter,
+        DecisionResult,
+    )
     from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
 
 
@@ -233,5 +238,82 @@ class MemoryStore(Protocol):
 
         Returns:
             List of CodePattern instances of the specified type.
+        """
+        ...
+
+    async def store_decision(self, decision: Decision) -> str:
+        """Store an agent decision and return its ID.
+
+        Stores the decision with its vector embedding for semantic search.
+        Uses upsert behavior - updates existing decision if same ID exists.
+
+        Args:
+            decision: The Decision instance to store.
+
+        Returns:
+            The unique identifier of the stored decision.
+
+        Example:
+            >>> decision = Decision(
+            ...     id="dec-001",
+            ...     agent_type="Architect",
+            ...     context="Database selection",
+            ...     rationale="PostgreSQL for ACID compliance",
+            ... )
+            >>> decision_id = await memory.store_decision(decision)
+        """
+        ...
+
+    async def search_decisions(
+        self,
+        query: str,
+        filters: DecisionFilter | None = None,
+        k: int = 5,
+    ) -> list[DecisionResult]:
+        """Search for decisions by semantic similarity with optional filters.
+
+        Performs semantic similarity search on decision context and rationale.
+        Results can be filtered by agent type, time range, and artifact type.
+
+        Args:
+            query: Search query for semantic matching.
+            filters: Optional DecisionFilter for metadata filtering.
+            k: Maximum number of results to return.
+
+        Returns:
+            List of DecisionResult instances ordered by similarity (highest first).
+
+        Example:
+            >>> from yolo_developer.memory.decisions import DecisionFilter
+            >>> filters = DecisionFilter(agent_type="Architect")
+            >>> results = await memory.search_decisions(
+            ...     "database choice for user data",
+            ...     filters=filters,
+            ...     k=5,
+            ... )
+        """
+        ...
+
+    async def get_decisions_by_agent(
+        self,
+        agent_type: str,
+        limit: int = 10,
+    ) -> list[Decision]:
+        """Get decisions made by a specific agent type.
+
+        Retrieves decisions filtered by agent type, ordered by timestamp
+        (most recent first).
+
+        Args:
+            agent_type: Agent type filter (Analyst, PM, Architect, Dev, SM, TEA).
+            limit: Maximum number of decisions to return.
+
+        Returns:
+            List of Decision instances ordered by timestamp (newest first).
+
+        Example:
+            >>> decisions = await memory.get_decisions_by_agent("Architect", limit=5)
+            >>> for dec in decisions:
+            ...     print(f"{dec.id}: {dec.context[:50]}...")
         """
         ...
