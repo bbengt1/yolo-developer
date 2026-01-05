@@ -6,6 +6,7 @@ Each gate module registers its evaluator automatically on import.
 Available gates:
     - testability: Validates requirements for testability
     - ac_measurability: Validates acceptance criteria for measurability
+    - architecture_validation: Validates architectural decisions against principles
 
 Example:
     >>> # Import to register the testability gate
@@ -32,6 +33,19 @@ Example:
     ...     ac_measurability_evaluator,
     ...     generate_ac_measurability_report,
     ... )
+    >>>
+    >>> # Import architecture validation gate
+    >>> from yolo_developer.gates.gates.architecture_validation import (
+    ...     ArchitectureIssue,
+    ...     TWELVE_FACTOR_PRINCIPLES,
+    ...     SECURITY_ANTI_PATTERNS,
+    ...     check_twelve_factor_compliance,
+    ...     validate_tech_stack,
+    ...     detect_security_anti_patterns,
+    ...     calculate_compliance_score,
+    ...     architecture_validation_evaluator,
+    ...     generate_architecture_report,
+    ... )
 """
 
 from __future__ import annotations
@@ -48,6 +62,18 @@ from yolo_developer.gates.gates.ac_measurability import (
     has_concrete_condition,
     has_gwt_structure,
 )
+from yolo_developer.gates.gates.architecture_validation import (
+    SECURITY_ANTI_PATTERNS,
+    TWELVE_FACTOR_PRINCIPLES,
+    ArchitectureIssue,
+    architecture_validation_evaluator,
+    calculate_compliance_score,
+    check_twelve_factor_compliance,
+    detect_security_anti_patterns,
+    evaluate_adrs,
+    generate_architecture_report,
+    validate_tech_stack,
+)
 from yolo_developer.gates.gates.testability import (
     VAGUE_TERMS,
     TestabilityIssue,
@@ -60,18 +86,28 @@ from yolo_developer.gates.gates.testability import (
 __all__ = [
     "CONCRETE_CONDITION_PATTERNS",
     "GWT_PATTERNS",
+    "SECURITY_ANTI_PATTERNS",
     "SUBJECTIVE_TERMS",
+    "TWELVE_FACTOR_PRINCIPLES",
     "VAGUE_TERMS",
     "ACMeasurabilityIssue",
+    "ArchitectureIssue",
     "TestabilityIssue",
     "ac_measurability_evaluator",
+    "architecture_validation_evaluator",
+    "calculate_compliance_score",
+    "check_twelve_factor_compliance",
+    "detect_security_anti_patterns",
     "detect_subjective_terms",
     "detect_vague_terms",
+    "evaluate_adrs",
     "generate_ac_measurability_report",
+    "generate_architecture_report",
     "generate_improvement_suggestions",
     "generate_testability_report",
     "has_concrete_condition",
     "has_gwt_structure",
     "has_success_criteria",
     "testability_evaluator",
+    "validate_tech_stack",
 ]
