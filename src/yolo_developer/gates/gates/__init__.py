@@ -7,6 +7,7 @@ Available gates:
     - testability: Validates requirements for testability
     - ac_measurability: Validates acceptance criteria for measurability
     - architecture_validation: Validates architectural decisions against principles
+    - definition_of_done: Validates code against DoD checklist
 
 Example:
     >>> # Import to register the testability gate
@@ -46,6 +47,21 @@ Example:
     ...     architecture_validation_evaluator,
     ...     generate_architecture_report,
     ... )
+    >>>
+    >>> # Import definition of done gate
+    >>> from yolo_developer.gates.gates.definition_of_done import (
+    ...     DoDIssue,
+    ...     DoDCategory,
+    ...     DOD_CHECKLIST_ITEMS,
+    ...     SEVERITY_WEIGHTS,
+    ...     check_test_presence,
+    ...     check_documentation,
+    ...     check_code_style,
+    ...     check_ac_coverage,
+    ...     generate_dod_checklist,
+    ...     definition_of_done_evaluator,
+    ...     generate_dod_report,
+    ... )
 """
 
 from __future__ import annotations
@@ -74,6 +90,20 @@ from yolo_developer.gates.gates.architecture_validation import (
     generate_architecture_report,
     validate_tech_stack,
 )
+from yolo_developer.gates.gates.definition_of_done import (
+    DEFAULT_DOD_THRESHOLD,
+    DOD_CHECKLIST_ITEMS,
+    SEVERITY_WEIGHTS,
+    DoDCategory,
+    DoDIssue,
+    check_ac_coverage,
+    check_code_style,
+    check_documentation,
+    check_test_presence,
+    definition_of_done_evaluator,
+    generate_dod_checklist,
+    generate_dod_report,
+)
 from yolo_developer.gates.gates.testability import (
     VAGUE_TERMS,
     TestabilityIssue,
@@ -85,24 +115,36 @@ from yolo_developer.gates.gates.testability import (
 
 __all__ = [
     "CONCRETE_CONDITION_PATTERNS",
+    "DEFAULT_DOD_THRESHOLD",
+    "DOD_CHECKLIST_ITEMS",
     "GWT_PATTERNS",
     "SECURITY_ANTI_PATTERNS",
+    "SEVERITY_WEIGHTS",
     "SUBJECTIVE_TERMS",
     "TWELVE_FACTOR_PRINCIPLES",
     "VAGUE_TERMS",
     "ACMeasurabilityIssue",
     "ArchitectureIssue",
+    "DoDCategory",
+    "DoDIssue",
     "TestabilityIssue",
     "ac_measurability_evaluator",
     "architecture_validation_evaluator",
     "calculate_compliance_score",
+    "check_ac_coverage",
+    "check_code_style",
+    "check_documentation",
+    "check_test_presence",
     "check_twelve_factor_compliance",
+    "definition_of_done_evaluator",
     "detect_security_anti_patterns",
     "detect_subjective_terms",
     "detect_vague_terms",
     "evaluate_adrs",
     "generate_ac_measurability_report",
     "generate_architecture_report",
+    "generate_dod_checklist",
+    "generate_dod_report",
     "generate_improvement_suggestions",
     "generate_testability_report",
     "has_concrete_condition",

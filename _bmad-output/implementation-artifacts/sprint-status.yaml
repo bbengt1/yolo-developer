@@ -69,7 +69,7 @@ development_status:
   3-2-implement-testability-gate: done
   3-3-implement-ac-measurability-gate: done
   3-4-implement-architecture-validation-gate: done
-  3-5-implement-definition-of-done-gate: backlog
+  3-5-implement-definition-of-done-gate: done
   3-6-implement-confidence-scoring: backlog
   3-7-configure-quality-thresholds: backlog
   3-8-generate-gate-failure-reports: backlog
