@@ -58,7 +58,7 @@ development_status:
   2-3-implement-json-graph-storage: done
   2-4-context-preservation-across-handoffs: done
   2-5-session-persistence: done
-  2-6-project-pattern-learning: backlog
+  2-6-project-pattern-learning: in-progress
   2-7-historical-decision-queries: backlog
   2-8-project-isolation: backlog
   epic-2-retrospective: optional

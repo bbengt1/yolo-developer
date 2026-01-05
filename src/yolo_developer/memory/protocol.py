@@ -28,7 +28,10 @@ Security Note:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
 
 
 @dataclass(frozen=True)
@@ -175,5 +178,60 @@ class MemoryStore(Protocol):
             ...     target="req-001",
             ...     relation="implements"
             ... )
+        """
+        ...
+
+    async def store_pattern(self, pattern: CodePattern) -> str:
+        """Store a code pattern and return its ID.
+
+        Stores the pattern with its vector embedding for semantic search.
+        Uses upsert behavior - updates existing pattern if same ID exists.
+
+        Args:
+            pattern: The CodePattern instance to store.
+
+        Returns:
+            The unique identifier assigned to the pattern.
+
+        Example:
+            >>> pattern = CodePattern(
+            ...     pattern_type=PatternType.NAMING_FUNCTION,
+            ...     name="function_naming",
+            ...     value="snake_case",
+            ...     confidence=0.95,
+            ... )
+            >>> pattern_id = await memory.store_pattern(pattern)
+        """
+        ...
+
+    async def search_patterns(
+        self,
+        query: str = "",
+        pattern_type: PatternType | None = None,
+        k: int = 5,
+    ) -> list[PatternResult]:
+        """Search for patterns by semantic similarity.
+
+        Args:
+            query: Search query for semantic matching.
+            pattern_type: Optional filter by pattern type.
+            k: Maximum number of results to return.
+
+        Returns:
+            List of PatternResult instances ordered by similarity.
+        """
+        ...
+
+    async def get_patterns_by_type(
+        self,
+        pattern_type: PatternType,
+    ) -> list[CodePattern]:
+        """Get all patterns of a specific type.
+
+        Args:
+            pattern_type: The type of patterns to retrieve.
+
+        Returns:
+            List of CodePattern instances of the specified type.
         """
         ...
