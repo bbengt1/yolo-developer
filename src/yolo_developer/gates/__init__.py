@@ -14,8 +14,9 @@ Exports:
     get_evaluator: Get a registered evaluator by name.
     list_evaluators: List all registered gate names.
     clear_evaluators: Clear all registered evaluators.
+    resolve_threshold: Resolve threshold from config with priority order.
 
-Example:
+Example - Basic Gate Usage:
     >>> from yolo_developer.gates import quality_gate, register_evaluator
     >>> from yolo_developer.gates import GateContext, GateResult
     >>>
@@ -36,6 +37,41 @@ Example:
     ... async def analyst_node(state: dict) -> dict:
     ...     # Agent logic here
     ...     return state
+
+Example - Configurable Thresholds:
+    Gates support configurable thresholds via the state config. Use
+    resolve_threshold() to get the threshold with priority order:
+    gate-specific > global > default.
+
+    >>> from yolo_developer.gates import resolve_threshold
+    >>>
+    >>> # In a gate evaluator:
+    >>> async def my_gate(ctx: GateContext) -> GateResult:
+    ...     threshold = resolve_threshold(
+    ...         gate_name="my_gate",
+    ...         state=ctx.state,
+    ...         default=0.80,  # Default threshold (0.0-1.0)
+    ...     )
+    ...     # Use threshold in evaluation logic
+    ...     passed = score >= threshold
+    ...     return GateResult(passed=passed, gate_name=ctx.gate_name, reason=None)
+
+    Configuration example (yolo.yaml):
+
+    .. code-block:: yaml
+
+        quality:
+          test_coverage_threshold: 0.85  # Global
+          confidence_threshold: 0.90     # Global
+
+          # Per-gate overrides
+          gate_thresholds:
+            testability:
+              min_score: 0.80
+              blocking: true
+            architecture_validation:
+              min_score: 0.70
+              blocking: false  # Advisory mode
 """
 
 from __future__ import annotations
@@ -48,6 +84,7 @@ from yolo_developer.gates.evaluators import (
     list_evaluators,
     register_evaluator,
 )
+from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateMode, GateResult
 
 __all__ = [
@@ -60,4 +97,5 @@ __all__ = [
     "list_evaluators",
     "quality_gate",
     "register_evaluator",
+    "resolve_threshold",
 ]

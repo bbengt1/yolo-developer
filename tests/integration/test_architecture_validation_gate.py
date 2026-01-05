@@ -110,7 +110,7 @@ class TestGateDecoratorIntegration:
             },
             "config": {
                 "quality": {
-                    "architecture_threshold": 70,
+                    "architecture_threshold": 0.70,
                 },
             },
         }
@@ -143,7 +143,7 @@ class TestGateDecoratorIntegration:
             },
             "config": {
                 "quality": {
-                    "architecture_threshold": 70,  # 85 > 70, should pass
+                    "architecture_threshold": 0.70,  # 85 > 70, should pass
                 },
             },
         }
@@ -195,7 +195,7 @@ class TestStateIntegration:
                     "allowed_languages": ["python", "typescript"],
                 },
                 "quality": {
-                    "architecture_threshold": 90,  # Set threshold high so single issue fails
+                    "architecture_threshold": 0.90,  # Set threshold high so single issue fails
                 },
             },
         }
@@ -217,7 +217,7 @@ class TestStateIntegration:
             },
             "config": {
                 "quality": {
-                    "architecture_threshold": 90,  # 85 < 90, should fail
+                    "architecture_threshold": 0.90,  # 85 < 90, should fail
                 },
             },
         }
@@ -349,26 +349,26 @@ class TestComplianceScoreIntegration:
     @pytest.mark.asyncio
     async def test_custom_threshold_respected(self) -> None:
         """Custom threshold from config is respected."""
-        # Test with threshold 50 - should pass with score 85
+        # Test with threshold 0.50 (50%) - should pass with score 85
         state_pass: dict[str, Any] = {
             "architecture": {
                 "twelve_factor": {"config": False},
             },
             "config": {
-                "quality": {"architecture_threshold": 50},
+                "quality": {"architecture_threshold": 0.50},
             },
         }
         context_pass = GateContext(state=state_pass, gate_name="architecture_validation")
         result_pass = await architecture_validation_evaluator(context_pass)
         assert result_pass.passed is True
 
-        # Test with threshold 90 - should fail with score 85
+        # Test with threshold 0.90 (90%) - should fail with score 85
         state_fail: dict[str, Any] = {
             "architecture": {
                 "twelve_factor": {"config": False},
             },
             "config": {
-                "quality": {"architecture_threshold": 90},
+                "quality": {"architecture_threshold": 0.90},
             },
         }
         context_fail = GateContext(state=state_fail, gate_name="architecture_validation")

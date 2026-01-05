@@ -37,6 +37,7 @@ from typing import Any
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
 logger = structlog.get_logger(__name__)
@@ -116,8 +117,8 @@ SEVERITY_WEIGHTS: dict[str, int] = {
     "low": 3,
 }
 
-# Default compliance threshold
-DEFAULT_DOD_THRESHOLD = 70
+# Default compliance threshold (0.0-1.0 decimal format)
+DEFAULT_DOD_THRESHOLD = 0.70
 
 
 # =============================================================================
@@ -646,10 +647,14 @@ async def definition_of_done_evaluator(context: GateContext) -> GateResult:
     if not isinstance(story, dict):
         story = {}
 
-    # Get threshold from config
-    config = state.get("config", {})
-    quality_config = config.get("quality", {})
-    threshold = quality_config.get("dod_threshold", DEFAULT_DOD_THRESHOLD)
+    # Get threshold from config using threshold resolver (0.0-1.0 format)
+    threshold_decimal = resolve_threshold(
+        gate_name="definition_of_done",
+        state=state,
+        default=DEFAULT_DOD_THRESHOLD,
+    )
+    # Convert to 0-100 scale for internal score comparison
+    threshold = int(threshold_decimal * 100)
 
     logger.info(
         "definition_of_done_evaluation_started",

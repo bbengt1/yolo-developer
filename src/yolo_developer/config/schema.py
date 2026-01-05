@@ -54,6 +54,35 @@ from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class GateThreshold(BaseModel):
+    """Configuration for a single gate's threshold.
+
+    Defines the minimum score and blocking behavior for a quality gate.
+    Used in QualityConfig.gate_thresholds for per-gate configuration.
+
+    Attributes:
+        min_score: Minimum score (0.0-1.0) for this gate to pass.
+        blocking: Whether this gate blocks (True) or is advisory (False).
+
+    Example:
+        >>> from yolo_developer.config.schema import GateThreshold
+        >>> gate = GateThreshold(min_score=0.85, blocking=True)
+        >>> gate.min_score
+        0.85
+    """
+
+    min_score: float = Field(
+        default=0.80,
+        description="Minimum score (0.0-1.0) for this gate to pass",
+        ge=0.0,
+        le=1.0,
+    )
+    blocking: bool = Field(
+        default=True,
+        description="Whether this gate blocks or is advisory",
+    )
+
+
 class LLMConfig(BaseModel):
     """Configuration for LLM provider settings.
 
@@ -92,6 +121,21 @@ class QualityConfig(BaseModel):
 
     Defines the minimum thresholds that must be met for quality gates
     to pass. All threshold values must be between 0.0 and 1.0.
+
+    Supports both global thresholds and per-gate configuration via
+    the gate_thresholds field.
+
+    Attributes:
+        test_coverage_threshold: Global test coverage threshold (0.0-1.0).
+        confidence_threshold: Global confidence score threshold (0.0-1.0).
+        gate_thresholds: Per-gate threshold configuration overrides.
+
+    Example:
+        >>> from yolo_developer.config.schema import QualityConfig, GateThreshold
+        >>> config = QualityConfig(
+        ...     test_coverage_threshold=0.85,
+        ...     gate_thresholds={"testability": GateThreshold(min_score=0.90)}
+        ... )
     """
 
     test_coverage_threshold: float = Field(
@@ -106,6 +150,34 @@ class QualityConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    gate_thresholds: dict[str, GateThreshold] = Field(
+        default_factory=dict,
+        description="Per-gate threshold configuration overrides",
+    )
+
+    def validate_thresholds(self) -> list[str]:
+        """Validate all threshold configurations and return errors.
+
+        Checks that all configured gate thresholds have valid min_score
+        values in the range 0.0-1.0.
+
+        Returns:
+            List of error messages. Empty list if all thresholds are valid.
+
+        Example:
+            >>> config = QualityConfig()
+            >>> errors = config.validate_thresholds()
+            >>> if errors:
+            ...     for error in errors:
+            ...         print(f"Error: {error}")
+        """
+        errors: list[str] = []
+        for gate_name, config in self.gate_thresholds.items():
+            if not 0.0 <= config.min_score <= 1.0:
+                errors.append(
+                    f"Gate '{gate_name}' min_score must be 0.0-1.0, got {config.min_score}"
+                )
+        return errors
 
 
 class MemoryConfig(BaseModel):

@@ -32,12 +32,13 @@ from typing import Any
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
 logger = structlog.get_logger(__name__)
 
-# Default compliance threshold (configurable via state)
-DEFAULT_COMPLIANCE_THRESHOLD = 70
+# Default compliance threshold (70% = 0.70 in decimal format)
+DEFAULT_COMPLIANCE_THRESHOLD = 0.70
 
 # Severity weights for compliance score calculation
 SEVERITY_WEIGHTS: dict[str, int] = {
@@ -732,8 +733,15 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
     # Get configuration
     config = context.state.get("config", {})
     tech_stack_constraints = config.get("tech_stack", {})
-    quality_config = config.get("quality", {})
-    threshold = quality_config.get("architecture_threshold", DEFAULT_COMPLIANCE_THRESHOLD)
+
+    # Get threshold from config using threshold resolver
+    # Note: resolve_threshold returns 0.0-1.0, but this gate uses 0-100 score
+    threshold_decimal = resolve_threshold(
+        gate_name="architecture_validation",
+        state=context.state,
+        default=DEFAULT_COMPLIANCE_THRESHOLD,
+    )
+    threshold = int(threshold_decimal * 100)  # Convert to 0-100 scale
 
     # Extract primary decision ID if available
     decisions = architecture.get("decisions", [])

@@ -19,6 +19,7 @@ from __future__ import annotations
 from yolo_developer.config.export import export_config, import_config
 from yolo_developer.config.loader import ConfigurationError, load_config
 from yolo_developer.config.schema import (
+    GateThreshold,
     LLMConfig,
     MemoryConfig,
     QualityConfig,
@@ -32,6 +33,7 @@ from yolo_developer.config.validators import (
 
 __all__ = [
     "ConfigurationError",
+    "GateThreshold",
     "LLMConfig",
     "MemoryConfig",
     "QualityConfig",

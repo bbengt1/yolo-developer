@@ -1118,3 +1118,152 @@ class TestStructuredLogging:
         # Check that logging occurred (structlog formats may vary)
         log_output = caplog.text.lower()
         assert "definition_of_done" in log_output or len(caplog.records) > 0
+
+
+# =============================================================================
+# Threshold Configuration Tests (Story 3.7)
+# =============================================================================
+
+
+class TestDefinitionOfDoneThresholdConfiguration:
+    """Tests for definition of done threshold configuration (Story 3.7)."""
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_default_threshold_when_no_config(
+        self, mock_code_with_tests: dict
+    ) -> None:
+        """Should use DEFAULT_DOD_THRESHOLD (0.70) when no config provided."""
+        from yolo_developer.gates.gates.definition_of_done import (
+            DEFAULT_DOD_THRESHOLD,
+            definition_of_done_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        # Verify default is 0.70
+        assert DEFAULT_DOD_THRESHOLD == 0.70
+
+        # Use empty story to avoid AC coverage issues - focus on threshold behavior
+        context = GateContext(
+            state={
+                "code": mock_code_with_tests,
+                "story": {},  # Empty story = no AC to check
+                # No config
+            },
+            gate_name="definition_of_done",
+        )
+
+        result = await definition_of_done_evaluator(context)
+        # Good code with no AC to check should pass with default 70% threshold
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_evaluator_respects_gate_specific_threshold(
+        self, mock_code_with_tests: dict
+    ) -> None:
+        """Should use gate-specific threshold from resolver (highest priority)."""
+        from yolo_developer.gates.gates.definition_of_done import definition_of_done_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # Use empty story to avoid AC coverage issues - focus on threshold behavior
+        context = GateContext(
+            state={
+                "code": mock_code_with_tests,
+                "story": {},
+                "config": {
+                    "quality": {
+                        "gate_thresholds": {
+                            "definition_of_done": {"min_score": 1.0},  # Gate-specific: 100%
+                        },
+                    },
+                },
+            },
+            gate_name="definition_of_done",
+        )
+
+        result = await definition_of_done_evaluator(context)
+        # Good code should pass with 100% threshold
+        assert result.passed is True
+        assert "100" in result.reason  # Threshold mentioned
+
+    @pytest.mark.asyncio
+    async def test_evaluator_fails_below_custom_threshold(
+        self, mock_code_without_tests: dict
+    ) -> None:
+        """Should fail when score is below custom threshold."""
+        from yolo_developer.gates.gates.definition_of_done import definition_of_done_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # Use empty story to avoid AC coverage issues - focus on threshold behavior
+        context = GateContext(
+            state={
+                "code": mock_code_without_tests,
+                "story": {},
+                "config": {
+                    "quality": {
+                        "gate_thresholds": {
+                            "definition_of_done": {"min_score": 0.95},  # 95% threshold
+                        },
+                    },
+                },
+            },
+            gate_name="definition_of_done",
+        )
+
+        result = await definition_of_done_evaluator(context)
+        # Code with missing tests should fail with 95% threshold
+        assert result.passed is False
+        assert "95" in result.reason
+
+    @pytest.mark.asyncio
+    async def test_evaluator_passes_with_low_threshold(self, mock_code_without_tests: dict) -> None:
+        """Should pass with low threshold even for imperfect code."""
+        from yolo_developer.gates.gates.definition_of_done import definition_of_done_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # Use empty story to avoid AC coverage issues - focus on threshold behavior
+        context = GateContext(
+            state={
+                "code": mock_code_without_tests,
+                "story": {},  # Empty story = no AC to check
+                "config": {
+                    "quality": {
+                        "gate_thresholds": {
+                            "definition_of_done": {"min_score": 0.50, "blocking": False},
+                        },
+                    },
+                },
+            },
+            gate_name="definition_of_done",
+        )
+
+        result = await definition_of_done_evaluator(context)
+        # Code with missing tests (score 80) should pass with 50% threshold
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_0_to_100_scale_internally(
+        self, mock_code_with_tests: dict
+    ) -> None:
+        """Should convert 0.0-1.0 config to 0-100 scale internally."""
+        from yolo_developer.gates.gates.definition_of_done import definition_of_done_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # Use empty story to avoid AC coverage issues
+        context = GateContext(
+            state={
+                "code": mock_code_with_tests,
+                "story": {},
+                "config": {
+                    "quality": {
+                        "gate_thresholds": {
+                            "definition_of_done": {"min_score": 0.70},  # 70%
+                        },
+                    },
+                },
+            },
+            gate_name="definition_of_done",
+        )
+
+        result = await definition_of_done_evaluator(context)
+        # Score should be displayed as /100 in reason
+        assert "/100" in result.reason

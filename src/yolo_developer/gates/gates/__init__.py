@@ -8,6 +8,7 @@ Available gates:
     - ac_measurability: Validates acceptance criteria for measurability
     - architecture_validation: Validates architectural decisions against principles
     - definition_of_done: Validates code against DoD checklist
+    - confidence_scoring: Calculates confidence score for deployable artifacts
 
 Example:
     >>> # Import to register the testability gate
@@ -62,6 +63,22 @@ Example:
     ...     definition_of_done_evaluator,
     ...     generate_dod_report,
     ... )
+    >>>
+    >>> # Import confidence scoring gate
+    >>> from yolo_developer.gates.gates.confidence_scoring import (
+    ...     ConfidenceFactor,
+    ...     ConfidenceBreakdown,
+    ...     DEFAULT_FACTOR_WEIGHTS,
+    ...     DEFAULT_CONFIDENCE_THRESHOLD,
+    ...     RISK_SEVERITY_IMPACT,
+    ...     calculate_coverage_factor,
+    ...     calculate_gate_factor,
+    ...     calculate_risk_factor,
+    ...     calculate_documentation_factor,
+    ...     calculate_confidence_score,
+    ...     confidence_scoring_evaluator,
+    ...     generate_confidence_report,
+    ... )
 """
 
 from __future__ import annotations
@@ -90,6 +107,21 @@ from yolo_developer.gates.gates.architecture_validation import (
     generate_architecture_report,
     validate_tech_stack,
 )
+from yolo_developer.gates.gates.confidence_scoring import (
+    DEFAULT_CONFIDENCE_THRESHOLD,
+    DEFAULT_FACTOR_WEIGHTS,
+    RISK_SEVERITY_IMPACT,
+    WEIGHT_SUM_TOLERANCE,
+    ConfidenceBreakdown,
+    ConfidenceFactor,
+    calculate_confidence_score,
+    calculate_coverage_factor,
+    calculate_documentation_factor,
+    calculate_gate_factor,
+    calculate_risk_factor,
+    confidence_scoring_evaluator,
+    generate_confidence_report,
+)
 from yolo_developer.gates.gates.definition_of_done import (
     DEFAULT_DOD_THRESHOLD,
     DOD_CHECKLIST_ITEMS,
@@ -115,27 +147,39 @@ from yolo_developer.gates.gates.testability import (
 
 __all__ = [
     "CONCRETE_CONDITION_PATTERNS",
+    "DEFAULT_CONFIDENCE_THRESHOLD",
     "DEFAULT_DOD_THRESHOLD",
+    "DEFAULT_FACTOR_WEIGHTS",
     "DOD_CHECKLIST_ITEMS",
     "GWT_PATTERNS",
+    "RISK_SEVERITY_IMPACT",
     "SECURITY_ANTI_PATTERNS",
     "SEVERITY_WEIGHTS",
     "SUBJECTIVE_TERMS",
     "TWELVE_FACTOR_PRINCIPLES",
     "VAGUE_TERMS",
+    "WEIGHT_SUM_TOLERANCE",
     "ACMeasurabilityIssue",
     "ArchitectureIssue",
+    "ConfidenceBreakdown",
+    "ConfidenceFactor",
     "DoDCategory",
     "DoDIssue",
     "TestabilityIssue",
     "ac_measurability_evaluator",
     "architecture_validation_evaluator",
     "calculate_compliance_score",
+    "calculate_confidence_score",
+    "calculate_coverage_factor",
+    "calculate_documentation_factor",
+    "calculate_gate_factor",
+    "calculate_risk_factor",
     "check_ac_coverage",
     "check_code_style",
     "check_documentation",
     "check_test_presence",
     "check_twelve_factor_compliance",
+    "confidence_scoring_evaluator",
     "definition_of_done_evaluator",
     "detect_security_anti_patterns",
     "detect_subjective_terms",
@@ -143,6 +187,7 @@ __all__ = [
     "evaluate_adrs",
     "generate_ac_measurability_report",
     "generate_architecture_report",
+    "generate_confidence_report",
     "generate_dod_checklist",
     "generate_dod_report",
     "generate_improvement_suggestions",

@@ -30,9 +30,13 @@ from typing import Any
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
 logger = structlog.get_logger(__name__)
+
+# Default testability threshold (80% of requirements must be testable)
+DEFAULT_TESTABILITY_THRESHOLD = 0.80
 
 # Vague terms that indicate untestable requirements
 VAGUE_TERMS: tuple[str, ...] = (
@@ -290,6 +294,9 @@ async def testability_evaluator(context: GateContext) -> GateResult:
     1. Vague or subjective terms
     2. Presence of measurable success criteria
 
+    Uses configurable threshold to determine pass/fail. The threshold
+    specifies what percentage of requirements must be testable (no issues).
+
     Args:
         context: Gate context containing state with requirements.
 
@@ -305,6 +312,13 @@ async def testability_evaluator(context: GateContext) -> GateResult:
         >>> result.passed
         True
     """
+    # Get threshold from config using threshold resolver
+    threshold = resolve_threshold(
+        gate_name="testability",
+        state=context.state,
+        default=DEFAULT_TESTABILITY_THRESHOLD,
+    )
+
     requirements = context.state.get("requirements", [])
 
     # Validate requirements is a list
@@ -375,15 +389,31 @@ async def testability_evaluator(context: GateContext) -> GateResult:
                 )
             )
 
-    if issues:
+    # Calculate testability score
+    # Count requirements with issues (each unique requirement_id counts as 1 failure)
+    failing_req_ids = {issue.requirement_id for issue in issues}
+    passing_count = len(requirements) - len(failing_req_ids)
+    score = passing_count / len(requirements) if requirements else 1.0
+
+    # Check against threshold
+    passed = score >= threshold
+    threshold_percent = int(threshold * 100)
+    score_percent = int(score * 100)
+
+    if not passed:
         report = generate_testability_report(issues)
-        # Create a summary reason
-        failing_reqs = sorted({issue.requirement_id for issue in issues})
-        reason = f"Testability check failed for {len(failing_reqs)} requirement(s): {', '.join(failing_reqs)}\n\n{report}"
+        failing_reqs = sorted(failing_req_ids)
+        reason = (
+            f"Testability score {score_percent}% below threshold {threshold_percent}%. "
+            f"{len(failing_reqs)} of {len(requirements)} requirement(s) failed: "
+            f"{', '.join(failing_reqs)}\n\n{report}"
+        )
 
         logger.warning(
             "testability_gate_failed",
             gate_name=context.gate_name,
+            score=score,
+            threshold=threshold,
             issue_count=len(issues),
             failing_requirements=failing_reqs,
         )
@@ -397,13 +427,24 @@ async def testability_evaluator(context: GateContext) -> GateResult:
     logger.info(
         "testability_gate_passed",
         gate_name=context.gate_name,
+        score=score,
+        threshold=threshold,
         requirements_checked=len(requirements),
     )
+
+    # Include score info even on pass
+    pass_reason: str | None = None
+    if issues:
+        report = generate_testability_report(issues)
+        pass_reason = (
+            f"Testability score {score_percent}% meets threshold {threshold_percent}%. "
+            f"Note: {len(failing_req_ids)} requirement(s) have issues.\n\n{report}"
+        )
 
     return GateResult(
         passed=True,
         gate_name=context.gate_name,
-        reason=None,
+        reason=pass_reason,
     )
 
 

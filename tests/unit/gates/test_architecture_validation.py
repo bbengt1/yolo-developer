@@ -640,7 +640,7 @@ class TestArchitectureValidationEvaluator:
                     "allowed_languages": ["python"],
                 },
                 "quality": {
-                    "architecture_threshold": 70,
+                    "architecture_threshold": 0.70,
                 },
             },
         }
@@ -670,7 +670,7 @@ class TestArchitectureValidationEvaluator:
             },
             "config": {
                 "quality": {
-                    "architecture_threshold": 70,
+                    "architecture_threshold": 0.70,
                 },
             },
         }
@@ -921,3 +921,126 @@ class TestDecisionIdTracking:
         # Check that decision-001 appears in the reason (it's the decision_id used)
         assert result.passed is True  # Score 85 > 70
         assert "decision-001" in (result.reason or "") or "85" in (result.reason or "")
+
+
+class TestArchitectureValidationThresholdConfiguration:
+    """Tests for architecture validation threshold configuration (Story 3.7)."""
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_default_threshold_when_no_config(self) -> None:
+        """Should use DEFAULT_COMPLIANCE_THRESHOLD (0.70) when no config provided."""
+        from yolo_developer.gates.gates.architecture_validation import (
+            DEFAULT_COMPLIANCE_THRESHOLD,
+            architecture_validation_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        # Verify default is 0.70
+        assert DEFAULT_COMPLIANCE_THRESHOLD == 0.70
+
+        # Architecture with one high issue (score 85, above default 70)
+        state: dict[str, Any] = {
+            "architecture": {
+                "twelve_factor": {
+                    "config": False,  # -15 points = score 85
+                },
+            },
+            # No config
+        }
+        context = GateContext(state=state, gate_name="architecture_validation")
+
+        result = await architecture_validation_evaluator(context)
+        # Score 85 is above default threshold 70, should pass
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_evaluator_respects_gate_specific_threshold(self) -> None:
+        """Should use gate-specific threshold from resolver (highest priority)."""
+        from yolo_developer.gates.gates.architecture_validation import (
+            architecture_validation_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        # Architecture with one high issue (score 85)
+        state: dict[str, Any] = {
+            "architecture": {
+                "twelve_factor": {
+                    "config": False,  # -15 points = score 85
+                },
+            },
+            "config": {
+                "quality": {
+                    "gate_thresholds": {
+                        "architecture_validation": {"min_score": 0.90},  # Gate-specific: 90%
+                    },
+                },
+            },
+        }
+        context = GateContext(state=state, gate_name="architecture_validation")
+
+        result = await architecture_validation_evaluator(context)
+        # Score 85 is BELOW threshold 90, should fail
+        assert result.passed is False
+        assert "85" in result.reason  # Score mentioned
+        assert "90" in result.reason  # Threshold mentioned
+
+    @pytest.mark.asyncio
+    async def test_evaluator_passes_when_above_custom_threshold(self) -> None:
+        """Should pass when score meets custom threshold."""
+        from yolo_developer.gates.gates.architecture_validation import (
+            architecture_validation_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        # Architecture with one high issue (score 85)
+        state: dict[str, Any] = {
+            "architecture": {
+                "twelve_factor": {
+                    "config": False,  # -15 points = score 85
+                },
+            },
+            "config": {
+                "quality": {
+                    "gate_thresholds": {
+                        "architecture_validation": {"min_score": 0.80},  # 80% threshold
+                    },
+                },
+            },
+        }
+        context = GateContext(state=state, gate_name="architecture_validation")
+
+        result = await architecture_validation_evaluator(context)
+        # Score 85 is ABOVE threshold 80, should pass
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_low_threshold_for_advisory_mode(self) -> None:
+        """Should allow low threshold for advisory mode (non-blocking)."""
+        from yolo_developer.gates.gates.architecture_validation import (
+            architecture_validation_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        # Architecture with multiple issues (score 55)
+        state: dict[str, Any] = {
+            "architecture": {
+                "twelve_factor": {
+                    "config": False,  # -15 points
+                },
+                "security": {
+                    "secrets_management": "password=secret123 in config",  # -25 points
+                },
+            },
+            "config": {
+                "quality": {
+                    "gate_thresholds": {
+                        "architecture_validation": {"min_score": 0.50, "blocking": False},
+                    },
+                },
+            },
+        }
+        context = GateContext(state=state, gate_name="architecture_validation")
+
+        result = await architecture_validation_evaluator(context)
+        # Score around 55-60 should be ABOVE threshold 50
+        assert result.passed is True

@@ -373,6 +373,116 @@ class TestTestabilityEvaluator:
         assert "req-001" in result.reason
 
 
+class TestTestabilityThresholdConfiguration:
+    """Tests for testability threshold configuration (Story 3.7)."""
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_default_threshold(self) -> None:
+        """Evaluator uses default 80% threshold when not configured."""
+        from yolo_developer.gates.gates.testability import (
+            DEFAULT_TESTABILITY_THRESHOLD,
+            testability_evaluator,
+        )
+        from yolo_developer.gates.types import GateContext
+
+        assert DEFAULT_TESTABILITY_THRESHOLD == 0.80
+
+        # 4 out of 5 requirements pass (80% exactly = pass)
+        state: dict[str, Any] = {
+            "requirements": [
+                {"id": "req-1", "content": "API responds in 500ms"},  # Pass
+                {"id": "req-2", "content": "Login completes in 2 seconds"},  # Pass
+                {"id": "req-3", "content": "Upload completes in 30 seconds"},  # Pass
+                {"id": "req-4", "content": "Handles at least 100 requests"},  # Pass
+                {"id": "req-5", "content": "System should be fast"},  # Fails - vague
+            ]
+        }
+        context = GateContext(state=state, gate_name="testability")
+
+        result = await testability_evaluator(context)
+        assert result.passed is True  # 80% meets 80% threshold
+
+    @pytest.mark.asyncio
+    async def test_evaluator_respects_custom_threshold_from_config(self) -> None:
+        """Evaluator respects threshold from gate_thresholds config."""
+        from yolo_developer.gates.gates.testability import testability_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # 2 out of 4 requirements pass (50%)
+        state: dict[str, Any] = {
+            "requirements": [
+                {"id": "req-1", "content": "API responds in 500ms"},  # Pass
+                {"id": "req-2", "content": "System should be fast"},  # Fail - vague
+                {"id": "req-3", "content": "Login completes in 2 seconds"},  # Pass
+                {"id": "req-4", "content": "User experience is intuitive"},  # Fail - vague
+            ],
+            "config": {
+                "quality": {
+                    "gate_thresholds": {
+                        "testability": {"min_score": 0.50},  # 50% threshold
+                    },
+                }
+            },
+        }
+        context = GateContext(state=state, gate_name="testability")
+
+        result = await testability_evaluator(context)
+        assert result.passed is True  # 50% meets 50% threshold
+
+    @pytest.mark.asyncio
+    async def test_evaluator_fails_when_below_custom_threshold(self) -> None:
+        """Evaluator fails when score is below custom threshold."""
+        from yolo_developer.gates.gates.testability import testability_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # 2 out of 4 requirements pass (50%)
+        state: dict[str, Any] = {
+            "requirements": [
+                {"id": "req-1", "content": "API responds in 500ms"},  # Pass
+                {"id": "req-2", "content": "System should be fast"},  # Fail - vague
+                {"id": "req-3", "content": "Login completes in 2 seconds"},  # Pass
+                {"id": "req-4", "content": "User experience is intuitive"},  # Fail - vague
+            ],
+            "config": {
+                "quality": {
+                    "gate_thresholds": {
+                        "testability": {"min_score": 0.75},  # 75% threshold
+                    },
+                }
+            },
+        }
+        context = GateContext(state=state, gate_name="testability")
+
+        result = await testability_evaluator(context)
+        assert result.passed is False  # 50% < 75% threshold
+        assert "75%" in result.reason
+
+    @pytest.mark.asyncio
+    async def test_evaluator_uses_global_threshold_fallback(self) -> None:
+        """Evaluator falls back to global test_coverage_threshold."""
+        from yolo_developer.gates.gates.testability import testability_evaluator
+        from yolo_developer.gates.types import GateContext
+
+        # 2 out of 4 requirements pass (50%)
+        state: dict[str, Any] = {
+            "requirements": [
+                {"id": "req-1", "content": "API responds in 500ms"},  # Pass
+                {"id": "req-2", "content": "System should be fast"},  # Fail - vague
+                {"id": "req-3", "content": "Login completes in 2 seconds"},  # Pass
+                {"id": "req-4", "content": "User experience is intuitive"},  # Fail - vague
+            ],
+            "config": {
+                "quality": {
+                    "test_coverage_threshold": 0.50,  # Global fallback
+                }
+            },
+        }
+        context = GateContext(state=state, gate_name="testability")
+
+        result = await testability_evaluator(context)
+        assert result.passed is True  # 50% meets 50% global threshold
+
+
 class TestFailureReportGeneration:
     """Tests for failure report generation (Task 5)."""
 

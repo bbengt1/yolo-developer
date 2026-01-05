@@ -32,9 +32,13 @@ from typing import Any
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
 logger = structlog.get_logger(__name__)
+
+# Default AC measurability threshold (80% of stories must pass)
+DEFAULT_AC_MEASURABILITY_THRESHOLD = 0.80
 
 # Subjective terms that indicate unmeasurable acceptance criteria
 # These trigger warnings (not blocking) when GWT structure is present
@@ -403,6 +407,9 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
     2. Subjective terms (warning if present)
     3. Concrete conditions in "Then" clause (warning if missing)
 
+    Uses configurable threshold to determine pass/fail based on
+    the percentage of stories that pass (no blocking issues).
+
     Args:
         context: Gate context containing state with stories.
 
@@ -420,6 +427,13 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
         >>> result.passed
         True
     """
+    # Get threshold from config using threshold resolver
+    threshold = resolve_threshold(
+        gate_name="ac_measurability",
+        state=context.state,
+        default=DEFAULT_AC_MEASURABILITY_THRESHOLD,
+    )
+
     stories = context.state.get("stories", [])
 
     # Validate stories is a list
@@ -537,19 +551,36 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
                     )
                 )
 
-    # Determine if there are any blocking issues
+    # Determine blocking and warning issues
     blocking_issues = [i for i in issues if i.severity == "blocking"]
+    warning_issues = [i for i in issues if i.severity == "warning"]
 
-    if blocking_issues:
+    # Calculate score based on stories without blocking issues
+    failing_story_ids = {issue.story_id for issue in blocking_issues}
+    passing_count = len(stories) - len(failing_story_ids)
+    score = passing_count / len(stories) if stories else 1.0
+
+    # Check against threshold
+    passed = score >= threshold
+    threshold_percent = int(threshold * 100)
+    score_percent = int(score * 100)
+
+    if not passed:
         report = generate_ac_measurability_report(issues)
-        failing_stories = sorted({issue.story_id for issue in blocking_issues})
-        reason = f"AC measurability check failed for {len(failing_stories)} story(ies): {', '.join(failing_stories)}\n\n{report}"
+        failing_stories = sorted(failing_story_ids)
+        reason = (
+            f"AC measurability score {score_percent}% below threshold {threshold_percent}%. "
+            f"{len(failing_stories)} of {len(stories)} story(ies) failed: "
+            f"{', '.join(failing_stories)}\n\n{report}"
+        )
 
         logger.warning(
             "ac_measurability_gate_failed",
             gate_name=context.gate_name,
+            score=score,
+            threshold=threshold,
             blocking_count=len(blocking_issues),
-            warning_count=len(issues) - len(blocking_issues),
+            warning_count=len(warning_issues),
             failing_stories=failing_stories,
         )
 
@@ -559,26 +590,37 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
             reason=reason,
         )
 
-    # Gate passes but may have warnings
-    warning_issues = [i for i in issues if i.severity == "warning"]
-
-    if warning_issues:
-        report = generate_ac_measurability_report(warning_issues)
+    # Gate passes - may have warnings or some blocking issues below threshold
+    if blocking_issues or warning_issues:
+        report = generate_ac_measurability_report(issues)
         logger.info(
-            "ac_measurability_gate_passed_with_warnings",
+            "ac_measurability_gate_passed",
             gate_name=context.gate_name,
+            score=score,
+            threshold=threshold,
             warning_count=len(warning_issues),
+            blocking_count=len(blocking_issues),
         )
+
+        if blocking_issues:
+            reason = (
+                f"AC measurability score {score_percent}% meets threshold {threshold_percent}%. "
+                f"Note: {len(failing_story_ids)} story(ies) have issues.\n\n{report}"
+            )
+        else:
+            reason = f"Passed with {len(warning_issues)} warning(s):\n\n{report}"
 
         return GateResult(
             passed=True,
             gate_name=context.gate_name,
-            reason=f"Passed with {len(warning_issues)} warning(s):\n\n{report}",
+            reason=reason,
         )
 
     logger.info(
         "ac_measurability_gate_passed",
         gate_name=context.gate_name,
+        score=score,
+        threshold=threshold,
         stories_checked=len(stories),
     )
 
