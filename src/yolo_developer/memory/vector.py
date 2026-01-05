@@ -44,6 +44,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from yolo_developer.memory.isolation import DEFAULT_PROJECT_ID, validate_project_id
 from yolo_developer.memory.protocol import MemoryResult
 from yolo_developer.orchestrator.context import Decision
 
@@ -140,21 +141,45 @@ class ChromaMemory:
         persist_directory: str,
         collection_name: str = "yolo_memory",
         graph_store: JSONGraphStore | None = None,
+        project_id: str | None = None,
     ) -> None:
         """Initialize ChromaMemory with persistent storage.
 
         Args:
             persist_directory: Directory path for ChromaDB persistence.
                 Data will be stored in this directory and survive restarts.
-            collection_name: Name for the ChromaDB collection.
+            collection_name: Name for the ChromaDB collection base name.
                 Defaults to "yolo_memory".
             graph_store: Optional JSONGraphStore for relationship storage.
                 If provided, store_relationship will delegate to this store.
                 If not provided, store_relationship logs a warning.
+            project_id: Optional project identifier for isolation.
+                If provided, collection name becomes `{collection_name}_{project_id}`.
+                Defaults to "default" if not specified.
+
+        Example:
+            >>> # Basic usage (backward compatible)
+            >>> memory = ChromaMemory(persist_directory=".yolo/memory")
+            >>>
+            >>> # With project isolation
+            >>> memory = ChromaMemory(
+            ...     persist_directory=".yolo/memory",
+            ...     project_id="my-project",
+            ... )
+            >>> # Collection name will be "yolo_memory_my-project"
         """
+        # Use default project_id if not specified (backward compatible)
+        effective_project_id = project_id if project_id is not None else DEFAULT_PROJECT_ID
+
+        # Validate project_id (raises InvalidProjectIdError if invalid)
+        self._project_id = validate_project_id(effective_project_id)
+
+        # Create project-scoped collection name
+        full_collection_name = f"{collection_name}_{self._project_id}"
+
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection = self.client.get_or_create_collection(
-            name=collection_name,
+            name=full_collection_name,
             metadata={"hnsw:space": "cosine"},  # Use cosine similarity
         )
         self._graph_store = graph_store

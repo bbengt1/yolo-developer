@@ -29,14 +29,11 @@ from datetime import datetime, timezone
 from typing import Any, cast
 
 import chromadb
-from chromadb.config import Settings
 
+from yolo_developer.memory.isolation import DEFAULT_PROJECT_ID, validate_project_id
 from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
 
 logger = logging.getLogger(__name__)
-
-# Default project ID if not specified
-DEFAULT_PROJECT_ID = "default"
 
 
 class ChromaPatternStore:
@@ -67,18 +64,17 @@ class ChromaPatternStore:
         Args:
             persist_directory: Directory for ChromaDB persistence.
             project_id: Identifier for project isolation. Defaults to "default".
+
+        Raises:
+            InvalidProjectIdError: If project_id is invalid.
         """
         self.persist_directory = persist_directory
-        self.project_id = project_id or DEFAULT_PROJECT_ID
+        # Validate project_id (raises InvalidProjectIdError if invalid)
+        effective_project_id = project_id if project_id is not None else DEFAULT_PROJECT_ID
+        self.project_id = validate_project_id(effective_project_id)
 
-        # Initialize ChromaDB client
-        self._client = chromadb.Client(
-            Settings(
-                persist_directory=persist_directory,
-                is_persistent=True,
-                anonymized_telemetry=False,
-            )
-        )
+        # Initialize ChromaDB client with PersistentClient (same as ChromaMemory)
+        self._client = chromadb.PersistentClient(path=persist_directory)
 
         # Get or create collection for this project's patterns
         collection_name = f"patterns_{self.project_id}"

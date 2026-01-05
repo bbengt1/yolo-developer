@@ -52,7 +52,7 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Memory & Context Layer (8 stories)
-  epic-2: in-progress
+  epic-2: done
   2-1-create-memory-store-protocol: done
   2-2-implement-chromadb-vector-storage: done
   2-3-implement-json-graph-storage: done
@@ -60,7 +60,7 @@ development_status:
   2-5-session-persistence: done
   2-6-project-pattern-learning: done
   2-7-historical-decision-queries: done
-  2-8-project-isolation: backlog
+  2-8-project-isolation: done
   epic-2-retrospective: optional
 
   # Epic 3: Quality Gate Framework (9 stories)

@@ -24,6 +24,9 @@ Exports:
     DecisionFilter: Filter criteria for decision queries.
     ChromaDecisionStore: ChromaDB-backed decision storage.
     DecisionQueryEngine: High-level interface for decision queries.
+    MemoryFactory: Factory for creating project-isolated memory stores.
+    InvalidProjectIdError: Exception for invalid project IDs.
+    validate_project_id: Validates project ID format.
 
 Example:
     >>> from yolo_developer.memory import MemoryStore, MemoryResult, ChromaMemory
@@ -48,6 +51,16 @@ Example:
     ... )
     >>> result = await learner.learn_from_codebase(Path("/my/project"))
     >>> print(f"Found {result.patterns_found} patterns")
+    >>>
+    >>> # Project-isolated memory stores via factory
+    >>> from yolo_developer.memory import MemoryFactory
+    >>> factory = MemoryFactory(
+    ...     project_id="my-project",
+    ...     base_directory=".yolo/memory",
+    ... )
+    >>> stores = factory.get_all_stores()
+    >>> vector_store = stores["vector"]
+    >>> graph_store = stores["graph"]
 """
 
 from __future__ import annotations
@@ -62,12 +75,14 @@ from yolo_developer.memory.decisions import (
     DecisionType,
     validate_agent_type,
 )
+from yolo_developer.memory.factory import MemoryFactory, StoreDict
 from yolo_developer.memory.graph import (
     JSONGraphError,
     JSONGraphStore,
     Relationship,
     RelationshipResult,
 )
+from yolo_developer.memory.isolation import InvalidProjectIdError, validate_project_id
 from yolo_developer.memory.learning import PatternLearner, PatternLearningResult
 from yolo_developer.memory.pattern_store import ChromaPatternStore
 from yolo_developer.memory.patterns import CodePattern, PatternResult, PatternType
@@ -88,8 +103,10 @@ __all__ = [
     "DecisionQueryEngine",
     "DecisionResult",
     "DecisionType",
+    "InvalidProjectIdError",
     "JSONGraphError",
     "JSONGraphStore",
+    "MemoryFactory",
     "MemoryResult",
     "MemoryStore",
     "PatternLearner",
@@ -99,5 +116,7 @@ __all__ = [
     "Relationship",
     "RelationshipResult",
     "ScanResult",
+    "StoreDict",
     "validate_agent_type",
+    "validate_project_id",
 ]
