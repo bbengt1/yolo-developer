@@ -68,9 +68,7 @@ class TestMemoryFactoryCreateVectorStore:
         store = factory.create_vector_store()
         assert isinstance(store, ChromaMemory)
 
-    def test_create_vector_store_uses_project_id_in_collection(
-        self, tmp_path: Path
-    ) -> None:
+    def test_create_vector_store_uses_project_id_in_collection(self, tmp_path: Path) -> None:
         """Vector store uses project ID in collection name."""
         factory = MemoryFactory(
             project_id="my-project",
@@ -109,9 +107,7 @@ class TestMemoryFactoryCreateGraphStore:
 class TestMemoryFactoryCreatePatternStore:
     """Tests for create_pattern_store method."""
 
-    def test_create_pattern_store_returns_chroma_pattern_store(
-        self, tmp_path: Path
-    ) -> None:
+    def test_create_pattern_store_returns_chroma_pattern_store(self, tmp_path: Path) -> None:
         """create_pattern_store returns a ChromaPatternStore instance."""
         from yolo_developer.memory.pattern_store import ChromaPatternStore
 
@@ -135,9 +131,7 @@ class TestMemoryFactoryCreatePatternStore:
 class TestMemoryFactoryCreateDecisionStore:
     """Tests for create_decision_store method."""
 
-    def test_create_decision_store_returns_chroma_decision_store(
-        self, tmp_path: Path
-    ) -> None:
+    def test_create_decision_store_returns_chroma_decision_store(self, tmp_path: Path) -> None:
         """create_decision_store returns a ChromaDecisionStore instance."""
         from yolo_developer.memory.decision_store import ChromaDecisionStore
 

@@ -14,7 +14,6 @@ from yolo_developer.memory import (
     ChromaDecisionStore,
     ChromaMemory,
     ChromaPatternStore,
-    JSONGraphStore,
     MemoryFactory,
 )
 from yolo_developer.memory.decisions import Decision, DecisionType
@@ -54,9 +53,7 @@ class TestChromaMemoryIsolation:
         assert results_a[0].key == "doc-001"
 
     @pytest.mark.asyncio
-    async def test_chromamemory_collections_have_different_names(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_chromamemory_collections_have_different_names(self, tmp_path: Path) -> None:
         """Different projects use different collection names."""
         memory_a = ChromaMemory(
             persist_directory=str(tmp_path),
@@ -157,9 +154,7 @@ class TestPatternStoreIsolation:
         assert len(results_a) == 1
 
     @pytest.mark.asyncio
-    async def test_pattern_stores_have_different_collections(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_pattern_stores_have_different_collections(self, tmp_path: Path) -> None:
         """Different projects use different collection names."""
         store_a = ChromaPatternStore(
             persist_directory=str(tmp_path),
@@ -209,9 +204,7 @@ class TestDecisionStoreIsolation:
         assert len(results_a) == 1
 
     @pytest.mark.asyncio
-    async def test_decision_stores_have_different_collections(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_decision_stores_have_different_collections(self, tmp_path: Path) -> None:
         """Different projects use different collection names."""
         store_a = ChromaDecisionStore(
             persist_directory=str(tmp_path),

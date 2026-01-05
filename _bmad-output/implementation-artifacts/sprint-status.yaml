@@ -64,9 +64,9 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Quality Gate Framework (9 stories)
-  epic-3: backlog
-  3-1-create-quality-gate-decorator: backlog
-  3-2-implement-testability-gate: backlog
+  epic-3: in-progress
+  3-1-create-quality-gate-decorator: done
+  3-2-implement-testability-gate: done
   3-3-implement-ac-measurability-gate: backlog
   3-4-implement-architecture-validation-gate: backlog
   3-5-implement-definition-of-done-gate: backlog
