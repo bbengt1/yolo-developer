@@ -27,7 +27,7 @@ Security Note:
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import chromadb
 from chromadb.api.types import Metadatas, QueryResult
@@ -40,6 +40,9 @@ from tenacity import (
 )
 
 from yolo_developer.memory.protocol import MemoryResult
+
+if TYPE_CHECKING:
+    from yolo_developer.memory.graph import JSONGraphStore
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +107,8 @@ class ChromaMemory:
     embedding generation via the default embedding function. Supports
     semantic similarity search and upsert behavior for content updates.
 
+    Can optionally integrate with JSONGraphStore for relationship storage.
+
     Attributes:
         client: ChromaDB PersistentClient instance.
         collection: ChromaDB collection for storing embeddings.
@@ -116,12 +121,19 @@ class ChromaMemory:
         ...     metadata={"type": "fact"}
         ... )
         >>> results = await memory.search_similar("programming", k=3)
+        >>>
+        >>> # With graph storage integration
+        >>> from yolo_developer.memory import JSONGraphStore
+        >>> graph = JSONGraphStore(persist_path="/tmp/graph.json")
+        >>> memory = ChromaMemory("/tmp/test", graph_store=graph)
+        >>> await memory.store_relationship("story-001", "req-001", "implements")
     """
 
     def __init__(
         self,
         persist_directory: str,
         collection_name: str = "yolo_memory",
+        graph_store: JSONGraphStore | None = None,
     ) -> None:
         """Initialize ChromaMemory with persistent storage.
 
@@ -130,12 +142,16 @@ class ChromaMemory:
                 Data will be stored in this directory and survive restarts.
             collection_name: Name for the ChromaDB collection.
                 Defaults to "yolo_memory".
+            graph_store: Optional JSONGraphStore for relationship storage.
+                If provided, store_relationship will delegate to this store.
+                If not provided, store_relationship logs a warning.
         """
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},  # Use cosine similarity
         )
+        self._graph_store = graph_store
 
     @_chromadb_retry
     def _upsert(
@@ -276,17 +292,28 @@ class ChromaMemory:
     ) -> None:
         """Store a relationship between two entities.
 
-        This is a stub implementation for MVP. Graph relationship storage
-        will be implemented in Story 2.3 using JSON-based graph storage.
+        Delegates to the configured JSONGraphStore if available.
+        If no graph store is configured, logs a warning.
 
         Args:
             source: The source entity identifier (e.g., "story-001").
             target: The target entity identifier (e.g., "req-001").
             relation: The type of relationship (e.g., "implements", "depends_on").
 
-        Note:
-            This method is a no-op in the current implementation.
-            Full relationship storage will be added in Story 2.3.
+        Example:
+            >>> from yolo_developer.memory import ChromaMemory, JSONGraphStore
+            >>> graph = JSONGraphStore(persist_path=".yolo/memory/graph.json")
+            >>> memory = ChromaMemory(".yolo/memory", graph_store=graph)
+            >>> await memory.store_relationship("story-001", "req-001", "implements")
         """
-        # No-op for MVP - graph storage implemented in Story 2.3
-        pass
+        if self._graph_store is not None:
+            await self._graph_store.store_relationship(source, target, relation)
+        else:
+            logger.warning(
+                "store_relationship called but no graph_store configured",
+                extra={
+                    "source": source,
+                    "target": target,
+                    "relation": relation,
+                },
+            )
