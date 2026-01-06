@@ -52,12 +52,14 @@ class GateResult:
     """Result of a quality gate evaluation.
 
     Captures whether the gate passed, the gate name, failure reason,
-    and timestamp. Results are immutable for audit trail integrity.
+    score, threshold, and timestamp. Results are immutable for audit trail integrity.
 
     Attributes:
         passed: Whether the gate evaluation passed.
         gate_name: Name of the gate that was evaluated.
         reason: Reason for failure (None if passed).
+        score: Evaluation score (0.0-1.0), None if not applicable.
+        threshold: Threshold used for evaluation, None if not applicable.
         timestamp: When the evaluation occurred.
 
     Example:
@@ -65,16 +67,20 @@ class GateResult:
         ...     passed=False,
         ...     gate_name="testability",
         ...     reason="Missing unit tests for core functionality",
+        ...     score=0.65,
+        ...     threshold=0.80,
         ... )
         >>> result.passed
         False
-        >>> result.reason
-        'Missing unit tests for core functionality'
+        >>> result.score
+        0.65
     """
 
     passed: bool
     gate_name: str
     reason: str | None = None
+    score: float | None = None
+    threshold: float | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,6 +99,8 @@ class GateResult:
             "passed": self.passed,
             "gate_name": self.gate_name,
             "reason": self.reason,
+            "score": self.score,
+            "threshold": self.threshold,
             "timestamp": self.timestamp.isoformat(),
         }
 

@@ -29,54 +29,11 @@ def ensure_testability_evaluator_registered() -> None:
 
 
 class TestTestabilityTypes:
-    """Tests for testability gate data structures (Task 1)."""
+    """Tests for testability gate data structures (Task 1).
 
-    def test_testability_issue_creation(self) -> None:
-        """TestabilityIssue can be created with required fields."""
-        from yolo_developer.gates.gates.testability import TestabilityIssue
-
-        issue = TestabilityIssue(
-            requirement_id="req-001",
-            issue_type="vague_term",
-            description="Contains vague term 'fast'",
-            severity="blocking",
-        )
-
-        assert issue.requirement_id == "req-001"
-        assert issue.issue_type == "vague_term"
-        assert issue.description == "Contains vague term 'fast'"
-        assert issue.severity == "blocking"
-
-    def test_testability_issue_is_frozen(self) -> None:
-        """TestabilityIssue is immutable."""
-        from yolo_developer.gates.gates.testability import TestabilityIssue
-
-        issue = TestabilityIssue(
-            requirement_id="req-001",
-            issue_type="vague_term",
-            description="Test",
-            severity="blocking",
-        )
-
-        with pytest.raises(AttributeError):
-            issue.requirement_id = "new-id"  # type: ignore[misc]
-
-    def test_testability_issue_to_dict(self) -> None:
-        """TestabilityIssue can be converted to dict."""
-        from yolo_developer.gates.gates.testability import TestabilityIssue
-
-        issue = TestabilityIssue(
-            requirement_id="req-001",
-            issue_type="vague_term",
-            description="Contains vague term",
-            severity="warning",
-        )
-
-        d = issue.to_dict()
-        assert d["requirement_id"] == "req-001"
-        assert d["issue_type"] == "vague_term"
-        assert d["description"] == "Contains vague term"
-        assert d["severity"] == "warning"
+    Note: GateIssue type tests are in test_report_types.py.
+    These tests focus on testability-specific constants.
+    """
 
     def test_vague_terms_constant_exists(self) -> None:
         """VAGUE_TERMS constant is defined with expected terms."""
@@ -484,85 +441,97 @@ class TestTestabilityThresholdConfiguration:
 
 
 class TestFailureReportGeneration:
-    """Tests for failure report generation (Task 5)."""
+    """Tests for failure report generation (Task 5).
+
+    Note: Core report generation is tested in test_report_generator.py.
+    These tests verify testability gate's integration with the report system.
+    """
 
     def test_generate_report_with_single_issue(self) -> None:
-        """Report is generated for single issue."""
-        from yolo_developer.gates.gates.testability import (
-            TestabilityIssue,
-            generate_testability_report,
+        """Report is generated for single issue using shared report utilities."""
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            TestabilityIssue(
-                requirement_id="req-001",
+            GateIssue(
+                location="req-001",
                 issue_type="vague_term",
                 description="Contains vague term 'fast'",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
-        report = generate_testability_report(issues)
-        assert "req-001" in report
-        assert "fast" in report.lower()
-        assert "blocking" in report.lower()
+        report = generate_failure_report("testability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        assert "req-001" in formatted
+        assert "fast" in formatted.lower()
+        assert "BLOCKING" in formatted
 
     def test_generate_report_with_multiple_issues(self) -> None:
         """Report handles multiple issues."""
-        from yolo_developer.gates.gates.testability import (
-            TestabilityIssue,
-            generate_testability_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            TestabilityIssue(
-                requirement_id="req-001",
+            GateIssue(
+                location="req-001",
                 issue_type="vague_term",
                 description="Contains vague term 'fast'",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             ),
-            TestabilityIssue(
-                requirement_id="req-002",
+            GateIssue(
+                location="req-002",
                 issue_type="no_success_criteria",
                 description="No measurable outcome",
-                severity="warning",
+                severity=Severity.WARNING,
             ),
         ]
 
-        report = generate_testability_report(issues)
-        assert "req-001" in report
-        assert "req-002" in report
+        report = generate_failure_report("testability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        assert "req-001" in formatted
+        assert "req-002" in formatted
 
     def test_generate_report_includes_remediation(self) -> None:
         """Report includes remediation guidance."""
-        from yolo_developer.gates.gates.testability import (
-            TestabilityIssue,
-            generate_testability_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            TestabilityIssue(
-                requirement_id="req-001",
+            GateIssue(
+                location="req-001",
                 issue_type="vague_term",
                 description="Contains vague term 'fast'",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
-        report = generate_testability_report(issues)
-        # Report should include some form of remediation guidance
-        assert any(
-            word in report.lower()
-            for word in ["instead", "specific", "quantif", "measur", "suggest", "example"]
-        )
+        report = generate_failure_report("testability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        # Report should include remediation suggestion
+        assert "Suggestion:" in formatted
+        assert any(word in formatted.lower() for word in ["specific", "quantif", "measur"])
 
     def test_generate_report_empty_issues(self) -> None:
         """Report handles empty issues list."""
-        from yolo_developer.gates.gates.testability import generate_testability_report
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
+        )
 
-        report = generate_testability_report([])
-        # Empty report or success message
-        assert report == "" or "pass" in report.lower() or "no issues" in report.lower()
+        report = generate_failure_report("testability", [], 1.0, 0.8)
+        formatted = format_report_text(report)
+        # Should still generate a valid report structure
+        assert "Testability Gate Report" in formatted
 
 
 class TestEvaluatorRegistration:

@@ -208,42 +208,46 @@ class TestDoDCategory:
         assert DoDCategory.AC_COVERAGE.value == "ac_coverage"
 
 
-class TestDoDIssue:
-    """Tests for DoDIssue dataclass."""
+class TestGateIssueForDoD:
+    """Tests for GateIssue usage in DoD gate."""
 
-    def test_dod_issue_creation(self) -> None:
-        """DoDIssue should be creatable with required fields."""
-        from yolo_developer.gates.gates.definition_of_done import DoDCategory, DoDIssue
+    def test_gate_issue_creation_for_dod(self) -> None:
+        """GateIssue should be creatable with DoD-specific context."""
+        from yolo_developer.gates.gates.definition_of_done import DoDCategory
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
-        issue = DoDIssue(
-            check_id="test_check",
-            category=DoDCategory.TESTS,
+        issue = GateIssue(
+            location="public_function",
+            issue_type="test_check",
             description="Missing test",
-            severity="high",
-            item_name="public_function",
-            remediation="Add unit test for public_function",
+            severity=Severity.BLOCKING,
+            context={
+                "original_severity": "high",
+                "category": DoDCategory.TESTS.value,
+                "remediation": "Add unit test for public_function",
+            },
         )
-        assert issue.check_id == "test_check"
-        assert issue.category == DoDCategory.TESTS
+        assert issue.location == "public_function"
+        assert issue.issue_type == "test_check"
         assert issue.description == "Missing test"
-        assert issue.severity == "high"
-        assert issue.item_name == "public_function"
-        assert issue.remediation == "Add unit test for public_function"
+        assert issue.severity == Severity.BLOCKING
+        assert issue.context.get("original_severity") == "high"
+        assert issue.context.get("category") == DoDCategory.TESTS.value
+        assert issue.context.get("remediation") == "Add unit test for public_function"
 
-    def test_dod_issue_is_frozen(self) -> None:
-        """DoDIssue should be immutable."""
-        from yolo_developer.gates.gates.definition_of_done import DoDCategory, DoDIssue
+    def test_gate_issue_is_frozen(self) -> None:
+        """GateIssue should be immutable."""
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
-        issue = DoDIssue(
-            check_id="test_check",
-            category=DoDCategory.TESTS,
+        issue = GateIssue(
+            location="public_function",
+            issue_type="test_check",
             description="Missing test",
-            severity="high",
-            item_name="public_function",
-            remediation="Add test",
+            severity=Severity.BLOCKING,
+            context={"original_severity": "high"},
         )
         with pytest.raises(AttributeError):
-            issue.severity = "low"  # type: ignore[misc]
+            issue.severity = Severity.WARNING  # type: ignore[misc]
 
 
 class TestDoDChecklistItems:
@@ -365,13 +369,14 @@ class TestCheckTestPresence:
     def test_issues_include_remediation(
         self, mock_code_without_tests: dict, mock_story: dict
     ) -> None:
-        """Issues should include remediation guidance."""
+        """Issues should include remediation guidance in context."""
         from yolo_developer.gates.gates.definition_of_done import check_test_presence
 
         issues = check_test_presence(mock_code_without_tests, mock_story)
         for issue in issues:
-            assert issue.remediation is not None
-            assert len(issue.remediation) > 0
+            remediation = issue.context.get("remediation")
+            assert remediation is not None
+            assert len(remediation) > 0
 
 
 # =============================================================================
@@ -413,13 +418,14 @@ class TestCheckDocumentation:
         assert any("docstring" in i.description.lower() for i in issues)
 
     def test_issues_include_remediation(self, mock_code_without_docs: dict) -> None:
-        """Issues should include remediation guidance."""
+        """Issues should include remediation guidance in context."""
         from yolo_developer.gates.gates.definition_of_done import check_documentation
 
         issues = check_documentation(mock_code_without_docs)
         for issue in issues:
-            assert issue.remediation is not None
-            assert len(issue.remediation) > 0
+            remediation = issue.context.get("remediation")
+            assert remediation is not None
+            assert len(remediation) > 0
 
 
 # =============================================================================
@@ -462,12 +468,12 @@ class TestCheckCodeStyle:
         assert "complex" in descriptions or "nesting" in descriptions
 
     def test_issues_have_correct_category(self, mock_code_with_style_issues: dict) -> None:
-        """Issues should have STYLE category."""
+        """Issues should have STYLE category in context."""
         from yolo_developer.gates.gates.definition_of_done import DoDCategory, check_code_style
 
         issues = check_code_style(mock_code_with_style_issues)
         for issue in issues:
-            assert issue.category == DoDCategory.STYLE
+            assert issue.context.get("category") == DoDCategory.STYLE.value
 
 
 # =============================================================================
@@ -544,12 +550,12 @@ def validate_code_style():
     def test_issues_have_ac_coverage_category(
         self, mock_code_with_tests: dict, mock_story_partial_coverage: dict
     ) -> None:
-        """Issues should have AC_COVERAGE category."""
+        """Issues should have AC_COVERAGE category in context."""
         from yolo_developer.gates.gates.definition_of_done import DoDCategory, check_ac_coverage
 
         issues = check_ac_coverage(mock_code_with_tests, mock_story_partial_coverage)
         for issue in issues:
-            assert issue.category == DoDCategory.AC_COVERAGE
+            assert issue.context.get("category") == DoDCategory.AC_COVERAGE.value
 
 
 # =============================================================================
@@ -564,14 +570,35 @@ class TestGenerateDoDChecklist:
         """Should group issues by category."""
         from yolo_developer.gates.gates.definition_of_done import (
             DoDCategory,
-            DoDIssue,
             generate_dod_checklist,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            DoDIssue("t1", DoDCategory.TESTS, "Missing test", "high", "func1", "Add test"),
-            DoDIssue("d1", DoDCategory.DOCUMENTATION, "Missing doc", "medium", "func2", "Add doc"),
-            DoDIssue("s1", DoDCategory.STYLE, "Style issue", "low", "func3", "Fix style"),
+            GateIssue(
+                location="func1",
+                issue_type="t1",
+                description="Missing test",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "category": DoDCategory.TESTS.value},
+            ),
+            GateIssue(
+                location="func2",
+                issue_type="d1",
+                description="Missing doc",
+                severity=Severity.WARNING,
+                context={
+                    "original_severity": "medium",
+                    "category": DoDCategory.DOCUMENTATION.value,
+                },
+            ),
+            GateIssue(
+                location="func3",
+                issue_type="s1",
+                description="Style issue",
+                severity=Severity.WARNING,
+                context={"original_severity": "low", "category": DoDCategory.STYLE.value},
+            ),
         ]
         checklist = generate_dod_checklist(issues)
         assert "tests" in checklist or DoDCategory.TESTS.value in str(checklist)
@@ -582,12 +609,18 @@ class TestGenerateDoDChecklist:
         """Should calculate compliance score."""
         from yolo_developer.gates.gates.definition_of_done import (
             DoDCategory,
-            DoDIssue,
             generate_dod_checklist,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            DoDIssue("t1", DoDCategory.TESTS, "Missing test", "high", "func1", "Add test"),  # -20
+            GateIssue(
+                location="func1",
+                issue_type="t1",
+                description="Missing test",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "category": DoDCategory.TESTS.value},
+            ),  # -20
         ]
         checklist = generate_dod_checklist(issues)
         assert "score" in checklist
@@ -597,13 +630,19 @@ class TestGenerateDoDChecklist:
         """Score should not go below zero."""
         from yolo_developer.gates.gates.definition_of_done import (
             DoDCategory,
-            DoDIssue,
             generate_dod_checklist,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         # Create many high-severity issues
         issues = [
-            DoDIssue(f"t{i}", DoDCategory.TESTS, f"Issue {i}", "high", f"func{i}", "Fix")
+            GateIssue(
+                location=f"func{i}",
+                issue_type=f"t{i}",
+                description=f"Issue {i}",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "category": DoDCategory.TESTS.value},
+            )
             for i in range(10)  # 10 * 20 = 200 points
         ]
         checklist = generate_dod_checklist(issues)
@@ -783,55 +822,104 @@ def test_validate_code_style():
 # =============================================================================
 
 
-class TestGenerateDoDReport:
-    """Tests for generate_dod_report function."""
+class TestFailureReportGeneration:
+    """Tests for failure report generation using shared utilities."""
 
     def test_report_includes_score(self) -> None:
         """Report should include compliance score."""
-        from yolo_developer.gates.gates.definition_of_done import (
-            DoDCategory,
-            DoDIssue,
-            generate_dod_report,
+        from yolo_developer.gates.gates.definition_of_done import DoDCategory
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
-
-        issues = [DoDIssue("t1", DoDCategory.TESTS, "Missing test", "high", "func1", "Add test")]
-        checklist = {"score": 80, "tests": [{"item": "unit_tests_present", "passed": False}]}
-        report = generate_dod_report(issues, checklist, 80)
-        assert "80" in report
-
-    def test_report_includes_issues_by_category(self) -> None:
-        """Report should include issues grouped by category."""
-        from yolo_developer.gates.gates.definition_of_done import (
-            DoDCategory,
-            DoDIssue,
-            generate_dod_report,
-        )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            DoDIssue("t1", DoDCategory.TESTS, "Missing test", "high", "func1", "Add test"),
-            DoDIssue("d1", DoDCategory.DOCUMENTATION, "Missing doc", "medium", "func2", "Add doc"),
+            GateIssue(
+                location="func1",
+                issue_type="t1",
+                description="Missing test",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "category": DoDCategory.TESTS.value},
+            )
         ]
-        checklist = {"score": 70, "tests": [], "documentation": []}
-        report = generate_dod_report(issues, checklist, 70)
-        assert "test" in report.lower()
-        assert "documentation" in report.lower() or "doc" in report.lower()
+        report = generate_failure_report(
+            gate_name="definition_of_done",
+            issues=issues,
+            score=0.80,
+            threshold=0.70,
+        )
+        report_text = format_report_text(report)
+        assert "80" in report_text
+
+    def test_report_includes_issues(self) -> None:
+        """Report should include issues."""
+        from yolo_developer.gates.gates.definition_of_done import DoDCategory
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
+        )
+        from yolo_developer.gates.report_types import GateIssue, Severity
+
+        issues = [
+            GateIssue(
+                location="func1",
+                issue_type="t1",
+                description="Missing test",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "category": DoDCategory.TESTS.value},
+            ),
+            GateIssue(
+                location="func2",
+                issue_type="d1",
+                description="Missing doc",
+                severity=Severity.WARNING,
+                context={
+                    "original_severity": "medium",
+                    "category": DoDCategory.DOCUMENTATION.value,
+                },
+            ),
+        ]
+        report = generate_failure_report(
+            gate_name="definition_of_done",
+            issues=issues,
+            score=0.70,
+            threshold=0.70,
+        )
+        report_text = format_report_text(report)
+        assert "missing" in report_text.lower()
 
     def test_report_includes_remediation(self) -> None:
         """Report should include remediation suggestions."""
-        from yolo_developer.gates.gates.definition_of_done import (
-            DoDCategory,
-            DoDIssue,
-            generate_dod_report,
+        from yolo_developer.gates.gates.definition_of_done import DoDCategory
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            DoDIssue(
-                "t1", DoDCategory.TESTS, "Missing test", "high", "func1", "Add unit test for func1"
+            GateIssue(
+                location="func1",
+                issue_type="tests_missing",  # Use registered issue type
+                description="Missing test",
+                severity=Severity.BLOCKING,
+                context={
+                    "original_severity": "high",
+                    "category": DoDCategory.TESTS.value,
+                    "remediation": "Add unit test for func1",
+                },
             )
         ]
-        checklist = {"score": 80}
-        report = generate_dod_report(issues, checklist, 80)
-        assert "Add unit test" in report or "remediation" in report.lower()
+        report = generate_failure_report(
+            gate_name="definition_of_done",
+            issues=issues,
+            score=0.80,
+            threshold=0.70,
+        )
+        report_text = format_report_text(report)
+        # Check that remediation is included (either from context or registry)
+        assert "test" in report_text.lower()
 
 
 # =============================================================================

@@ -30,13 +30,14 @@ from __future__ import annotations
 
 import ast
 import re
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.report_generator import format_report_text, generate_failure_report
+from yolo_developer.gates.report_types import GateIssue, Severity
 from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
@@ -64,27 +65,18 @@ class DoDCategory(Enum):
     AC_COVERAGE = "ac_coverage"
 
 
-@dataclass(frozen=True)
-class DoDIssue:
-    """Issue found during Definition of Done validation.
+def _map_severity(original_severity: str) -> Severity:
+    """Map original severity level to Severity enum.
 
-    Immutable dataclass representing a single DoD validation issue.
+    Args:
+        original_severity: Original severity string (high, medium, low).
 
-    Attributes:
-        check_id: Unique identifier for this check.
-        category: Category of the issue (tests, docs, style, ac_coverage).
-        description: Human-readable description of the issue.
-        severity: Severity level (high, medium, low).
-        item_name: Name of the item (function, file, AC) with the issue.
-        remediation: Guidance on how to fix the issue.
+    Returns:
+        Severity.BLOCKING for high, Severity.WARNING for medium/low.
     """
-
-    check_id: str
-    category: DoDCategory
-    description: str
-    severity: str
-    item_name: str
-    remediation: str
+    if original_severity == "high":
+        return Severity.BLOCKING
+    return Severity.WARNING
 
 
 # Checklist items for each category
@@ -240,7 +232,7 @@ def _extract_test_function_names(content: str) -> set[str]:
 # =============================================================================
 
 
-def check_test_presence(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIssue]:
+def check_test_presence(code: dict[str, Any], story: dict[str, Any]) -> list[GateIssue]:
     """Check for test presence in the code.
 
     Detects public functions and verifies corresponding tests exist.
@@ -250,9 +242,9 @@ def check_test_presence(code: dict[str, Any], story: dict[str, Any]) -> list[DoD
         story: Story dict with acceptance criteria.
 
     Returns:
-        List of DoDIssue for missing tests.
+        List of GateIssue for missing tests.
     """
-    issues: list[DoDIssue] = []
+    issues: list[GateIssue] = []
     files = code.get("files", [])
 
     # Separate source and test files
@@ -283,27 +275,35 @@ def check_test_presence(code: dict[str, Any], story: dict[str, Any]) -> list[DoD
             )
 
             if not has_test:
+                original_severity = "high"
                 issues.append(
-                    DoDIssue(
-                        check_id=f"test_missing_{func_name}",
-                        category=DoDCategory.TESTS,
+                    GateIssue(
+                        location=func_name,
+                        issue_type=f"test_missing_{func_name}",
                         description=f"Public function '{func_name}' in {path} has no corresponding test",
-                        severity="high",
-                        item_name=func_name,
-                        remediation=f"Add a test function 'test_{func_name}' that covers the functionality of '{func_name}'",
+                        severity=_map_severity(original_severity),
+                        context={
+                            "original_severity": original_severity,
+                            "category": DoDCategory.TESTS.value,
+                            "remediation": f"Add a test function 'test_{func_name}' that covers the functionality of '{func_name}'",
+                        },
                     )
                 )
 
     # Check if test files exist at all
     if not test_files and source_files:
+        original_severity = "high"
         issues.append(
-            DoDIssue(
-                check_id="no_test_files",
-                category=DoDCategory.TESTS,
+            GateIssue(
+                location="tests",
+                issue_type="no_test_files",
                 description="No test files found in the codebase",
-                severity="high",
-                item_name="tests",
-                remediation="Create test files in the tests/ directory to cover the implementation",
+                severity=_map_severity(original_severity),
+                context={
+                    "original_severity": original_severity,
+                    "category": DoDCategory.TESTS.value,
+                    "remediation": "Create test files in the tests/ directory to cover the implementation",
+                },
             )
         )
 
@@ -316,7 +316,7 @@ def check_test_presence(code: dict[str, Any], story: dict[str, Any]) -> list[DoD
 # =============================================================================
 
 
-def check_documentation(code: dict[str, Any]) -> list[DoDIssue]:
+def check_documentation(code: dict[str, Any]) -> list[GateIssue]:
     """Check for documentation presence in the code.
 
     Verifies module docstrings and function docstrings exist.
@@ -325,9 +325,9 @@ def check_documentation(code: dict[str, Any]) -> list[DoDIssue]:
         code: Code artifact dict with 'files' key.
 
     Returns:
-        List of DoDIssue for missing documentation.
+        List of GateIssue for missing documentation.
     """
-    issues: list[DoDIssue] = []
+    issues: list[GateIssue] = []
     files = code.get("files", [])
 
     # Only check source files (not tests)
@@ -339,14 +339,18 @@ def check_documentation(code: dict[str, Any]) -> list[DoDIssue]:
 
         # Check module docstring
         if not _has_module_docstring(content):
+            original_severity = "medium"
             issues.append(
-                DoDIssue(
-                    check_id=f"missing_module_docstring_{path}",
-                    category=DoDCategory.DOCUMENTATION,
+                GateIssue(
+                    location=path,
+                    issue_type=f"missing_module_docstring_{path}",
                     description=f"Module '{path}' is missing a module-level docstring",
-                    severity="medium",
-                    item_name=path,
-                    remediation=f"Add a module docstring at the top of {path} describing its purpose and usage",
+                    severity=_map_severity(original_severity),
+                    context={
+                        "original_severity": original_severity,
+                        "category": DoDCategory.DOCUMENTATION.value,
+                        "remediation": f"Add a module docstring at the top of {path} describing its purpose and usage",
+                    },
                 )
             )
 
@@ -356,14 +360,18 @@ def check_documentation(code: dict[str, Any]) -> list[DoDIssue]:
 
         for func in public_functions:
             if not func["has_docstring"]:
+                original_severity = "medium"
                 issues.append(
-                    DoDIssue(
-                        check_id=f"missing_docstring_{func['name']}",
-                        category=DoDCategory.DOCUMENTATION,
+                    GateIssue(
+                        location=func["name"],
+                        issue_type=f"missing_docstring_{func['name']}",
                         description=f"Public function '{func['name']}' in {path} is missing a docstring",
-                        severity="medium",
-                        item_name=func["name"],
-                        remediation=f"Add a docstring to '{func['name']}' describing its purpose, args, and return value",
+                        severity=_map_severity(original_severity),
+                        context={
+                            "original_severity": original_severity,
+                            "category": DoDCategory.DOCUMENTATION.value,
+                            "remediation": f"Add a docstring to '{func['name']}' describing its purpose, args, and return value",
+                        },
                     )
                 )
 
@@ -376,7 +384,7 @@ def check_documentation(code: dict[str, Any]) -> list[DoDIssue]:
 # =============================================================================
 
 
-def check_code_style(code: dict[str, Any]) -> list[DoDIssue]:
+def check_code_style(code: dict[str, Any]) -> list[GateIssue]:
     """Check for code style compliance.
 
     Validates type annotations, naming conventions, and complexity.
@@ -385,9 +393,9 @@ def check_code_style(code: dict[str, Any]) -> list[DoDIssue]:
         code: Code artifact dict with 'files' key.
 
     Returns:
-        List of DoDIssue for style violations.
+        List of GateIssue for style violations.
     """
-    issues: list[DoDIssue] = []
+    issues: list[GateIssue] = []
     files = code.get("files", [])
 
     # Only check source files
@@ -404,64 +412,84 @@ def check_code_style(code: dict[str, Any]) -> list[DoDIssue]:
             # Check type annotations (skip private functions for this check)
             if not func["is_private"]:
                 if not func["has_return_type"]:
+                    original_severity = "medium"
                     issues.append(
-                        DoDIssue(
-                            check_id=f"missing_return_type_{func_name}",
-                            category=DoDCategory.STYLE,
+                        GateIssue(
+                            location=func_name,
+                            issue_type=f"missing_return_type_{func_name}",
                             description=f"Function '{func_name}' in {path} is missing return type annotation",
-                            severity="medium",
-                            item_name=func_name,
-                            remediation=f"Add return type annotation to '{func_name}' (e.g., '-> ReturnType')",
+                            severity=_map_severity(original_severity),
+                            context={
+                                "original_severity": original_severity,
+                                "category": DoDCategory.STYLE.value,
+                                "remediation": f"Add return type annotation to '{func_name}' (e.g., '-> ReturnType')",
+                            },
                         )
                     )
 
                 if not func["has_arg_types"]:
+                    original_severity = "medium"
                     issues.append(
-                        DoDIssue(
-                            check_id=f"missing_arg_types_{func_name}",
-                            category=DoDCategory.STYLE,
+                        GateIssue(
+                            location=func_name,
+                            issue_type=f"missing_arg_types_{func_name}",
                             description=f"Function '{func_name}' in {path} is missing argument type annotations",
-                            severity="medium",
-                            item_name=func_name,
-                            remediation=f"Add type annotations to arguments of '{func_name}' (e.g., 'arg: Type')",
+                            severity=_map_severity(original_severity),
+                            context={
+                                "original_severity": original_severity,
+                                "category": DoDCategory.STYLE.value,
+                                "remediation": f"Add type annotations to arguments of '{func_name}' (e.g., 'arg: Type')",
+                            },
                         )
                     )
 
             # Check naming conventions
             if not _is_naming_convention_valid(func_name):
+                original_severity = "medium"
                 issues.append(
-                    DoDIssue(
-                        check_id=f"naming_violation_{func_name}",
-                        category=DoDCategory.STYLE,
+                    GateIssue(
+                        location=func_name,
+                        issue_type=f"naming_violation_{func_name}",
                         description=f"Function '{func_name}' in {path} violates snake_case naming convention",
-                        severity="medium",
-                        item_name=func_name,
-                        remediation=f"Rename '{func_name}' to follow snake_case convention (lowercase with underscores)",
+                        severity=_map_severity(original_severity),
+                        context={
+                            "original_severity": original_severity,
+                            "category": DoDCategory.STYLE.value,
+                            "remediation": f"Rename '{func_name}' to follow snake_case convention (lowercase with underscores)",
+                        },
                     )
                 )
 
             # Check complexity (>20 lines or >4 nesting)
             if func["line_count"] > 20:
+                original_severity = "low"
                 issues.append(
-                    DoDIssue(
-                        check_id=f"long_function_{func_name}",
-                        category=DoDCategory.STYLE,
+                    GateIssue(
+                        location=func_name,
+                        issue_type=f"long_function_{func_name}",
                         description=f"Function '{func_name}' in {path} is too long ({func['line_count']} lines, max 20)",
-                        severity="low",
-                        item_name=func_name,
-                        remediation=f"Refactor '{func_name}' into smaller functions to improve readability",
+                        severity=_map_severity(original_severity),
+                        context={
+                            "original_severity": original_severity,
+                            "category": DoDCategory.STYLE.value,
+                            "remediation": f"Refactor '{func_name}' into smaller functions to improve readability",
+                        },
                     )
                 )
 
             if func["nesting_depth"] > 4:
+                original_severity = "medium"
                 issues.append(
-                    DoDIssue(
-                        check_id=f"deep_nesting_{func_name}",
-                        category=DoDCategory.STYLE,
+                    GateIssue(
+                        location=func_name,
+                        issue_type=f"deep_nesting_{func_name}",
                         description=f"Function '{func_name}' in {path} has excessive nesting (depth {func['nesting_depth']}, max 4)",
-                        severity="medium",
-                        item_name=func_name,
-                        remediation=f"Reduce nesting in '{func_name}' using early returns, guard clauses, or extraction",
+                        severity=_map_severity(original_severity),
+                        context={
+                            "original_severity": original_severity,
+                            "category": DoDCategory.STYLE.value,
+                            "remediation": f"Reduce nesting in '{func_name}' using early returns, guard clauses, or extraction",
+                        },
                     )
                 )
 
@@ -474,7 +502,7 @@ def check_code_style(code: dict[str, Any]) -> list[DoDIssue]:
 # =============================================================================
 
 
-def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIssue]:
+def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[GateIssue]:
     """Check acceptance criteria coverage in the code.
 
     Matches ACs to implementation evidence in code (comments, function names, etc.).
@@ -484,9 +512,9 @@ def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIs
         story: Story dict with 'acceptance_criteria' key.
 
     Returns:
-        List of DoDIssue for unaddressed ACs.
+        List of GateIssue for unaddressed ACs.
     """
-    issues: list[DoDIssue] = []
+    issues: list[GateIssue] = []
     acceptance_criteria = story.get("acceptance_criteria", [])
 
     if not acceptance_criteria:
@@ -533,14 +561,18 @@ def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIs
         if ac_addressed:
             addressed_count += 1
         else:
+            original_severity = "high"
             issues.append(
-                DoDIssue(
-                    check_id=f"unaddressed_ac_{ac_id}",
-                    category=DoDCategory.AC_COVERAGE,
+                GateIssue(
+                    location=ac_id,
+                    issue_type=f"unaddressed_ac_{ac_id}",
                     description=f"Acceptance criterion '{ac_id}' appears not addressed in the implementation",
-                    severity="high",
-                    item_name=ac_id,
-                    remediation=f"Ensure implementation addresses: {ac_text[:100]}...",
+                    severity=_map_severity(original_severity),
+                    context={
+                        "original_severity": original_severity,
+                        "category": DoDCategory.AC_COVERAGE.value,
+                        "remediation": f"Ensure implementation addresses: {ac_text[:100]}...",
+                    },
                 )
             )
 
@@ -548,14 +580,18 @@ def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIs
     if total_count > 0:
         coverage_pct = int((addressed_count / total_count) * 100)
         if coverage_pct < 100:
+            original_severity = "high" if coverage_pct < 50 else "medium"
             issues.append(
-                DoDIssue(
-                    check_id="ac_coverage_incomplete",
-                    category=DoDCategory.AC_COVERAGE,
+                GateIssue(
+                    location="ac_coverage",
+                    issue_type="ac_coverage_incomplete",
                     description=f"AC coverage is {coverage_pct}% ({addressed_count}/{total_count} criteria addressed)",
-                    severity="high" if coverage_pct < 50 else "medium",
-                    item_name="ac_coverage",
-                    remediation="Review and implement all acceptance criteria to achieve 100% coverage",
+                    severity=_map_severity(original_severity),
+                    context={
+                        "original_severity": original_severity,
+                        "category": DoDCategory.AC_COVERAGE.value,
+                        "remediation": "Review and implement all acceptance criteria to achieve 100% coverage",
+                    },
                 )
             )
 
@@ -568,13 +604,13 @@ def check_ac_coverage(code: dict[str, Any], story: dict[str, Any]) -> list[DoDIs
 # =============================================================================
 
 
-def generate_dod_checklist(issues: list[DoDIssue]) -> dict[str, Any]:
+def generate_dod_checklist(issues: list[GateIssue]) -> dict[str, Any]:
     """Generate DoD checklist from issues.
 
     Groups issues by category and calculates compliance score.
 
     Args:
-        issues: List of DoDIssue objects.
+        issues: List of GateIssue objects.
 
     Returns:
         Dict with score, breakdown, and categorized issues.
@@ -583,25 +619,29 @@ def generate_dod_checklist(issues: list[DoDIssue]) -> dict[str, Any]:
     categorized: dict[str, list[dict[str, Any]]] = {cat.value: [] for cat in DoDCategory}
 
     for issue in issues:
-        categorized[issue.category.value].append(
+        category = issue.context.get("category", DoDCategory.TESTS.value)
+        categorized[category].append(
             {
-                "check_id": issue.check_id,
+                "check_id": issue.issue_type,
                 "description": issue.description,
-                "severity": issue.severity,
-                "item_name": issue.item_name,
-                "remediation": issue.remediation,
+                "severity": issue.context.get("original_severity", "medium"),
+                "item_name": issue.location,
+                "remediation": issue.context.get("remediation", ""),
             }
         )
 
-    # Calculate score
-    total_deductions = sum(SEVERITY_WEIGHTS.get(issue.severity, 0) for issue in issues)
+    # Calculate score using original severity weights
+    total_deductions = sum(
+        SEVERITY_WEIGHTS.get(issue.context.get("original_severity", "medium"), 0)
+        for issue in issues
+    )
     score = max(0, 100 - total_deductions)
 
-    # Calculate breakdown
+    # Calculate breakdown using original severity
     breakdown: dict[str, int] = {
-        "high_count": sum(1 for i in issues if i.severity == "high"),
-        "medium_count": sum(1 for i in issues if i.severity == "medium"),
-        "low_count": sum(1 for i in issues if i.severity == "low"),
+        "high_count": sum(1 for i in issues if i.context.get("original_severity") == "high"),
+        "medium_count": sum(1 for i in issues if i.context.get("original_severity") == "medium"),
+        "low_count": sum(1 for i in issues if i.context.get("original_severity") == "low"),
         "total_deductions": total_deductions,
     }
 
@@ -663,7 +703,7 @@ async def definition_of_done_evaluator(context: GateContext) -> GateResult:
     )
 
     # Run all checks
-    all_issues: list[DoDIssue] = []
+    all_issues: list[GateIssue] = []
 
     # Test presence (AC1)
     all_issues.extend(check_test_presence(code, story))
@@ -681,11 +721,19 @@ async def definition_of_done_evaluator(context: GateContext) -> GateResult:
     checklist = generate_dod_checklist(all_issues)
     score = checklist["score"]
 
-    # Generate report for reason
-    report = generate_dod_report(all_issues, checklist, score)
-
     # Determine pass/fail
     passed = score >= threshold
+
+    # Generate report using shared utilities
+    score_decimal = score / 100.0
+    threshold_decimal_report = threshold / 100.0
+    report = generate_failure_report(
+        gate_name=context.gate_name,
+        issues=all_issues,
+        score=score_decimal,
+        threshold=threshold_decimal_report,
+    )
+    report_text = format_report_text(report)
 
     logger.info(
         "definition_of_done_evaluation_complete",
@@ -699,59 +747,10 @@ async def definition_of_done_evaluator(context: GateContext) -> GateResult:
     return GateResult(
         passed=passed,
         gate_name=context.gate_name,
-        reason=f"DoD compliance score: {score}/100 (threshold: {threshold}). {report}"
-        if not passed
-        else f"DoD compliance score: {score}/100 - All checks passed.",
+        reason=f"DoD compliance score: {score}/100 - All checks passed."
+        if passed
+        else f"DoD compliance score: {score}/100 (threshold: {threshold}).\n{report_text}",
     )
-
-
-# =============================================================================
-# Task 8: Failure Report Generation
-# =============================================================================
-
-
-def generate_dod_report(issues: list[DoDIssue], checklist: dict[str, Any], score: int) -> str:
-    """Generate a human-readable DoD report.
-
-    Args:
-        issues: List of DoDIssue objects.
-        checklist: Checklist dict from generate_dod_checklist.
-        score: Compliance score.
-
-    Returns:
-        Formatted report string.
-    """
-    if not issues:
-        return f"Score: {score}/100 - No issues found."
-
-    lines = [f"Score: {score}/100"]
-
-    # Add breakdown
-    breakdown = checklist.get("breakdown", {})
-    if breakdown:
-        lines.append(
-            f"Issues: {breakdown.get('high_count', 0)} high, "
-            f"{breakdown.get('medium_count', 0)} medium, "
-            f"{breakdown.get('low_count', 0)} low"
-        )
-
-    # Group by category
-    by_category: dict[str, list[DoDIssue]] = {}
-    for issue in issues:
-        cat_name = issue.category.value
-        if cat_name not in by_category:
-            by_category[cat_name] = []
-        by_category[cat_name].append(issue)
-
-    for category, cat_issues in by_category.items():
-        lines.append(f"\n{category.upper()} ({len(cat_issues)} issues):")
-        for issue in cat_issues[:3]:  # Show first 3 per category
-            lines.append(f"  - [{issue.severity}] {issue.description}")
-            lines.append(f"    Remediation: {issue.remediation}")
-        if len(cat_issues) > 3:
-            lines.append(f"  ... and {len(cat_issues) - 3} more")
-
-    return "\n".join(lines)
 
 
 # =============================================================================

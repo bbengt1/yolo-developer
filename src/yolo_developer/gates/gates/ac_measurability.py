@@ -26,12 +26,12 @@ Security Note:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import Any
 
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.report_generator import format_report_text, generate_failure_report
+from yolo_developer.gates.report_types import GateIssue, Severity
 from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
@@ -114,48 +114,6 @@ CONCRETE_CONDITION_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Count expectations
     re.compile(r"\d+\s+(?:items?|records?|results?|rows?|entries?)", re.IGNORECASE),
 )
-
-
-@dataclass(frozen=True)
-class ACMeasurabilityIssue:
-    """Represents a measurability issue found in an acceptance criterion.
-
-    Attributes:
-        story_id: ID of the story containing the AC.
-        ac_index: Index of the AC within the story's acceptance_criteria list.
-        issue_type: Type of issue (e.g., 'missing_gwt', 'subjective_term', 'vague_outcome').
-        description: Human-readable description of the issue.
-        severity: Severity level ('blocking' or 'warning').
-
-    Example:
-        >>> issue = ACMeasurabilityIssue(
-        ...     story_id="story-001",
-        ...     ac_index=0,
-        ...     issue_type="missing_gwt",
-        ...     description="Missing 'Given' clause",
-        ...     severity="blocking",
-        ... )
-    """
-
-    story_id: str
-    ac_index: int
-    issue_type: str
-    description: str
-    severity: str
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert issue to dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the issue.
-        """
-        return {
-            "story_id": self.story_id,
-            "ac_index": self.ac_index,
-            "issue_type": self.issue_type,
-            "description": self.description,
-            "severity": self.severity,
-        }
 
 
 def detect_subjective_terms(text: str) -> list[tuple[str, int]]:
@@ -269,19 +227,22 @@ def has_concrete_condition(ac_text: str) -> bool:
     return False
 
 
-def generate_improvement_suggestions(issues: list[ACMeasurabilityIssue]) -> dict[str, str]:
+def generate_improvement_suggestions(issues: list[GateIssue]) -> dict[str, str]:
     """Generate improvement suggestions for measurability issues.
 
     Creates targeted suggestions based on the type of issue found.
+    Note: This function is kept for backward compatibility. The centralized
+    remediation system in report_generator.py is now the preferred approach.
 
     Args:
-        issues: List of measurability issues to generate suggestions for.
+        issues: List of GateIssue instances to generate suggestions for.
 
     Returns:
         Dictionary mapping issue descriptions to improvement suggestions.
 
     Example:
-        >>> issues = [ACMeasurabilityIssue("s-1", 0, "missing_gwt", "Missing 'Given'", "blocking")]
+        >>> from yolo_developer.gates.report_types import GateIssue, Severity
+        >>> issues = [GateIssue("s-1/ac-0", "missing_gwt", "Missing 'Given'", Severity.BLOCKING)]
         >>> suggestions = generate_improvement_suggestions(issues)
         >>> "Given" in suggestions.get("Missing 'Given'", "")
         True
@@ -332,71 +293,6 @@ def generate_improvement_suggestions(issues: list[ACMeasurabilityIssue]) -> dict
             )
 
     return suggestions
-
-
-def generate_ac_measurability_report(issues: list[ACMeasurabilityIssue]) -> str:
-    """Generate a human-readable report of AC measurability issues.
-
-    Creates a formatted report listing all issues by story and AC,
-    including severity levels and remediation guidance.
-
-    Args:
-        issues: List of measurability issues found.
-
-    Returns:
-        Formatted report string.
-
-    Example:
-        >>> issues = [ACMeasurabilityIssue("s-1", 0, "missing_gwt", "Missing structure", "blocking")]
-        >>> report = generate_ac_measurability_report(issues)
-        >>> "s-1" in report
-        True
-    """
-    if not issues:
-        return ""
-
-    lines: list[str] = ["AC Measurability Gate Report", "=" * 40, ""]
-
-    # Group issues by story
-    issues_by_story: dict[str, list[ACMeasurabilityIssue]] = {}
-    for issue in issues:
-        if issue.story_id not in issues_by_story:
-            issues_by_story[issue.story_id] = []
-        issues_by_story[issue.story_id].append(issue)
-
-    # Generate suggestions for all issues
-    suggestions = generate_improvement_suggestions(issues)
-
-    for story_id, story_issues in issues_by_story.items():
-        lines.append(f"Story: {story_id}")
-        lines.append("-" * 30)
-
-        # Group by AC index within story
-        issues_by_ac: dict[int, list[ACMeasurabilityIssue]] = {}
-        for issue in story_issues:
-            if issue.ac_index not in issues_by_ac:
-                issues_by_ac[issue.ac_index] = []
-            issues_by_ac[issue.ac_index].append(issue)
-
-        for ac_index, ac_issues in sorted(issues_by_ac.items()):
-            lines.append(f"  AC #{ac_index}:")
-
-            for issue in ac_issues:
-                severity_marker = "[BLOCKING]" if issue.severity == "blocking" else "[WARNING]"
-                lines.append(f"    {severity_marker} {issue.description}")
-
-                # Add suggestion if available
-                if issue.description in suggestions:
-                    lines.append(f"      → {suggestions[issue.description]}")
-
-        lines.append("")
-
-    # Add summary
-    blocking_count = sum(1 for i in issues if i.severity == "blocking")
-    warning_count = sum(1 for i in issues if i.severity == "warning")
-    lines.append(f"Summary: {blocking_count} blocking, {warning_count} warnings")
-
-    return "\n".join(lines)
 
 
 async def ac_measurability_evaluator(context: GateContext) -> GateResult:
@@ -463,18 +359,21 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
             reason=None,
         )
 
-    issues: list[ACMeasurabilityIssue] = []
+    issues: list[GateIssue] = []
+    # Track story_ids for each location to calculate failing stories later
+    location_to_story: dict[str, str] = {}
 
     for story_idx, story in enumerate(stories):
         # Validate each story is a dict
         if not isinstance(story, dict):
+            location = f"index-{story_idx}"
+            location_to_story[location] = location
             issues.append(
-                ACMeasurabilityIssue(
-                    story_id=f"index-{story_idx}",
-                    ac_index=-1,
+                GateIssue(
+                    location=location,
                     issue_type="invalid_structure",
                     description=f"Story at index {story_idx} is not a dict (got {type(story).__name__})",
-                    severity="blocking",
+                    severity=Severity.BLOCKING,
                 )
             )
             continue
@@ -484,27 +383,29 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
 
         # Validate acceptance_criteria is a list
         if not isinstance(acceptance_criteria, list):
+            location_to_story[story_id] = story_id
             issues.append(
-                ACMeasurabilityIssue(
-                    story_id=story_id,
-                    ac_index=-1,
+                GateIssue(
+                    location=story_id,
                     issue_type="invalid_structure",
                     description=f"acceptance_criteria must be a list, got {type(acceptance_criteria).__name__}",
-                    severity="blocking",
+                    severity=Severity.BLOCKING,
                 )
             )
             continue
 
         for ac_idx, ac in enumerate(acceptance_criteria):
+            location = f"{story_id}/ac-{ac_idx}"
+            location_to_story[location] = story_id
+
             # Validate each AC is a dict
             if not isinstance(ac, dict):
                 issues.append(
-                    ACMeasurabilityIssue(
-                        story_id=story_id,
-                        ac_index=ac_idx,
+                    GateIssue(
+                        location=location,
                         issue_type="invalid_structure",
                         description=f"AC at index {ac_idx} is not a dict (got {type(ac).__name__})",
-                        severity="blocking",
+                        severity=Severity.BLOCKING,
                     )
                 )
                 continue
@@ -517,12 +418,11 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
             has_structure, missing_parts = has_gwt_structure(content)
             if not has_structure:
                 issues.append(
-                    ACMeasurabilityIssue(
-                        story_id=story_id,
-                        ac_index=ac_idx,
+                    GateIssue(
+                        location=location,
                         issue_type="missing_gwt",
                         description=f"Missing Given/When/Then structure: {', '.join(missing_parts)} not found",
-                        severity="blocking",
+                        severity=Severity.BLOCKING,
                     )
                 )
 
@@ -530,33 +430,32 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
             subjective_terms = detect_subjective_terms(content)
             for term, _pos in subjective_terms:
                 issues.append(
-                    ACMeasurabilityIssue(
-                        story_id=story_id,
-                        ac_index=ac_idx,
+                    GateIssue(
+                        location=location,
                         issue_type="subjective_term",
                         description=f"Contains subjective term '{term}'",
-                        severity="warning",
+                        severity=Severity.WARNING,
                     )
                 )
 
             # Check for concrete conditions (warning if has GWT but vague outcome)
             if has_structure and not has_concrete_condition(content):
                 issues.append(
-                    ACMeasurabilityIssue(
-                        story_id=story_id,
-                        ac_index=ac_idx,
+                    GateIssue(
+                        location=location,
                         issue_type="vague_outcome",
                         description="'Then' clause lacks concrete, verifiable condition",
-                        severity="warning",
+                        severity=Severity.WARNING,
                     )
                 )
 
     # Determine blocking and warning issues
-    blocking_issues = [i for i in issues if i.severity == "blocking"]
-    warning_issues = [i for i in issues if i.severity == "warning"]
+    blocking_issues = [i for i in issues if i.severity == Severity.BLOCKING]
+    warning_issues = [i for i in issues if i.severity == Severity.WARNING]
 
     # Calculate score based on stories without blocking issues
-    failing_story_ids = {issue.story_id for issue in blocking_issues}
+    # Extract story_id from location using the mapping
+    failing_story_ids = {location_to_story[issue.location] for issue in blocking_issues}
     passing_count = len(stories) - len(failing_story_ids)
     score = passing_count / len(stories) if stories else 1.0
 
@@ -566,12 +465,18 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
     score_percent = int(score * 100)
 
     if not passed:
-        report = generate_ac_measurability_report(issues)
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=issues,
+            score=score,
+            threshold=threshold,
+        )
+        formatted_report = format_report_text(report)
         failing_stories = sorted(failing_story_ids)
         reason = (
             f"AC measurability score {score_percent}% below threshold {threshold_percent}%. "
             f"{len(failing_stories)} of {len(stories)} story(ies) failed: "
-            f"{', '.join(failing_stories)}\n\n{report}"
+            f"{', '.join(failing_stories)}\n\n{formatted_report}"
         )
 
         logger.warning(
@@ -592,7 +497,13 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
 
     # Gate passes - may have warnings or some blocking issues below threshold
     if blocking_issues or warning_issues:
-        report = generate_ac_measurability_report(issues)
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=issues,
+            score=score,
+            threshold=threshold,
+        )
+        formatted_report = format_report_text(report)
         logger.info(
             "ac_measurability_gate_passed",
             gate_name=context.gate_name,
@@ -605,10 +516,10 @@ async def ac_measurability_evaluator(context: GateContext) -> GateResult:
         if blocking_issues:
             reason = (
                 f"AC measurability score {score_percent}% meets threshold {threshold_percent}%. "
-                f"Note: {len(failing_story_ids)} story(ies) have issues.\n\n{report}"
+                f"Note: {len(failing_story_ids)} story(ies) have issues.\n\n{formatted_report}"
             )
         else:
-            reason = f"Passed with {len(warning_issues)} warning(s):\n\n{report}"
+            reason = f"Passed with {len(warning_issues)} warning(s):\n\n{formatted_report}"
 
         return GateResult(
             passed=True,

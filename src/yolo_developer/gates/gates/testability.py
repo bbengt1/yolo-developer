@@ -24,12 +24,13 @@ Security Note:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Any
 
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.report_generator import format_report_text, generate_failure_report
+from yolo_developer.gates.report_types import GateIssue, Severity
 from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
@@ -96,44 +97,6 @@ MEASURABLE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Boolean outcomes (e.g., "succeeds", "fails", "returns true")
     re.compile(r"\b(?:succeeds?|fails?|returns?\s+(?:true|false)|completes?)\b", re.IGNORECASE),
 )
-
-
-@dataclass(frozen=True)
-class TestabilityIssue:
-    """Represents a testability issue found in a requirement.
-
-    Attributes:
-        requirement_id: ID of the requirement with the issue.
-        issue_type: Type of issue (e.g., 'vague_term', 'no_success_criteria').
-        description: Human-readable description of the issue.
-        severity: Severity level ('blocking' or 'warning').
-
-    Example:
-        >>> issue = TestabilityIssue(
-        ...     requirement_id="req-001",
-        ...     issue_type="vague_term",
-        ...     description="Contains vague term 'fast'",
-        ...     severity="blocking",
-        ... )
-    """
-
-    requirement_id: str
-    issue_type: str
-    description: str
-    severity: str
-
-    def to_dict(self) -> dict[str, str]:
-        """Convert issue to dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the issue.
-        """
-        return {
-            "requirement_id": self.requirement_id,
-            "issue_type": self.issue_type,
-            "description": self.description,
-            "severity": self.severity,
-        }
 
 
 def detect_vague_terms(text: str) -> list[tuple[str, int]]:
@@ -230,63 +193,6 @@ def has_success_criteria(requirement: dict[str, Any]) -> bool:
     return False
 
 
-def generate_testability_report(issues: list[TestabilityIssue]) -> str:
-    """Generate a human-readable report of testability issues.
-
-    Creates a formatted report listing all issues by requirement,
-    including severity levels and remediation guidance.
-
-    Args:
-        issues: List of testability issues found.
-
-    Returns:
-        Formatted report string.
-
-    Example:
-        >>> issues = [TestabilityIssue("r1", "vague_term", "Contains 'fast'", "blocking")]
-        >>> report = generate_testability_report(issues)
-        >>> "r1" in report
-        True
-    """
-    if not issues:
-        return ""
-
-    lines: list[str] = ["Testability Gate Report", "=" * 40, ""]
-
-    # Group issues by requirement
-    issues_by_req: dict[str, list[TestabilityIssue]] = {}
-    for issue in issues:
-        if issue.requirement_id not in issues_by_req:
-            issues_by_req[issue.requirement_id] = []
-        issues_by_req[issue.requirement_id].append(issue)
-
-    for req_id, req_issues in issues_by_req.items():
-        lines.append(f"Requirement: {req_id}")
-        lines.append("-" * 30)
-
-        for issue in req_issues:
-            severity_marker = "[BLOCKING]" if issue.severity == "blocking" else "[WARNING]"
-            lines.append(f"  {severity_marker} {issue.description}")
-
-            # Add remediation guidance based on issue type
-            if issue.issue_type == "vague_term":
-                lines.append(
-                    "    Suggestion: Replace vague terms with specific, measurable criteria."
-                )
-                lines.append("    Example: Instead of 'fast', use 'responds within 500ms'")
-            elif issue.issue_type == "no_success_criteria":
-                lines.append(
-                    "    Suggestion: Add quantifiable success criteria to this requirement."
-                )
-                lines.append(
-                    "    Example: Include specific metrics, percentages, or Given/When/Then format"
-                )
-
-        lines.append("")
-
-    return "\n".join(lines)
-
-
 async def testability_evaluator(context: GateContext) -> GateResult:
     """Evaluate requirements for testability.
 
@@ -348,17 +254,17 @@ async def testability_evaluator(context: GateContext) -> GateResult:
             reason=None,
         )
 
-    issues: list[TestabilityIssue] = []
+    issues: list[GateIssue] = []
 
     for idx, req in enumerate(requirements):
         # Validate each requirement is a dict
         if not isinstance(req, dict):
             issues.append(
-                TestabilityIssue(
-                    requirement_id=f"index-{idx}",
+                GateIssue(
+                    location=f"index-{idx}",
                     issue_type="invalid_structure",
                     description=f"Requirement at index {idx} is not a dict (got {type(req).__name__})",
-                    severity="blocking",
+                    severity=Severity.BLOCKING,
                 )
             )
             continue
@@ -370,28 +276,28 @@ async def testability_evaluator(context: GateContext) -> GateResult:
         vague_terms = detect_vague_terms(content)
         for term, _pos in vague_terms:
             issues.append(
-                TestabilityIssue(
-                    requirement_id=req_id,
+                GateIssue(
+                    location=req_id,
                     issue_type="vague_term",
                     description=f"Contains vague term '{term}'",
-                    severity="blocking",
+                    severity=Severity.BLOCKING,
                 )
             )
 
         # Check for success criteria
         if not has_success_criteria(req):
             issues.append(
-                TestabilityIssue(
-                    requirement_id=req_id,
+                GateIssue(
+                    location=req_id,
                     issue_type="no_success_criteria",
                     description="No measurable success criteria found",
-                    severity="blocking",
+                    severity=Severity.BLOCKING,
                 )
             )
 
     # Calculate testability score
-    # Count requirements with issues (each unique requirement_id counts as 1 failure)
-    failing_req_ids = {issue.requirement_id for issue in issues}
+    # Count requirements with issues (each unique location counts as 1 failure)
+    failing_req_ids = {issue.location for issue in issues}
     passing_count = len(requirements) - len(failing_req_ids)
     score = passing_count / len(requirements) if requirements else 1.0
 
@@ -401,12 +307,18 @@ async def testability_evaluator(context: GateContext) -> GateResult:
     score_percent = int(score * 100)
 
     if not passed:
-        report = generate_testability_report(issues)
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=issues,
+            score=score,
+            threshold=threshold,
+        )
+        formatted_report = format_report_text(report)
         failing_reqs = sorted(failing_req_ids)
         reason = (
             f"Testability score {score_percent}% below threshold {threshold_percent}%. "
             f"{len(failing_reqs)} of {len(requirements)} requirement(s) failed: "
-            f"{', '.join(failing_reqs)}\n\n{report}"
+            f"{', '.join(failing_reqs)}\n\n{formatted_report}"
         )
 
         logger.warning(
@@ -435,10 +347,16 @@ async def testability_evaluator(context: GateContext) -> GateResult:
     # Include score info even on pass
     pass_reason: str | None = None
     if issues:
-        report = generate_testability_report(issues)
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=issues,
+            score=score,
+            threshold=threshold,
+        )
+        formatted_report = format_report_text(report)
         pass_reason = (
             f"Testability score {score_percent}% meets threshold {threshold_percent}%. "
-            f"Note: {len(failing_req_ids)} requirement(s) have issues.\n\n{report}"
+            f"Note: {len(failing_req_ids)} requirement(s) have issues.\n\n{formatted_report}"
         )
 
     return GateResult(

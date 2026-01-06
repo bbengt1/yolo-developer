@@ -35,6 +35,8 @@ from typing import Any
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.report_generator import format_report_text, generate_failure_report
+from yolo_developer.gates.report_types import GateIssue, Severity
 from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
@@ -278,6 +280,48 @@ def _get_remediation_for_factor(factor_name: str, score: int) -> str:
         "documentation": "Add docstrings to public functions and module-level documentation",
     }
     return remediations.get(factor_name, f"Improve {factor_name} to increase confidence score")
+
+
+def _factors_to_issues(factors: list[ConfidenceFactor], threshold: int) -> list[GateIssue]:
+    """Convert low-scoring confidence factors to GateIssue objects.
+
+    Creates GateIssue objects for factors scoring below threshold/100,
+    enabling integration with the shared report system.
+
+    Args:
+        factors: List of ConfidenceFactor objects.
+        threshold: Confidence threshold (0-100 scale).
+
+    Returns:
+        List of GateIssue objects for factors needing improvement.
+    """
+    issues: list[GateIssue] = []
+    low_threshold = max(60, threshold - 30)  # Factors below this are concerning
+
+    for factor in factors:
+        if factor.score < low_threshold:
+            # Very low score is blocking, moderately low is warning
+            if factor.score < 50:
+                severity = Severity.BLOCKING
+            else:
+                severity = Severity.WARNING
+
+            issues.append(
+                GateIssue(
+                    location=factor.name,
+                    issue_type=f"low_{factor.name}",
+                    description=f"{factor.name} score is {factor.score}/100: {factor.description}",
+                    severity=severity,
+                    context={
+                        "factor_score": factor.score,
+                        "factor_weight": factor.weight,
+                        "contribution": round(factor.score * factor.weight, 2),
+                        "remediation": _get_remediation_for_factor(factor.name, factor.score),
+                    },
+                )
+            )
+
+    return issues
 
 
 # =============================================================================
@@ -871,8 +915,8 @@ async def confidence_scoring_evaluator(context: GateContext) -> GateResult:
     # Calculate overall score
     breakdown = calculate_confidence_score(factors, threshold)
 
-    # Generate report
-    report = generate_confidence_report(breakdown, threshold)
+    # Convert low-scoring factors to issues for shared report
+    issues = _factors_to_issues(factors, threshold)
 
     logger.info(
         "confidence_scoring_evaluation_complete",
@@ -885,7 +929,20 @@ async def confidence_scoring_evaluator(context: GateContext) -> GateResult:
     if breakdown.passed:
         reason = f"Confidence score: {breakdown.weighted_score:.1f}/100 (threshold: {threshold}). All factors acceptable."
     else:
-        reason = f"Confidence score: {breakdown.weighted_score:.1f}/100 (threshold: {threshold}). {report}"
+        # Generate report using shared utilities
+        score_decimal = breakdown.weighted_score / 100.0
+        threshold_decimal_report = threshold / 100.0
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=issues,
+            score=score_decimal,
+            threshold=threshold_decimal_report,
+        )
+        report_text = format_report_text(report)
+
+        # Include detailed confidence report for factor breakdown
+        confidence_report = generate_confidence_report(breakdown, threshold)
+        reason = f"Confidence score: {breakdown.weighted_score:.1f}/100 (threshold: {threshold}).\n{report_text}\n\n{confidence_report}"
 
     return GateResult(
         passed=breakdown.passed,

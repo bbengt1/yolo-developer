@@ -26,12 +26,13 @@ Security Note:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Any
 
 import structlog
 
 from yolo_developer.gates.evaluators import register_evaluator
+from yolo_developer.gates.report_generator import format_report_text, generate_failure_report
+from yolo_developer.gates.report_types import GateIssue, Severity
 from yolo_developer.gates.threshold_resolver import resolve_threshold
 from yolo_developer.gates.types import GateContext, GateResult
 
@@ -151,52 +152,24 @@ SECURITY_ANTI_PATTERNS: dict[str, dict[str, Any]] = {
 }
 
 
-@dataclass(frozen=True)
-class ArchitectureIssue:
-    """Represents an architecture validation issue.
+def _map_severity(original_severity: str) -> Severity:
+    """Map original severity level to Severity enum.
 
-    Attributes:
-        decision_id: ID of the decision with the issue.
-        issue_type: Type of issue ('twelve_factor', 'tech_stack', 'security').
-        description: Human-readable description of the issue.
-        severity: Severity level ('critical', 'high', 'medium', 'low').
-        principle: Optional 12-Factor principle name if applicable.
+    Args:
+        original_severity: Original severity string (critical, high, medium, low).
 
-    Example:
-        >>> issue = ArchitectureIssue(
-        ...     decision_id="decision-001",
-        ...     issue_type="twelve_factor",
-        ...     description="Config not externalized",
-        ...     severity="high",
-        ...     principle="config",
-        ... )
+    Returns:
+        Severity.BLOCKING for critical/high, Severity.WARNING for medium/low.
     """
-
-    decision_id: str
-    issue_type: str
-    description: str
-    severity: str
-    principle: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert issue to dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the issue.
-        """
-        return {
-            "decision_id": self.decision_id,
-            "issue_type": self.issue_type,
-            "description": self.description,
-            "severity": self.severity,
-            "principle": self.principle,
-        }
+    if original_severity in ("critical", "high"):
+        return Severity.BLOCKING
+    return Severity.WARNING
 
 
 def check_twelve_factor_compliance(
     architecture: dict[str, Any],
     decision_id: str = "architecture",
-) -> list[ArchitectureIssue]:
+) -> list[GateIssue]:
     """Check architecture against 12-Factor principles.
 
     Validates that the architecture follows 12-Factor app methodology.
@@ -206,7 +179,7 @@ def check_twelve_factor_compliance(
         decision_id: ID of the decision being checked (for traceability).
 
     Returns:
-        List of ArchitectureIssue for any violations found.
+        List of GateIssue for any violations found.
 
     Example:
         >>> arch = {"twelve_factor": {"config": False}}
@@ -214,7 +187,7 @@ def check_twelve_factor_compliance(
         >>> len(issues) >= 1
         True
     """
-    issues: list[ArchitectureIssue] = []
+    issues: list[GateIssue] = []
     twelve_factor = architecture.get("twelve_factor", {})
 
     if not isinstance(twelve_factor, dict):
@@ -225,13 +198,14 @@ def check_twelve_factor_compliance(
         if principle_name in twelve_factor and twelve_factor[principle_name] is False:
             description = principle_info["description"]
             remediation = principle_info["remediation"]
+            original_severity = "high"
             issues.append(
-                ArchitectureIssue(
-                    decision_id=decision_id,
+                GateIssue(
+                    location=decision_id,
                     issue_type="twelve_factor",
                     description=f"12-Factor violation ({principle_name}): {description}. Remediation: {remediation}",
-                    severity="high",
-                    principle=principle_name,
+                    severity=_map_severity(original_severity),
+                    context={"original_severity": original_severity, "principle": principle_name},
                 )
             )
 
@@ -305,7 +279,7 @@ def validate_tech_stack(
     architecture: dict[str, Any],
     constraints: dict[str, Any],
     decision_id: str = "tech_stack",
-) -> list[ArchitectureIssue]:
+) -> list[GateIssue]:
     """Validate tech stack against constraints.
 
     Checks that the architecture uses only allowed technologies and
@@ -318,7 +292,7 @@ def validate_tech_stack(
         decision_id: ID of the decision being checked (for traceability).
 
     Returns:
-        List of ArchitectureIssue for any constraint violations.
+        List of GateIssue for any constraint violations.
 
     Example:
         >>> arch = {"tech_stack": {"languages": ["rust"]}}
@@ -327,7 +301,7 @@ def validate_tech_stack(
         >>> len(issues) >= 1
         True
     """
-    issues: list[ArchitectureIssue] = []
+    issues: list[GateIssue] = []
 
     if not constraints:
         return issues
@@ -348,13 +322,14 @@ def validate_tech_stack(
         for lang in used_languages:
             lang_lower = lang.lower()
             if lang_lower not in [a.lower() for a in allowed_languages]:
+                original_severity = "high"
                 issues.append(
-                    ArchitectureIssue(
-                        decision_id=decision_id,
+                    GateIssue(
+                        location=decision_id,
                         issue_type="tech_stack",
                         description=f"Unsupported language: {lang}. Allowed: {', '.join(allowed_languages)}",
-                        severity="high",
-                        principle=None,
+                        severity=_map_severity(original_severity),
+                        context={"original_severity": original_severity},
                     )
                 )
             # Check version constraint
@@ -362,13 +337,14 @@ def validate_tech_stack(
                 constraint = version_constraints.get(lang_lower) or version_constraints.get(lang)
                 used_version = language_versions.get(lang) or language_versions.get(lang_lower, "")
                 if used_version and not _check_version_constraint(used_version, constraint):
+                    original_severity = "high"
                     issues.append(
-                        ArchitectureIssue(
-                            decision_id=decision_id,
+                        GateIssue(
+                            location=decision_id,
                             issue_type="tech_stack",
                             description=f"Version incompatibility: {lang} {used_version} does not satisfy {constraint}",
-                            severity="high",
-                            principle=None,
+                            severity=_map_severity(original_severity),
+                            context={"original_severity": original_severity},
                         )
                     )
 
@@ -381,13 +357,14 @@ def validate_tech_stack(
         for framework in used_frameworks:
             framework_lower = framework.lower()
             if framework_lower not in [a.lower() for a in allowed_frameworks]:
+                original_severity = "medium"
                 issues.append(
-                    ArchitectureIssue(
-                        decision_id=decision_id,
+                    GateIssue(
+                        location=decision_id,
                         issue_type="tech_stack",
                         description=f"Unsupported framework: {framework}. Allowed: {', '.join(allowed_frameworks)}",
-                        severity="medium",
-                        principle=None,
+                        severity=_map_severity(original_severity),
+                        context={"original_severity": original_severity},
                     )
                 )
             # Check version constraint
@@ -399,13 +376,14 @@ def validate_tech_stack(
                     framework_lower, ""
                 )
                 if used_version and not _check_version_constraint(used_version, constraint):
+                    original_severity = "medium"
                     issues.append(
-                        ArchitectureIssue(
-                            decision_id=decision_id,
+                        GateIssue(
+                            location=decision_id,
                             issue_type="tech_stack",
                             description=f"Version incompatibility: {framework} {used_version} does not satisfy {constraint}",
-                            severity="medium",
-                            principle=None,
+                            severity=_map_severity(original_severity),
+                            context={"original_severity": original_severity},
                         )
                     )
 
@@ -415,13 +393,14 @@ def validate_tech_stack(
         used_databases = tech_stack.get("databases", [])
         for db in used_databases:
             if db.lower() not in [a.lower() for a in allowed_databases]:
+                original_severity = "high"
                 issues.append(
-                    ArchitectureIssue(
-                        decision_id=decision_id,
+                    GateIssue(
+                        location=decision_id,
                         issue_type="tech_stack",
                         description=f"Unsupported database: {db}. Allowed: {', '.join(allowed_databases)}",
-                        severity="high",
-                        principle=None,
+                        severity=_map_severity(original_severity),
+                        context={"original_severity": original_severity},
                     )
                 )
 
@@ -463,7 +442,7 @@ def _extract_text_content(obj: Any, depth: int = 0, max_depth: int = 5) -> str:
 def detect_security_anti_patterns(
     architecture: dict[str, Any],
     decision_id: str = "security",
-) -> list[ArchitectureIssue]:
+) -> list[GateIssue]:
     """Detect security anti-patterns in architecture.
 
     Scans architecture for known security issues.
@@ -473,7 +452,7 @@ def detect_security_anti_patterns(
         decision_id: ID of the decision being checked (for traceability).
 
     Returns:
-        List of ArchitectureIssue for any security issues found.
+        List of GateIssue for any security issues found.
 
     Example:
         >>> arch = {"security": {"secrets": "password=secret123"}}
@@ -481,7 +460,7 @@ def detect_security_anti_patterns(
         >>> len(issues) >= 1
         True
     """
-    issues: list[ArchitectureIssue] = []
+    issues: list[GateIssue] = []
 
     # Extract all text content from architecture for scanning
     text_content = _extract_text_content(architecture)
@@ -489,13 +468,14 @@ def detect_security_anti_patterns(
     for pattern_name, pattern_config in SECURITY_ANTI_PATTERNS.items():
         for pattern in pattern_config["patterns"]:
             if pattern.search(text_content):
+                original_severity = pattern_config["severity"]
                 issues.append(
-                    ArchitectureIssue(
-                        decision_id=decision_id,
+                    GateIssue(
+                        location=decision_id,
                         issue_type="security",
                         description=f"Security anti-pattern detected: {pattern_name}. {pattern_config['remediation']}",
-                        severity=pattern_config["severity"],
-                        principle=None,
+                        severity=_map_severity(original_severity),
+                        context={"original_severity": original_severity, "pattern": pattern_name},
                     )
                 )
                 # Only report each anti-pattern type once
@@ -505,7 +485,7 @@ def detect_security_anti_patterns(
 
 
 def calculate_compliance_score(
-    issues: list[ArchitectureIssue],
+    issues: list[GateIssue],
 ) -> tuple[int, dict[str, int]]:
     """Calculate compliance score from issues.
 
@@ -516,15 +496,21 @@ def calculate_compliance_score(
     - low: 1 point
 
     Args:
-        issues: List of architecture issues.
+        issues: List of GateIssue (with original_severity in context).
 
     Returns:
         Tuple of (score, breakdown) where score is 0-100 and
         breakdown shows counts by severity.
 
     Example:
-        >>> issues = [ArchitectureIssue("d-1", "security", "Test", "critical", None)]
-        >>> score, breakdown = calculate_compliance_score(issues)
+        >>> issue = GateIssue(
+        ...     location="d-1",
+        ...     issue_type="security",
+        ...     description="Test",
+        ...     severity=Severity.BLOCKING,
+        ...     context={"original_severity": "critical"},
+        ... )
+        >>> score, breakdown = calculate_compliance_score([issue])
         >>> score
         75
     """
@@ -535,7 +521,10 @@ def calculate_compliance_score(
     total_deduction = 0
 
     for issue in issues:
-        severity = issue.severity
+        # Extract original severity from context, default to high for blocking, low for warning
+        severity = issue.context.get("original_severity")
+        if severity is None:
+            severity = "high" if issue.severity == Severity.BLOCKING else "low"
         if severity in breakdown:
             breakdown[severity] += 1
             total_deduction += SEVERITY_WEIGHTS.get(severity, 0)
@@ -544,80 +533,7 @@ def calculate_compliance_score(
     return score, breakdown
 
 
-def generate_architecture_report(
-    issues: list[ArchitectureIssue],
-    score: int,
-    breakdown: dict[str, int],
-) -> str:
-    """Generate human-readable architecture validation report.
-
-    Args:
-        issues: List of architecture issues.
-        score: Compliance score (0-100).
-        breakdown: Score breakdown by severity.
-
-    Returns:
-        Formatted report string.
-
-    Example:
-        >>> issues = [ArchitectureIssue("d-1", "security", "Test", "critical", None)]
-        >>> report = generate_architecture_report(issues, 75, {"critical": 1})
-        >>> "75" in report
-        True
-    """
-    if not issues:
-        return ""
-
-    lines: list[str] = [
-        "Architecture Validation Gate Report",
-        "=" * 40,
-        "",
-        f"Compliance Score: {score}/100",
-        "",
-    ]
-
-    # Add breakdown
-    if breakdown:
-        lines.append("Score Breakdown:")
-        for severity, count in breakdown.items():
-            if count > 0:
-                lines.append(
-                    f"  - {severity.capitalize()}: {count} issue(s) (-{count * SEVERITY_WEIGHTS.get(severity, 0)} points)"
-                )
-        lines.append("")
-
-    # Group issues by type
-    issues_by_type: dict[str, list[ArchitectureIssue]] = {}
-    for issue in issues:
-        if issue.issue_type not in issues_by_type:
-            issues_by_type[issue.issue_type] = []
-        issues_by_type[issue.issue_type].append(issue)
-
-    # Report each category
-    type_labels = {
-        "twelve_factor": "12-Factor Principle Violations",
-        "tech_stack": "Tech Stack Constraint Violations",
-        "security": "Security Issues",
-        "adr": "Architecture Decision Record Issues",
-    }
-
-    for issue_type, type_issues in issues_by_type.items():
-        label = type_labels.get(issue_type, issue_type.title())
-        lines.append(f"{label}:")
-        lines.append("-" * 30)
-
-        for issue in type_issues:
-            severity_marker = f"[{issue.severity.upper()}]"
-            lines.append(f"  {severity_marker} {issue.description}")
-            if issue.principle:
-                lines.append(f"    Principle: {issue.principle}")
-
-        lines.append("")
-
-    return "\n".join(lines)
-
-
-def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[ArchitectureIssue]:
+def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[GateIssue]:
     """Evaluate Architecture Decision Records for completeness and quality.
 
     Checks each ADR for required fields and content quality.
@@ -626,7 +542,7 @@ def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[ArchitectureIssue]:
         adrs: List of ADR dictionaries.
 
     Returns:
-        List of ArchitectureIssue for any ADR problems found.
+        List of GateIssue for any ADR problems found.
 
     Example:
         >>> adrs = [{"id": "ADR-001", "title": "Use PostgreSQL"}]
@@ -634,7 +550,7 @@ def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[ArchitectureIssue]:
         >>> isinstance(issues, list)
         True
     """
-    issues: list[ArchitectureIssue] = []
+    issues: list[GateIssue] = []
 
     required_fields = ["id", "title", "status", "context", "decision", "consequences"]
 
@@ -647,13 +563,17 @@ def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[ArchitectureIssue]:
         # Check for required fields
         missing_fields = [f for f in required_fields if f not in adr or not adr[f]]
         if missing_fields:
+            original_severity = "medium"
             issues.append(
-                ArchitectureIssue(
-                    decision_id=adr_id,
+                GateIssue(
+                    location=adr_id,
                     issue_type="adr",
                     description=f"ADR {adr_id} missing required fields: {', '.join(missing_fields)}",
-                    severity="medium",
-                    principle=None,
+                    severity=_map_severity(original_severity),
+                    context={
+                        "original_severity": original_severity,
+                        "missing_fields": missing_fields,
+                    },
                 )
             )
 
@@ -662,13 +582,17 @@ def evaluate_adrs(adrs: list[dict[str, Any]]) -> list[ArchitectureIssue]:
         for pattern_name, pattern_config in SECURITY_ANTI_PATTERNS.items():
             for pattern in pattern_config["patterns"]:
                 if pattern.search(adr_text):
+                    original_severity = pattern_config["severity"]
                     issues.append(
-                        ArchitectureIssue(
-                            decision_id=adr_id,
+                        GateIssue(
+                            location=adr_id,
                             issue_type="security",
                             description=f"ADR {adr_id} contains security anti-pattern: {pattern_name}. {pattern_config['remediation']}",
-                            severity=pattern_config["severity"],
-                            principle=None,
+                            severity=_map_severity(original_severity),
+                            context={
+                                "original_severity": original_severity,
+                                "pattern": pattern_name,
+                            },
                         )
                     )
                     break
@@ -752,7 +676,7 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
             primary_decision_id = first_decision["id"]
 
     # Collect all issues
-    all_issues: list[ArchitectureIssue] = []
+    all_issues: list[GateIssue] = []
 
     # Check 12-Factor compliance (use primary decision ID)
     twelve_factor_issues = check_twelve_factor_compliance(architecture, primary_decision_id)
@@ -776,6 +700,9 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
 
     # Calculate compliance score
     score, breakdown = calculate_compliance_score(all_issues)
+    # Convert to 0.0-1.0 scale for GateFailureReport
+    score_decimal = score / 100.0
+    threshold_decimal_report = threshold / 100.0
 
     # Log results
     logger.info(
@@ -789,10 +716,13 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
 
     # Determine if gate passes
     if score < threshold:
-        report = generate_architecture_report(all_issues, score, breakdown)
-        reason = (
-            f"Architecture compliance score ({score}) below threshold ({threshold})\n\n{report}"
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=all_issues,
+            score=score_decimal,
+            threshold=threshold_decimal_report,
         )
+        report_text = format_report_text(report)
 
         logger.warning(
             "architecture_validation_gate_failed",
@@ -805,12 +735,18 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
         return GateResult(
             passed=False,
             gate_name=context.gate_name,
-            reason=reason,
+            reason=report_text,
         )
 
     # Gate passes
     if all_issues:
-        report = generate_architecture_report(all_issues, score, breakdown)
+        report = generate_failure_report(
+            gate_name=context.gate_name,
+            issues=all_issues,
+            score=score_decimal,
+            threshold=threshold_decimal_report,
+        )
+        report_text = format_report_text(report)
         logger.info(
             "architecture_validation_gate_passed_with_issues",
             gate_name=context.gate_name,
@@ -820,7 +756,7 @@ async def architecture_validation_evaluator(context: GateContext) -> GateResult:
         return GateResult(
             passed=True,
             gate_name=context.gate_name,
-            reason=f"Passed with score {score}/100. {len(all_issues)} issue(s) found:\n\n{report}",
+            reason=report_text,
         )
 
     logger.info(

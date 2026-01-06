@@ -442,3 +442,234 @@ class TestAdvisoryGateBehavior:
         captured = capsys.readouterr()
         assert "Advisory gate failure" in captured.out
         assert "advisory_log_test" in captured.out
+
+
+class TestMetricsRecordingIntegration:
+    """Tests for metrics recording in decorator (Story 3.9 - Task 4)."""
+
+    def test_set_metrics_store_is_available(self) -> None:
+        """set_metrics_store function should be importable."""
+        from yolo_developer.gates.decorator import set_metrics_store
+
+        assert callable(set_metrics_store)
+
+    def test_get_metrics_store_is_available(self) -> None:
+        """get_metrics_store function should be importable."""
+        from yolo_developer.gates.decorator import get_metrics_store
+
+        assert callable(get_metrics_store)
+
+    def test_set_and_get_metrics_store(self) -> None:
+        """Should be able to set and get metrics store."""
+        import tempfile
+        from pathlib import Path
+
+        from yolo_developer.gates.decorator import (
+            get_metrics_store,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.metrics_store import JsonGateMetricsStore
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = JsonGateMetricsStore(base_path=Path(tmpdir))
+            set_metrics_store(store)
+
+            retrieved = get_metrics_store()
+            assert retrieved is store
+
+            # Clean up
+            set_metrics_store(None)
+
+    @pytest.mark.asyncio
+    async def test_metrics_recorded_on_gate_pass(self) -> None:
+        """Metrics should be recorded when gate passes and store is configured."""
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        from yolo_developer.gates.decorator import (
+            quality_gate,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
+        from yolo_developer.gates.metrics_store import JsonGateMetricsStore
+        from yolo_developer.gates.types import GateContext, GateResult
+
+        clear_evaluators()
+
+        async def passing_eval(ctx: GateContext) -> GateResult:
+            return GateResult(passed=True, gate_name=ctx.gate_name)
+
+        register_evaluator("metrics_pass_test", passing_eval)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = JsonGateMetricsStore(base_path=Path(tmpdir))
+            set_metrics_store(store)
+
+            try:
+
+                @quality_gate("metrics_pass_test")
+                async def node(state: dict) -> dict:
+                    return state
+
+                await node({})
+
+                # Allow async recording to complete
+                await asyncio.sleep(0.1)
+
+                metrics = await store.get_metrics()
+                assert len(metrics) >= 1
+                assert metrics[0].gate_name == "metrics_pass_test"
+                assert metrics[0].passed is True
+            finally:
+                set_metrics_store(None)
+
+    @pytest.mark.asyncio
+    async def test_metrics_recorded_on_gate_fail(self) -> None:
+        """Metrics should be recorded when gate fails."""
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        from yolo_developer.gates.decorator import (
+            quality_gate,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
+        from yolo_developer.gates.metrics_store import JsonGateMetricsStore
+        from yolo_developer.gates.types import GateContext, GateResult
+
+        clear_evaluators()
+
+        async def failing_eval(ctx: GateContext) -> GateResult:
+            return GateResult(passed=False, gate_name=ctx.gate_name, reason="Test fail")
+
+        register_evaluator("metrics_fail_test", failing_eval)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = JsonGateMetricsStore(base_path=Path(tmpdir))
+            set_metrics_store(store)
+
+            try:
+
+                @quality_gate("metrics_fail_test", blocking=False)
+                async def node(state: dict) -> dict:
+                    return state
+
+                await node({})
+                await asyncio.sleep(0.1)
+
+                metrics = await store.get_metrics()
+                assert len(metrics) >= 1
+                assert metrics[0].passed is False
+            finally:
+                set_metrics_store(None)
+
+    @pytest.mark.asyncio
+    async def test_metrics_extracts_agent_name_from_state(self) -> None:
+        """Metrics should extract agent_name from state.current_agent."""
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        from yolo_developer.gates.decorator import (
+            quality_gate,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
+        from yolo_developer.gates.metrics_store import JsonGateMetricsStore
+        from yolo_developer.gates.types import GateContext, GateResult
+
+        clear_evaluators()
+
+        async def passing_eval(ctx: GateContext) -> GateResult:
+            return GateResult(passed=True, gate_name=ctx.gate_name)
+
+        register_evaluator("metrics_agent_test", passing_eval)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = JsonGateMetricsStore(base_path=Path(tmpdir))
+            set_metrics_store(store)
+
+            try:
+
+                @quality_gate("metrics_agent_test")
+                async def node(state: dict) -> dict:
+                    return state
+
+                await node({"current_agent": "analyst"})
+                await asyncio.sleep(0.1)
+
+                metrics = await store.get_metrics()
+                assert len(metrics) >= 1
+                assert metrics[0].agent_name == "analyst"
+            finally:
+                set_metrics_store(None)
+
+    @pytest.mark.asyncio
+    async def test_metrics_extracts_sprint_id_from_state(self) -> None:
+        """Metrics should extract sprint_id from state."""
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        from yolo_developer.gates.decorator import (
+            quality_gate,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
+        from yolo_developer.gates.metrics_store import JsonGateMetricsStore
+        from yolo_developer.gates.types import GateContext, GateResult
+
+        clear_evaluators()
+
+        async def passing_eval(ctx: GateContext) -> GateResult:
+            return GateResult(passed=True, gate_name=ctx.gate_name)
+
+        register_evaluator("metrics_sprint_test", passing_eval)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = JsonGateMetricsStore(base_path=Path(tmpdir))
+            set_metrics_store(store)
+
+            try:
+
+                @quality_gate("metrics_sprint_test")
+                async def node(state: dict) -> dict:
+                    return state
+
+                await node({"sprint_id": "sprint-3"})
+                await asyncio.sleep(0.1)
+
+                metrics = await store.get_metrics()
+                assert len(metrics) >= 1
+                assert metrics[0].sprint_id == "sprint-3"
+            finally:
+                set_metrics_store(None)
+
+    @pytest.mark.asyncio
+    async def test_no_metrics_when_store_not_configured(self) -> None:
+        """No errors when metrics store is not configured."""
+        from yolo_developer.gates.decorator import (
+            quality_gate,
+            set_metrics_store,
+        )
+        from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
+        from yolo_developer.gates.types import GateContext, GateResult
+
+        clear_evaluators()
+        set_metrics_store(None)
+
+        async def passing_eval(ctx: GateContext) -> GateResult:
+            return GateResult(passed=True, gate_name=ctx.gate_name)
+
+        register_evaluator("no_store_test", passing_eval)
+
+        @quality_gate("no_store_test")
+        async def node(state: dict) -> dict:
+            state["executed"] = True
+            return state
+
+        # Should not raise and should execute normally
+        result = await node({})
+        assert result["executed"] is True

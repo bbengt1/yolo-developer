@@ -12,19 +12,7 @@ from typing import Any
 import pytest
 
 from yolo_developer.gates.evaluators import get_evaluator, register_evaluator
-
-# Import will happen after implementation
-# from yolo_developer.gates.gates.architecture_validation import (
-#     SECURITY_ANTI_PATTERNS,
-#     TWELVE_FACTOR_PRINCIPLES,
-#     ArchitectureIssue,
-#     architecture_validation_evaluator,
-#     calculate_compliance_score,
-#     check_twelve_factor_compliance,
-#     detect_security_anti_patterns,
-#     generate_architecture_report,
-#     validate_tech_stack,
-# )
+from yolo_developer.gates.report_types import GateIssue, Severity
 
 
 @pytest.fixture(autouse=True)
@@ -41,61 +29,6 @@ def ensure_architecture_validation_evaluator_registered() -> None:
 
     if get_evaluator("architecture_validation") is None:
         register_evaluator("architecture_validation", architecture_validation_evaluator)
-
-
-class TestArchitectureIssueDataclass:
-    """Tests for ArchitectureIssue dataclass."""
-
-    def test_architecture_issue_creation(self) -> None:
-        """ArchitectureIssue can be created with required fields."""
-        from yolo_developer.gates.gates.architecture_validation import ArchitectureIssue
-
-        issue = ArchitectureIssue(
-            decision_id="decision-001",
-            issue_type="twelve_factor",
-            description="Config not externalized",
-            severity="high",
-            principle="config",
-        )
-        assert issue.decision_id == "decision-001"
-        assert issue.issue_type == "twelve_factor"
-        assert issue.description == "Config not externalized"
-        assert issue.severity == "high"
-        assert issue.principle == "config"
-
-    def test_architecture_issue_is_frozen(self) -> None:
-        """ArchitectureIssue is immutable (frozen dataclass)."""
-        from yolo_developer.gates.gates.architecture_validation import ArchitectureIssue
-
-        issue = ArchitectureIssue(
-            decision_id="decision-001",
-            issue_type="security",
-            description="Hardcoded secrets",
-            severity="critical",
-            principle=None,
-        )
-        with pytest.raises(AttributeError):
-            issue.decision_id = "new-id"  # type: ignore[misc]
-
-    def test_architecture_issue_to_dict(self) -> None:
-        """ArchitectureIssue can be converted to dictionary."""
-        from yolo_developer.gates.gates.architecture_validation import ArchitectureIssue
-
-        issue = ArchitectureIssue(
-            decision_id="decision-001",
-            issue_type="tech_stack",
-            description="Unsupported database",
-            severity="medium",
-            principle=None,
-        )
-        result = issue.to_dict()
-        assert result == {
-            "decision_id": "decision-001",
-            "issue_type": "tech_stack",
-            "description": "Unsupported database",
-            "severity": "medium",
-            "principle": None,
-        }
 
 
 class TestTwelveFactorPrinciples:
@@ -232,7 +165,7 @@ class TestCheckTwelveFactorCompliance:
         }
         issues = check_twelve_factor_compliance(architecture)
         assert len(issues) >= 1
-        config_issues = [i for i in issues if i.principle == "config"]
+        config_issues = [i for i in issues if i.context.get("principle") == "config"]
         assert len(config_issues) >= 1
         assert config_issues[0].issue_type == "twelve_factor"
 
@@ -251,7 +184,7 @@ class TestCheckTwelveFactorCompliance:
         }
         issues = check_twelve_factor_compliance(architecture)
         assert len(issues) >= 3
-        principles_violated = {i.principle for i in issues}
+        principles_violated = {i.context.get("principle") for i in issues}
         assert "config" in principles_violated
         assert "logs" in principles_violated
         assert "processes" in principles_violated
@@ -428,18 +361,15 @@ class TestCalculateComplianceScore:
 
     def test_critical_issue_deducts_25(self) -> None:
         """Critical issue deducts 25 points."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         issues = [
-            ArchitectureIssue(
-                decision_id="d-1",
+            GateIssue(
+                location="d-1",
                 issue_type="security",
                 description="Critical security issue",
-                severity="critical",
-                principle=None,
+                severity=Severity.BLOCKING,
+                context={"original_severity": "critical"},
             )
         ]
         score, breakdown = calculate_compliance_score(issues)
@@ -448,18 +378,15 @@ class TestCalculateComplianceScore:
 
     def test_high_issue_deducts_15(self) -> None:
         """High severity issue deducts 15 points."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         issues = [
-            ArchitectureIssue(
-                decision_id="d-1",
+            GateIssue(
+                location="d-1",
                 issue_type="twelve_factor",
                 description="High severity issue",
-                severity="high",
-                principle="config",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "principle": "config"},
             )
         ]
         score, breakdown = calculate_compliance_score(issues)
@@ -468,18 +395,15 @@ class TestCalculateComplianceScore:
 
     def test_medium_issue_deducts_5(self) -> None:
         """Medium severity issue deducts 5 points."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         issues = [
-            ArchitectureIssue(
-                decision_id="d-1",
+            GateIssue(
+                location="d-1",
                 issue_type="tech_stack",
                 description="Medium severity issue",
-                severity="medium",
-                principle=None,
+                severity=Severity.WARNING,
+                context={"original_severity": "medium"},
             )
         ]
         score, breakdown = calculate_compliance_score(issues)
@@ -488,18 +412,15 @@ class TestCalculateComplianceScore:
 
     def test_low_issue_deducts_1(self) -> None:
         """Low severity issue deducts 1 point."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         issues = [
-            ArchitectureIssue(
-                decision_id="d-1",
+            GateIssue(
+                location="d-1",
                 issue_type="twelve_factor",
                 description="Low severity issue",
-                severity="low",
-                principle="logs",
+                severity=Severity.WARNING,
+                context={"original_severity": "low", "principle": "logs"},
             )
         ]
         score, breakdown = calculate_compliance_score(issues)
@@ -508,15 +429,30 @@ class TestCalculateComplianceScore:
 
     def test_multiple_issues_cumulative(self) -> None:
         """Multiple issues have cumulative deduction."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         issues = [
-            ArchitectureIssue("d-1", "security", "Critical", "critical", None),
-            ArchitectureIssue("d-2", "twelve_factor", "High", "high", "config"),
-            ArchitectureIssue("d-3", "tech_stack", "Medium", "medium", None),
+            GateIssue(
+                location="d-1",
+                issue_type="security",
+                description="Critical",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "critical"},
+            ),
+            GateIssue(
+                location="d-2",
+                issue_type="twelve_factor",
+                description="High",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "principle": "config"},
+            ),
+            GateIssue(
+                location="d-3",
+                issue_type="tech_stack",
+                description="Medium",
+                severity=Severity.WARNING,
+                context={"original_severity": "medium"},
+            ),
         ]
         score, _breakdown = calculate_compliance_score(issues)
         # 100 - 25 - 15 - 5 = 55
@@ -524,73 +460,75 @@ class TestCalculateComplianceScore:
 
     def test_score_capped_at_zero(self) -> None:
         """Score is capped at minimum of 0."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            calculate_compliance_score,
-        )
+        from yolo_developer.gates.gates.architecture_validation import calculate_compliance_score
 
         # Create enough critical issues to exceed 100 points deduction
         issues = [
-            ArchitectureIssue(f"d-{i}", "security", f"Critical {i}", "critical", None)
+            GateIssue(
+                location=f"d-{i}",
+                issue_type="security",
+                description=f"Critical {i}",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "critical"},
+            )
             for i in range(10)
         ]
         score, _breakdown = calculate_compliance_score(issues)
         assert score == 0
 
 
-class TestGenerateArchitectureReport:
-    """Tests for generate_architecture_report function."""
-
-    def test_empty_issues_returns_empty_string(self) -> None:
-        """Empty issues list returns empty report."""
-        from yolo_developer.gates.gates.architecture_validation import generate_architecture_report
-
-        report = generate_architecture_report([], 100, {})
-        assert report == ""
+class TestFailureReportGeneration:
+    """Tests for failure report generation using shared utilities."""
 
     def test_report_includes_score(self) -> None:
         """Report includes compliance score."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            generate_architecture_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
 
         issues = [
-            ArchitectureIssue("d-1", "security", "Critical issue", "critical", None),
+            GateIssue(
+                location="d-1",
+                issue_type="security",
+                description="Critical issue",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "critical"},
+            ),
         ]
-        report = generate_architecture_report(issues, 75, {"critical": 1})
-        assert "75" in report
+        report = generate_failure_report(
+            gate_name="architecture_validation",
+            issues=issues,
+            score=0.75,
+            threshold=0.70,
+        )
+        report_text = format_report_text(report)
+        assert "75" in report_text or "0.75" in report_text
 
     def test_report_includes_issue_details(self) -> None:
         """Report includes issue details."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            generate_architecture_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
 
         issues = [
-            ArchitectureIssue("d-1", "twelve_factor", "Config not externalized", "high", "config"),
+            GateIssue(
+                location="d-1",
+                issue_type="twelve_factor",
+                description="Config not externalized",
+                severity=Severity.BLOCKING,
+                context={"original_severity": "high", "principle": "config"},
+            ),
         ]
-        report = generate_architecture_report(issues, 85, {"high": 1})
-        assert "Config not externalized" in report
-        assert "config" in report  # Principle is included
-
-    def test_report_categorizes_by_type(self) -> None:
-        """Report categorizes issues by type."""
-        from yolo_developer.gates.gates.architecture_validation import (
-            ArchitectureIssue,
-            generate_architecture_report,
+        report = generate_failure_report(
+            gate_name="architecture_validation",
+            issues=issues,
+            score=0.85,
+            threshold=0.70,
         )
-
-        issues = [
-            ArchitectureIssue("d-1", "twelve_factor", "12-Factor issue", "high", "config"),
-            ArchitectureIssue("d-2", "security", "Security issue", "critical", None),
-            ArchitectureIssue("d-3", "tech_stack", "Tech stack issue", "medium", None),
-        ]
-        report = generate_architecture_report(issues, 55, {"critical": 1, "high": 1, "medium": 1})
-        # Report should contain category headers or organize by type
-        assert "12-Factor" in report or "twelve_factor" in report
-        assert "Security" in report or "security" in report
+        report_text = format_report_text(report)
+        assert "Config not externalized" in report_text
 
 
 class TestArchitectureValidationEvaluator:
@@ -842,7 +780,7 @@ class TestADREvaluation:
         issues = evaluate_adrs(adrs)
         assert len(issues) >= 1
         assert any("missing" in i.description.lower() for i in issues)
-        assert any("ADR-001" in i.decision_id for i in issues)
+        assert any("ADR-001" in i.location for i in issues)
 
     def test_adr_with_security_antipattern_creates_issue(self) -> None:
         """ADR containing security anti-pattern creates issue."""

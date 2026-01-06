@@ -29,59 +29,11 @@ def ensure_ac_measurability_evaluator_registered() -> None:
 
 
 class TestACMeasurabilityTypes:
-    """Tests for AC measurability gate data structures (Task 1)."""
+    """Tests for AC measurability gate data structures (Task 1).
 
-    def test_ac_measurability_issue_creation(self) -> None:
-        """ACMeasurabilityIssue can be created with required fields."""
-        from yolo_developer.gates.gates.ac_measurability import ACMeasurabilityIssue
-
-        issue = ACMeasurabilityIssue(
-            story_id="story-001",
-            ac_index=0,
-            issue_type="missing_gwt",
-            description="Missing 'Given' clause",
-            severity="blocking",
-        )
-
-        assert issue.story_id == "story-001"
-        assert issue.ac_index == 0
-        assert issue.issue_type == "missing_gwt"
-        assert issue.description == "Missing 'Given' clause"
-        assert issue.severity == "blocking"
-
-    def test_ac_measurability_issue_is_frozen(self) -> None:
-        """ACMeasurabilityIssue is immutable."""
-        from yolo_developer.gates.gates.ac_measurability import ACMeasurabilityIssue
-
-        issue = ACMeasurabilityIssue(
-            story_id="story-001",
-            ac_index=0,
-            issue_type="missing_gwt",
-            description="Test",
-            severity="blocking",
-        )
-
-        with pytest.raises(AttributeError):
-            issue.story_id = "new-id"  # type: ignore[misc]
-
-    def test_ac_measurability_issue_to_dict(self) -> None:
-        """ACMeasurabilityIssue can be converted to dict."""
-        from yolo_developer.gates.gates.ac_measurability import ACMeasurabilityIssue
-
-        issue = ACMeasurabilityIssue(
-            story_id="story-001",
-            ac_index=2,
-            issue_type="subjective_term",
-            description="Contains subjective term",
-            severity="warning",
-        )
-
-        d = issue.to_dict()
-        assert d["story_id"] == "story-001"
-        assert d["ac_index"] == 2
-        assert d["issue_type"] == "subjective_term"
-        assert d["description"] == "Contains subjective term"
-        assert d["severity"] == "warning"
+    Note: GateIssue type tests are in test_report_types.py.
+    These tests focus on AC measurability-specific constants.
+    """
 
     def test_subjective_terms_constant_exists(self) -> None:
         """SUBJECTIVE_TERMS constant is defined with expected terms."""
@@ -371,17 +323,16 @@ class TestImprovementSuggestions:
     def test_generate_suggestions_for_missing_given(self) -> None:
         """Generates suggestion for missing 'Given' clause."""
         from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
             generate_improvement_suggestions,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="s-1",
-                ac_index=0,
+            GateIssue(
+                location="s-1/ac-0",
                 issue_type="missing_gwt",
                 description="Missing 'Given' clause",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
@@ -393,17 +344,16 @@ class TestImprovementSuggestions:
     def test_generate_suggestions_for_subjective_term(self) -> None:
         """Generates suggestion for subjective terms."""
         from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
             generate_improvement_suggestions,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="s-1",
-                ac_index=0,
+            GateIssue(
+                location="s-1/ac-0",
                 issue_type="subjective_term",
                 description="Contains subjective term 'intuitive'",
-                severity="warning",
+                severity=Severity.WARNING,
             )
         ]
 
@@ -415,17 +365,16 @@ class TestImprovementSuggestions:
     def test_generate_suggestions_for_vague_outcome(self) -> None:
         """Generates suggestion for vague outcomes."""
         from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
             generate_improvement_suggestions,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="s-1",
-                ac_index=0,
+            GateIssue(
+                location="s-1/ac-0",
                 issue_type="vague_outcome",
                 description="'Then' clause lacks concrete condition",
-                severity="warning",
+                severity=Severity.WARNING,
             )
         ]
 
@@ -668,135 +617,142 @@ class TestACMeasurabilityEvaluator:
 
 
 class TestFailureReportGeneration:
-    """Tests for failure report generation (Task 7)."""
+    """Tests for failure report generation (Task 7).
+
+    Note: Core report generation is tested in test_report_generator.py.
+    These tests verify AC measurability gate's integration with the report system.
+    """
 
     def test_generate_report_with_single_issue(self) -> None:
-        """Report is generated for single issue."""
-        from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
-            generate_ac_measurability_report,
+        """Report is generated for single issue using shared report utilities."""
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=0,
+            GateIssue(
+                location="story-001/ac-0",
                 issue_type="missing_gwt",
                 description="Missing 'Given' clause",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
-        report = generate_ac_measurability_report(issues)
-        assert "story-001" in report
-        assert "Given" in report
-        assert "blocking" in report.lower()
+        report = generate_failure_report("ac_measurability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        assert "story-001" in formatted
+        assert "Given" in formatted
+        assert "BLOCKING" in formatted
 
     def test_generate_report_with_multiple_issues(self) -> None:
         """Report handles multiple issues."""
-        from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
-            generate_ac_measurability_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=0,
+            GateIssue(
+                location="story-001/ac-0",
                 issue_type="missing_gwt",
                 description="Missing structure",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             ),
-            ACMeasurabilityIssue(
-                story_id="story-002",
-                ac_index=1,
+            GateIssue(
+                location="story-002/ac-1",
                 issue_type="subjective_term",
                 description="Contains 'intuitive'",
-                severity="warning",
+                severity=Severity.WARNING,
             ),
         ]
 
-        report = generate_ac_measurability_report(issues)
-        assert "story-001" in report
-        assert "story-002" in report
+        report = generate_failure_report("ac_measurability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        assert "story-001" in formatted
+        assert "story-002" in formatted
 
     def test_generate_report_includes_ac_index(self) -> None:
-        """Report includes AC index."""
-        from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
-            generate_ac_measurability_report,
+        """Report includes AC index in location."""
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=2,
+            GateIssue(
+                location="story-001/ac-2",
                 issue_type="missing_gwt",
                 description="Missing structure",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
-        report = generate_ac_measurability_report(issues)
-        assert "AC #2" in report or "ac_index" in report.lower() or "#2" in report
+        report = generate_failure_report("ac_measurability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        assert "ac-2" in formatted or "story-001/ac-2" in formatted
 
     def test_generate_report_includes_remediation(self) -> None:
         """Report includes remediation guidance."""
-        from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
-            generate_ac_measurability_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
+        from yolo_developer.gates.report_types import GateIssue, Severity
 
         issues = [
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=0,
+            GateIssue(
+                location="story-001/ac-0",
                 issue_type="missing_gwt",
                 description="Missing 'Given' clause",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             )
         ]
 
-        report = generate_ac_measurability_report(issues)
-        # Report should include some form of remediation guidance
-        assert any(word in report.lower() for word in ["example", "add", "suggest", "given"])
+        report = generate_failure_report("ac_measurability", issues, 0.5, 0.8)
+        formatted = format_report_text(report)
+        # Report should include remediation suggestion
+        assert "Suggestion:" in formatted
 
     def test_generate_report_empty_issues(self) -> None:
         """Report handles empty issues list."""
-        from yolo_developer.gates.gates.ac_measurability import generate_ac_measurability_report
-
-        report = generate_ac_measurability_report([])
-        # Empty report
-        assert report == ""
-
-    def test_generate_report_shows_severity_summary(self) -> None:
-        """Report shows blocking and warning counts."""
-        from yolo_developer.gates.gates.ac_measurability import (
-            ACMeasurabilityIssue,
-            generate_ac_measurability_report,
+        from yolo_developer.gates.report_generator import (
+            format_report_text,
+            generate_failure_report,
         )
 
+        report = generate_failure_report("ac_measurability", [], 1.0, 0.8)
+        formatted = format_report_text(report)
+        # Should still generate a valid report structure
+        assert "Ac Measurability Gate Report" in formatted
+
+    def test_generate_report_shows_severity_summary(self) -> None:
+        """Report shows blocking and warning counts in summary."""
+        from yolo_developer.gates.report_generator import generate_failure_report
+        from yolo_developer.gates.report_types import GateIssue, Severity
+
         issues = [
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=0,
+            GateIssue(
+                location="story-001/ac-0",
                 issue_type="missing_gwt",
                 description="Missing structure",
-                severity="blocking",
+                severity=Severity.BLOCKING,
             ),
-            ACMeasurabilityIssue(
-                story_id="story-001",
-                ac_index=0,
+            GateIssue(
+                location="story-001/ac-0",
                 issue_type="subjective_term",
                 description="Contains 'clean'",
-                severity="warning",
+                severity=Severity.WARNING,
             ),
         ]
 
-        report = generate_ac_measurability_report(issues)
+        report = generate_failure_report("ac_measurability", issues, 0.5, 0.8)
         # Should have summary with blocking and warning counts
-        assert "1 blocking" in report.lower() or "blocking" in report.lower()
-        assert "1 warning" in report.lower() or "warning" in report.lower()
+        assert "1 blocking" in report.summary.lower()
+        assert "1 warning" in report.summary.lower()
 
 
 class TestEvaluatorRegistration:

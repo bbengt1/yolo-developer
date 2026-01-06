@@ -64,7 +64,7 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Quality Gate Framework (9 stories)
-  epic-3: in-progress
+  epic-3: done
   3-1-create-quality-gate-decorator: done
   3-2-implement-testability-gate: done
   3-3-implement-ac-measurability-gate: done
@@ -72,8 +72,8 @@ development_status:
   3-5-implement-definition-of-done-gate: done
   3-6-implement-confidence-scoring: done
   3-7-configure-quality-thresholds: done
-  3-8-generate-gate-failure-reports: backlog
-  3-9-track-gate-metrics-over-time: backlog
+  3-8-generate-gate-failure-reports: done
+  3-9-track-gate-metrics-over-time: done
   epic-3-retrospective: optional
 
   # Epic 4: Seed Input & Validation (7 stories)
