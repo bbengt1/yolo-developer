@@ -81,8 +81,7 @@ async def get_gate_metrics(
     metrics_store = store or get_metrics_store()
     if metrics_store is None:
         raise RuntimeError(
-            "No metrics store configured. "
-            "Call set_metrics_store() first or pass store parameter."
+            "No metrics store configured. Call set_metrics_store() first or pass store parameter."
         )
 
     start_time = time_range[0] if time_range else None
@@ -122,8 +121,7 @@ async def get_pass_rates(
     metrics_store = store or get_metrics_store()
     if metrics_store is None:
         raise RuntimeError(
-            "No metrics store configured. "
-            "Call set_metrics_store() first or pass store parameter."
+            "No metrics store configured. Call set_metrics_store() first or pass store parameter."
         )
 
     records = await metrics_store.get_metrics(gate_name=gate_name)
@@ -158,8 +156,7 @@ async def get_trends(
     metrics_store = store or get_metrics_store()
     if metrics_store is None:
         raise RuntimeError(
-            "No metrics store configured. "
-            "Call set_metrics_store() first or pass store parameter."
+            "No metrics store configured. Call set_metrics_store() first or pass store parameter."
         )
 
     records = await metrics_store.get_metrics(gate_name=gate_name)
@@ -191,8 +188,7 @@ async def get_agent_summary(
     metrics_store = store or get_metrics_store()
     if metrics_store is None:
         raise RuntimeError(
-            "No metrics store configured. "
-            "Call set_metrics_store() first or pass store parameter."
+            "No metrics store configured. Call set_metrics_store() first or pass store parameter."
         )
 
     records = await metrics_store.get_metrics()

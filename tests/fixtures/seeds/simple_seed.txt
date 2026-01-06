@@ -1,0 +1,8 @@
+Build a todo list application.
+
+Features:
+- Add tasks
+- Mark tasks complete
+- Delete tasks
+
+Must be built with Python.

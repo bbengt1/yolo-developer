@@ -1,0 +1,9 @@
+Build app with unicode support: 🚀 emoji handling, international characters (日本語, Ελληνικά)
+
+Features with special chars:
+- Auth with OAuth 2.0 ✅
+- REST API endpoints
+- Real-time notifications via WebSockets 💬
+
+Budget: $50,000 💰
+Timeline: 3 months
