@@ -1,0 +1,51 @@
+"""Analyst agent module for requirement crystallization (Story 5.1).
+
+The Analyst agent is responsible for:
+- Crystallizing raw requirements from seed content
+- Identifying gaps in requirements
+- Flagging contradictions between requirements
+- Categorizing requirements (functional, non-functional, constraint)
+- Assessing requirement testability
+
+Example:
+    >>> from yolo_developer.agents.analyst import (
+    ...     analyst_node,
+    ...     AnalystOutput,
+    ...     CrystallizedRequirement,
+    ... )
+    >>>
+    >>> # Create a crystallized requirement
+    >>> req = CrystallizedRequirement(
+    ...     id="req-001",
+    ...     original_text="Fast system",
+    ...     refined_text="API response < 200ms",
+    ...     category="non-functional",
+    ...     testable=True,
+    ... )
+    >>>
+    >>> # Run the analyst node
+    >>> result = await analyst_node(state)
+
+Architecture:
+    The analyst_node function is a LangGraph node that:
+    - Receives YoloState TypedDict as input
+    - Returns state update dict (not full state)
+    - Never mutates input state
+    - Uses async/await for all I/O
+
+References:
+    - ADR-001: TypedDict for internal state
+    - ADR-005: LangGraph node patterns
+    - FR36-41: Analyst Agent capabilities
+"""
+
+from __future__ import annotations
+
+from yolo_developer.agents.analyst.node import analyst_node
+from yolo_developer.agents.analyst.types import AnalystOutput, CrystallizedRequirement
+
+__all__ = [
+    "AnalystOutput",
+    "CrystallizedRequirement",
+    "analyst_node",
+]

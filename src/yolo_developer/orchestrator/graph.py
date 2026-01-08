@@ -8,6 +8,11 @@ Key concepts:
 - **wrap_node**: Decorator/wrapper to add handoff context creation to agent nodes
 - **validated_handoff**: Utility to validate state integrity during handoffs
 - **Checkpointer**: Class for session checkpointing during graph execution
+- **AGENT_NODES**: Registry of available agent nodes for graph building
+
+Available Agent Nodes (Story 5.1+):
+    analyst_node: Requirement crystallization and gap analysis
+    (More nodes will be added as agents are implemented)
 
 Example:
     >>> from yolo_developer.orchestrator.graph import wrap_node, Checkpointer
@@ -288,3 +293,38 @@ def validated_handoff(
                 "after_keys": list(after_state.keys()),
             },
         )
+
+
+# =============================================================================
+# Agent Node Registry (Story 5.1+)
+# =============================================================================
+# Registry of available agent nodes for building the orchestration graph.
+# Nodes are registered here as they are implemented across stories.
+# The graph builder (Epic 10) will use this registry to construct the workflow.
+
+
+def get_agent_nodes() -> dict[str, AgentNode]:
+    """Get the registry of available agent nodes.
+
+    Returns a dictionary mapping agent names to their node functions.
+    Nodes are imported lazily to avoid circular dependencies.
+
+    Returns:
+        Dict mapping agent name to node function.
+
+    Example:
+        >>> nodes = get_agent_nodes()
+        >>> analyst = nodes["analyst"]
+        >>> result = await analyst(state)
+    """
+    from yolo_developer.agents import analyst_node
+
+    return {
+        "analyst": analyst_node,
+        # Future agents will be added here:
+        # "pm": pm_node,
+        # "architect": architect_node,
+        # "dev": dev_node,
+        # "tea": tea_node,
+        # "sm": sm_node,
+    }
