@@ -39,8 +39,8 @@ class CrystallizedRequirement:
     """A refined, categorized requirement extracted from seed content.
 
     Immutable dataclass representing a single requirement that has been
-    processed by the Analyst agent. Each requirement is categorized and
-    assessed for testability.
+    processed by the Analyst agent. Each requirement is categorized,
+    assessed for testability, and enhanced with scope and implementation hints.
 
     Attributes:
         id: Unique identifier for this requirement (e.g., "req-001").
@@ -51,6 +51,12 @@ class CrystallizedRequirement:
             - "non-functional": Quality attribute (performance, security, etc.)
             - "constraint": Technical or business constraint
         testable: Whether this requirement can be objectively tested.
+        scope_notes: Optional clarification of scope boundaries (in-scope vs
+            out-of-scope items, edge cases). None if no scope clarification needed.
+        implementation_hints: Tuple of implementation suggestions referencing
+            project patterns, libraries, or architectural conventions.
+        confidence: Confidence score (0.0-1.0) for the crystallization quality.
+            1.0 = high confidence the refinement is accurate, 0.0 = low confidence.
 
     Example:
         >>> req = CrystallizedRequirement(
@@ -59,6 +65,9 @@ class CrystallizedRequirement:
         ...     refined_text="API response time < 200ms for 95th percentile",
         ...     category="non-functional",
         ...     testable=True,
+        ...     scope_notes="Applies to GET endpoints; POST excluded",
+        ...     implementation_hints=("Use async handlers", "Add caching"),
+        ...     confidence=0.9,
         ... )
         >>> req.category
         'non-functional'
@@ -69,12 +78,15 @@ class CrystallizedRequirement:
     refined_text: str
     category: str
     testable: bool
+    scope_notes: str | None = None
+    implementation_hints: tuple[str, ...] = ()
+    confidence: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
-            Dictionary with all requirement fields.
+            Dictionary with all requirement fields including enhanced fields.
 
         Example:
             >>> req = CrystallizedRequirement(
@@ -93,6 +105,9 @@ class CrystallizedRequirement:
             "refined_text": self.refined_text,
             "category": self.category,
             "testable": self.testable,
+            "scope_notes": self.scope_notes,
+            "implementation_hints": list(self.implementation_hints),
+            "confidence": self.confidence,
         }
 
 

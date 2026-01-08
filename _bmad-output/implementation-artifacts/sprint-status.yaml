@@ -90,7 +90,7 @@ development_status:
   # Epic 5: Analyst Agent (7 stories)
   epic-5: in-progress
   5-1-create-analyst-agent-node: done
-  5-2-requirement-crystallization: backlog
+  5-2-requirement-crystallization: done
   5-3-missing-requirement-identification: backlog
   5-4-requirement-categorization: backlog
   5-5-implementability-validation: backlog

@@ -1,4 +1,4 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
@@ -32,6 +32,7 @@ Architecture Note:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import structlog
@@ -47,6 +48,66 @@ logger = structlog.get_logger(__name__)
 
 # Flag to enable/disable actual LLM calls (for testing)
 _USE_LLM: bool = False
+
+# Vague terms to detect in requirements (Story 5.2)
+# These patterns indicate ambiguity that needs crystallization
+VAGUE_TERMS: frozenset[str] = frozenset([
+    # Quantifier vagueness
+    "fast", "quick", "slow", "efficient", "performant",
+    "scalable", "responsive", "real-time",
+    # Ease vagueness
+    "easy", "simple", "straightforward", "intuitive",
+    "user-friendly", "seamless",
+    # Certainty vagueness
+    "should", "might", "could", "may", "possibly",
+    "probably", "maybe", "sometimes",
+    # Scope vagueness
+    "etc", "and so on", "and more", "various", "multiple",
+    "several", "many", "few", "some",
+    # Quality vagueness
+    "good", "better", "best", "nice", "beautiful",
+    "clean", "modern", "robust",
+])
+
+
+def _detect_vague_terms(text: str) -> set[str]:
+    """Detect vague terms in requirement text.
+
+    Scans the input text for common vague terms that indicate
+    ambiguity needing crystallization. Detection is case-insensitive.
+
+    Args:
+        text: The requirement text to analyze.
+
+    Returns:
+        Set of detected vague terms (lowercase). Empty set if none found.
+
+    Example:
+        >>> _detect_vague_terms("The system should be fast")
+        {'should', 'fast'}
+        >>> _detect_vague_terms("Response time < 200ms")
+        set()
+    """
+    if not text:
+        return set()
+
+    text_lower = text.lower()
+    detected: set[str] = set()
+
+    for term in VAGUE_TERMS:
+        # Check for the term as a word (not substring of another word)
+        # Handle hyphenated terms specially
+        if "-" in term:
+            if term in text_lower:
+                detected.add(term)
+        else:
+            # Use simple word boundary check
+            # Check if term appears surrounded by non-alphanumeric chars
+            pattern = rf"\b{re.escape(term)}\b"
+            if re.search(pattern, text_lower):
+                detected.add(term)
+
+    return detected
 
 
 @quality_gate("testability", blocking=True)
@@ -204,7 +265,8 @@ def _parse_llm_response(response: str) -> AnalystOutput:
     """Parse LLM JSON response into AnalystOutput.
 
     Attempts to parse the LLM response as JSON and convert it to
-    an AnalystOutput. Falls back to a placeholder on parse failure.
+    an AnalystOutput. Handles both legacy format (Story 5.1) and
+    enhanced format with new fields (Story 5.2).
 
     Args:
         response: The raw LLM response string (expected to be JSON).
@@ -222,6 +284,10 @@ def _parse_llm_response(response: str) -> AnalystOutput:
                 refined_text=req.get("refined_text", ""),
                 category=req.get("category", "functional"),
                 testable=req.get("testable", True),
+                # New fields from Story 5.2 (with backward-compatible defaults)
+                scope_notes=req.get("scope_notes"),
+                implementation_hints=tuple(req.get("implementation_hints", [])),
+                confidence=float(req.get("confidence", 1.0)),
             )
             for i, req in enumerate(data.get("requirements", []), start=1)
         )
@@ -245,7 +311,7 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
 
     When _USE_LLM is True, calls the LLM to analyze seed content
     and extract structured requirements. Otherwise, returns a
-    placeholder output for testing.
+    placeholder output for testing that includes vague term detection.
 
     Args:
         seed_content: The raw seed document content.
@@ -262,6 +328,15 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
             contradictions=(),
         )
 
+    # Detect vague terms for logging and placeholder generation
+    vague_terms = _detect_vague_terms(seed_content)
+    if vague_terms:
+        logger.info(
+            "vague_terms_detected",
+            terms=list(vague_terms),
+            count=len(vague_terms),
+        )
+
     # Use LLM if enabled
     if _USE_LLM:
         from yolo_developer.agents.prompts.analyst import (
@@ -271,15 +346,53 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
 
         prompt = ANALYST_USER_PROMPT_TEMPLATE.format(seed_content=seed_content)
         response = await _call_llm(prompt, ANALYST_SYSTEM_PROMPT)
-        return _parse_llm_response(response)
+        output = _parse_llm_response(response)
+
+        # Log transformation details for audit trail
+        for req in output.requirements:
+            logger.info(
+                "requirement_crystallized",
+                req_id=req.id,
+                original_length=len(req.original_text),
+                refined_length=len(req.refined_text),
+                category=req.category,
+                testable=req.testable,
+                confidence=req.confidence,
+                has_scope_notes=req.scope_notes is not None,
+                hint_count=len(req.implementation_hints),
+            )
+
+        return output
 
     # Placeholder for testing (when LLM is disabled)
+    # Generate confidence based on vague term detection
+    confidence = 1.0 - (len(vague_terms) * 0.1) if vague_terms else 1.0
+    confidence = max(0.3, min(1.0, confidence))  # Clamp to [0.3, 1.0]
+
+    # Generate scope notes if vague terms detected
+    scope_notes: str | None = None
+    if vague_terms:
+        scope_notes = f"Vague terms detected: {', '.join(sorted(vague_terms))}. Scope needs clarification."
+
+    # Generate implementation hints based on content
+    hints: tuple[str, ...] = ()
+    seed_lower = seed_content.lower()
+    if "api" in seed_lower or "endpoint" in seed_lower:
+        hints = ("Consider async handlers for I/O operations",)
+    elif "ui" in seed_lower or "interface" in seed_lower:
+        hints = ("Follow component-based architecture",)
+    elif "data" in seed_lower or "database" in seed_lower:
+        hints = ("Use repository pattern for data access",)
+
     placeholder_req = CrystallizedRequirement(
         id="req-001",
         original_text=seed_content[:200] if len(seed_content) > 200 else seed_content,
         refined_text=f"Implement: {seed_content[:100]}..." if len(seed_content) > 100 else seed_content,
         category="functional",
         testable=True,
+        scope_notes=scope_notes,
+        implementation_hints=hints,
+        confidence=confidence,
     )
 
     return AnalystOutput(
