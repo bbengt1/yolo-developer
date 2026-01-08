@@ -51,6 +51,23 @@ Example:
     >>> result = await parse_seed(content, validate_sop=True, sop_store=store)
     >>> if not result.sop_passed:
     ...     print(f"Found {len(result.sop_validation.conflicts)} SOP conflicts")
+    >>>
+    >>> # Generate validation reports (Story 4.6)
+    >>> from yolo_developer.seed import (
+    ...     generate_validation_report,
+    ...     format_report_json,
+    ...     format_report_markdown,
+    ...     format_report_rich,
+    ...     calculate_quality_score,
+    ...     ValidationReport,
+    ...     QualityMetrics,
+    ...     ReportFormat,
+    ... )
+    >>> report = generate_validation_report(result, source_file="requirements.md")
+    >>> print(f"Quality Score: {report.quality_metrics.overall_score:.0%}")
+    >>> json_output = format_report_json(report)  # JSON format
+    >>> md_output = format_report_markdown(report)  # Markdown format
+    >>> format_report_rich(report)  # Rich console output
 """
 
 from __future__ import annotations
@@ -76,6 +93,16 @@ from yolo_developer.seed.parser import (
     SeedParser,
     detect_source_format,
     normalize_content,
+)
+from yolo_developer.seed.report import (
+    QualityMetrics,
+    ReportFormat,
+    ValidationReport,
+    calculate_quality_score,
+    format_report_json,
+    format_report_markdown,
+    format_report_rich,
+    generate_validation_report,
 )
 from yolo_developer.seed.sop import (
     ConflictSeverity,
@@ -111,6 +138,8 @@ __all__ = [
     "ConstraintCategory",
     "InMemorySOPStore",  # Story 4.5
     "LLMSeedParser",
+    "QualityMetrics",  # Story 4.6
+    "ReportFormat",  # Story 4.6
     "Resolution",
     "ResolutionPrompt",
     "SOPCategory",  # Story 4.5
@@ -126,12 +155,18 @@ __all__ = [
     "SeedParseResult",
     "SeedParser",
     "SeedSource",
+    "ValidationReport",  # Story 4.6
     # Functions
     "calculate_ambiguity_confidence",
+    "calculate_quality_score",  # Story 4.6
     "calculate_question_priority",  # Story 4.4
     "detect_ambiguities",
     "detect_source_format",
+    "format_report_json",  # Story 4.6
+    "format_report_markdown",  # Story 4.6
+    "format_report_rich",  # Story 4.6
     "generate_constraint_id",  # Story 4.5
+    "generate_validation_report",  # Story 4.6
     "normalize_content",
     "parse_seed",
     "prioritize_questions",  # Story 4.4

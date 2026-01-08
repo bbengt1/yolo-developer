@@ -832,3 +832,298 @@ class TestSOPValidationFeatures:
         assert result.exit_code == 0
         # Should indicate constraints were loaded
         assert "Loaded 1 SOP constraint" in result.output
+
+
+# ============================================================================
+# Test Validation Report Features (Story 4.6)
+# ============================================================================
+
+
+class TestValidationReportFeatures:
+    """Integration tests for Story 4.6 semantic validation reports."""
+
+    def test_report_format_flag_appears_in_help(self) -> None:
+        """Test that --report-format flag appears in help."""
+        result = runner.invoke(app, ["seed", "--help"])
+        assert result.exit_code == 0
+        assert "--report-format" in result.output
+        assert "--report-output" in result.output
+
+    def test_report_format_json_outputs_valid_json(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that --report-format json produces valid JSON."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "json"]
+            )
+
+        assert result.exit_code == 0
+        # Should contain report structure
+        assert "quality_metrics" in result.output
+        assert "overall_score" in result.output
+        assert "report_id" in result.output
+
+    def test_report_format_markdown_outputs_markdown(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that --report-format markdown produces markdown output."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "markdown"]
+            )
+
+        assert result.exit_code == 0
+        # Should contain markdown headers
+        assert "# Validation Report" in result.output
+        assert "## Quality Metrics" in result.output
+
+    def test_report_format_rich_outputs_to_console(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that --report-format rich outputs rich console format."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
+            )
+
+        assert result.exit_code == 0
+        # Rich output should contain score information
+        assert "Quality" in result.output or "Score" in result.output
+
+    def test_report_output_writes_to_file(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
+        """Test that --report-output writes report to file."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        output_file = tmp_path / "report.json"
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--report-format",
+                    "json",
+                    "--report-output",
+                    str(output_file),
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+        assert "Report written to" in result.output
+
+        # Verify content is valid JSON
+        content = output_file.read_text()
+        data = json.loads(content)
+        assert "quality_metrics" in data
+        assert "overall_score" in data["quality_metrics"]
+
+    def test_report_format_markdown_to_file(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
+        """Test that markdown report can be written to file."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        output_file = tmp_path / "report.md"
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--report-format",
+                    "markdown",
+                    "--report-output",
+                    str(output_file),
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        content = output_file.read_text()
+        assert "# Validation Report" in content
+        assert "## Quality Metrics" in content
+
+    def test_report_short_flag_r(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that -r short flag works for report format."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "-r", "json"]
+            )
+
+        assert result.exit_code == 0
+        assert "quality_metrics" in result.output
+
+    def test_report_includes_ambiguity_details(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that report includes ambiguity details when present."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        mock_ambiguity_response = {
+            "ambiguities": [
+                {
+                    "type": "TECHNICAL",
+                    "severity": "HIGH",
+                    "source_text": "scalable",
+                    "location": "line 5",
+                    "description": "No specific scale defined",
+                    "question": "What scale is needed?",
+                    "suggestions": ["1000 users", "10000 users"],
+                    "answer_format": "CHOICE",
+                }
+            ]
+        }
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+                new_callable=AsyncMock,
+                return_value=mock_ambiguity_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=SOPValidationResult(passed=True),
+            ),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--report-format",
+                    "json",
+                    "--validate-sop",
+                ],
+            )
+
+        assert result.exit_code == 0
+        # JSON output should include ambiguity score
+        assert "ambiguity_score" in result.output
+
+    def test_report_with_sop_validation(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that report includes SOP validation scores."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=SOPValidationResult(passed=True),
+            ),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--report-format",
+                    "json",
+                    "--validate-sop",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "sop_score" in result.output
+
+    def test_unknown_report_format_error(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that unknown report format returns error."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "invalid"]
+            )
+
+        assert result.exit_code == 1
+        assert "Unknown report format" in result.output

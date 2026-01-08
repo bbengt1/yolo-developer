@@ -99,6 +99,18 @@ def seed(
         "--override-soft",
         help="Auto-override all SOFT SOP conflicts without prompting.",
     ),
+    report_format: str | None = typer.Option(
+        None,
+        "--report-format",
+        "-r",
+        help="Generate validation report in specified format (json, markdown, rich).",
+    ),
+    report_output: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--report-output",
+        "-o",
+        help="File path to write the validation report to.",
+    ),
 ) -> None:
     """Parse a seed document into structured components.
 
@@ -119,6 +131,12 @@ def seed(
     3. Report HARD conflicts (block processing)
     4. Prompt for SOFT conflict overrides (or auto-override with --override-soft)
 
+    With validation reports (--report-format), the command will:
+    1. Parse the seed document
+    2. Calculate quality metrics (ambiguity, SOP, extraction scores)
+    3. Generate a comprehensive validation report
+    4. Output in the specified format (json, markdown, or rich console)
+
     Examples:
         yolo seed requirements.md
         yolo seed requirements.md --verbose
@@ -126,6 +144,9 @@ def seed(
         yolo seed requirements.md --interactive
         yolo seed requirements.md --validate-sop --sop-store constraints.json
         yolo seed requirements.md --validate-sop --override-soft
+        yolo seed requirements.md --report-format json
+        yolo seed requirements.md --report-format markdown -o report.md
+        yolo seed requirements.md --report-format rich
     """
     seed_command(
         file_path=file_path,
@@ -135,6 +156,8 @@ def seed(
         validate_sop=validate_sop,
         sop_store_path=sop_store,
         override_soft=override_soft,
+        report_format=report_format,
+        report_output=report_output,
     )
 
 

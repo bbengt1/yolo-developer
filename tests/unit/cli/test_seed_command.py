@@ -809,3 +809,152 @@ class TestSeedCommandInteractive:
         )
 
         assert mock_asyncio_run.call_count == 2
+
+
+# ============================================================================
+# Test Report Format CLI Options (Story 4.6)
+# ============================================================================
+
+
+class TestSeedCommandReportFormat:
+    """Tests for seed_command with report format options (Story 4.6)."""
+
+    @patch("yolo_developer.cli.commands.seed._display_parse_results")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_report_format_none_uses_default_display(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_display: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test no report format uses default display."""
+        mock_asyncio_run.return_value = sample_parse_result
+
+        seed_command(temp_seed_file, verbose=False, json_output=False)
+
+        mock_display.assert_called_once_with(sample_parse_result, verbose=False)
+
+    @patch("yolo_developer.cli.commands.seed.format_report_json")
+    @patch("yolo_developer.cli.commands.seed.generate_validation_report")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_report_format_json(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_generate_report: MagicMock,
+        mock_format_json: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test --report-format json outputs JSON validation report."""
+        mock_asyncio_run.return_value = sample_parse_result
+        mock_format_json.return_value = '{"test": "json"}'
+
+        seed_command(
+            temp_seed_file,
+            verbose=False,
+            json_output=False,
+            report_format="json",
+        )
+
+        mock_generate_report.assert_called_once()
+        mock_format_json.assert_called_once()
+
+    @patch("yolo_developer.cli.commands.seed.format_report_markdown")
+    @patch("yolo_developer.cli.commands.seed.generate_validation_report")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_report_format_markdown(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_generate_report: MagicMock,
+        mock_format_markdown: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test --report-format markdown outputs markdown report."""
+        mock_asyncio_run.return_value = sample_parse_result
+        mock_format_markdown.return_value = "# Report"
+
+        seed_command(
+            temp_seed_file,
+            verbose=False,
+            json_output=False,
+            report_format="markdown",
+        )
+
+        mock_generate_report.assert_called_once()
+        mock_format_markdown.assert_called_once()
+
+    @patch("yolo_developer.cli.commands.seed.format_report_rich")
+    @patch("yolo_developer.cli.commands.seed.generate_validation_report")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_report_format_rich(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_generate_report: MagicMock,
+        mock_format_rich: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test --report-format rich outputs rich console report."""
+        mock_asyncio_run.return_value = sample_parse_result
+
+        seed_command(
+            temp_seed_file,
+            verbose=False,
+            json_output=False,
+            report_format="rich",
+        )
+
+        mock_generate_report.assert_called_once()
+        mock_format_rich.assert_called_once()
+
+    @patch("yolo_developer.cli.commands.seed.generate_validation_report")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_report_output_file(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_generate_report: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+        tmp_path: Path,
+    ) -> None:
+        """Test --report-output writes report to file."""
+        from yolo_developer.seed.report import QualityMetrics, ValidationReport
+
+        mock_asyncio_run.return_value = sample_parse_result
+        mock_report = ValidationReport(
+            parse_result=sample_parse_result,
+            quality_metrics=QualityMetrics(
+                ambiguity_score=1.0,
+                sop_score=1.0,
+                extraction_score=1.0,
+                overall_score=1.0,
+            ),
+            report_id="test-123",
+            source_file=str(temp_seed_file),
+        )
+        mock_generate_report.return_value = mock_report
+
+        output_file = tmp_path / "report.json"
+        seed_command(
+            temp_seed_file,
+            verbose=False,
+            json_output=False,
+            report_format="json",
+            report_output=output_file,
+        )
+
+        assert output_file.exists()
+        content = output_file.read_text()
+        assert "test-123" in content

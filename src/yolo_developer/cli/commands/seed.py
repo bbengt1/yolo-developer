@@ -1,9 +1,10 @@
-"""CLI command for parsing seed documents (Story 4.2, 4.3, 4.5).
+"""CLI command for parsing seed documents (Story 4.2, 4.3, 4.5, 4.6).
 
 This module implements the `yolo seed` command that parses natural language
 seed documents into structured components (goals, features, constraints).
-It also supports interactive ambiguity resolution via --interactive flag
-and SOP constraint validation via --validate-sop flag.
+It also supports interactive ambiguity resolution via --interactive flag,
+SOP constraint validation via --validate-sop flag, and semantic validation
+reports via --report-format flag (Story 4.6).
 
 Example:
     $ yolo seed requirements.md
@@ -12,6 +13,8 @@ Example:
     $ yolo seed requirements.md --interactive
     $ yolo seed requirements.md --validate-sop
     $ yolo seed requirements.md --validate-sop --override-soft
+    $ yolo seed requirements.md --report-format json
+    $ yolo seed requirements.md --report-format markdown --report-output report.md
 """
 
 from __future__ import annotations
@@ -39,6 +42,12 @@ from yolo_developer.seed.ambiguity import (
     calculate_question_priority,
     detect_ambiguities,
     prioritize_questions,
+)
+from yolo_developer.seed.report import (
+    format_report_json,
+    format_report_markdown,
+    format_report_rich,
+    generate_validation_report,
 )
 from yolo_developer.seed.sop import (
     ConflictSeverity,
@@ -726,6 +735,8 @@ def seed_command(
     validate_sop: bool = False,
     sop_store_path: Path | None = None,
     override_soft: bool = False,
+    report_format: str | None = None,
+    report_output: Path | None = None,
 ) -> None:
     """Parse a seed document and display structured results.
 
@@ -733,6 +744,7 @@ def seed_command(
     components (goals, features, constraints), and displays the results.
     In interactive mode, detects ambiguities and prompts for resolution.
     With --validate-sop, validates against SOP constraints.
+    With --report-format, generates semantic validation reports (Story 4.6).
 
     Args:
         file_path: Path to the seed document file.
@@ -742,6 +754,8 @@ def seed_command(
         validate_sop: If True, validate against SOP constraints (Story 4.5).
         sop_store_path: Path to SOP store JSON file (Story 4.5).
         override_soft: If True, auto-override all SOFT conflicts (Story 4.5).
+        report_format: Output format for validation report (json, markdown, rich).
+        report_output: File path to write report to (optional).
     """
     logger.info(
         "seed_command_started",
@@ -751,6 +765,8 @@ def seed_command(
         interactive=interactive,
         validate_sop=validate_sop,
         override_soft=override_soft,
+        report_format=report_format,
+        report_output=str(report_output) if report_output else None,
     )
 
     # Read the seed file
@@ -961,8 +977,50 @@ def seed_command(
             _output_json(result)
         raise typer.Exit(code=1)
 
-    # Output results
-    if json_output:
+    # Generate validation report if requested (Story 4.6)
+    if report_format:
+        report = generate_validation_report(result, source_file=str(file_path))
+        logger.info(
+            "validation_report_generated",
+            report_id=report.report_id,
+            overall_score=report.quality_metrics.overall_score,
+            format=report_format,
+        )
+
+        # Generate formatted output
+        if report_format == "json":
+            formatted_output = format_report_json(report)
+        elif report_format == "markdown":
+            formatted_output = format_report_markdown(report)
+        elif report_format == "rich":
+            # Rich output goes directly to console
+            formatted_output = None
+        else:
+            console.print(f"[red]Error:[/red] Unknown report format: {report_format}")
+            raise typer.Exit(code=1)
+
+        # Write to file or display
+        if report_output:
+            try:
+                if report_format == "rich":
+                    # For rich format, write markdown fallback to file
+                    report_output.write_text(format_report_markdown(report), encoding="utf-8")
+                else:
+                    report_output.write_text(formatted_output or "", encoding="utf-8")
+                console.print(f"[green]Report written to:[/green] {report_output}")
+                logger.info("report_written_to_file", path=str(report_output))
+            except OSError as e:
+                console.print(f"[red]Error writing report:[/red] {e!s}")
+                raise typer.Exit(code=1) from e
+        else:
+            if report_format == "rich":
+                format_report_rich(report, console=console)
+            elif report_format == "json":
+                console.print_json(formatted_output or "")
+            else:
+                console.print(formatted_output or "")
+    elif json_output:
+        # Legacy --json output (just the parse result)
         _output_json(result)
     else:
         _display_parse_results(result, verbose=verbose)
@@ -989,7 +1047,7 @@ def seed_command(
         console.print()
         console.print(
             "[green]Seed parsing complete![/green] "
-            "[dim]Use --json for machine-readable output.[/dim]"
+            "[dim]Use --json for machine-readable output or --report-format for validation reports.[/dim]"
         )
 
     logger.info("seed_command_completed", file_path=str(file_path))
