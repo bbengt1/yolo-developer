@@ -15,6 +15,9 @@ Environment variables use the ``YOLO_`` prefix with ``__`` as the nested delimit
 - ``YOLO_LLM__ANTHROPIC_API_KEY``: Anthropic API key (secrets only via env vars)
 - ``YOLO_QUALITY__TEST_COVERAGE_THRESHOLD``: Test coverage threshold (0.0-1.0)
 - ``YOLO_QUALITY__CONFIDENCE_THRESHOLD``: Confidence threshold (0.0-1.0)
+- ``YOLO_QUALITY__SEED_THRESHOLDS__OVERALL``: Seed overall quality threshold (0.0-1.0, default 0.70)
+- ``YOLO_QUALITY__SEED_THRESHOLDS__AMBIGUITY``: Seed ambiguity threshold (0.0-1.0, default 0.60)
+- ``YOLO_QUALITY__SEED_THRESHOLDS__SOP``: Seed SOP compliance threshold (0.0-1.0, default 0.80)
 - ``YOLO_MEMORY__PERSIST_PATH``: Memory persistence directory
 - ``YOLO_MEMORY__VECTOR_STORE_TYPE``: Vector store type (chromadb)
 - ``YOLO_MEMORY__GRAPH_STORE_TYPE``: Graph store type (json, neo4j)
@@ -116,6 +119,44 @@ class LLMConfig(BaseModel):
     )
 
 
+class SeedThresholdConfig(BaseModel):
+    """Configuration for seed quality thresholds (Story 4.7).
+
+    Defines the minimum thresholds that must be met for seed validation.
+    Seeds with scores below these thresholds are rejected unless --force is used.
+
+    Attributes:
+        overall: Minimum overall quality score (0.0-1.0, default 0.70).
+        ambiguity: Minimum ambiguity score (0.0-1.0, default 0.60).
+        sop: Minimum SOP compliance score (0.0-1.0, default 0.80).
+
+    Example:
+        >>> from yolo_developer.config.schema import SeedThresholdConfig
+        >>> config = SeedThresholdConfig(overall=0.85, ambiguity=0.75)
+        >>> config.overall
+        0.85
+    """
+
+    overall: float = Field(
+        default=0.70,
+        description="Minimum overall quality score (0.0-1.0) for seed acceptance",
+        ge=0.0,
+        le=1.0,
+    )
+    ambiguity: float = Field(
+        default=0.60,
+        description="Minimum ambiguity resolution score (0.0-1.0)",
+        ge=0.0,
+        le=1.0,
+    )
+    sop: float = Field(
+        default=0.80,
+        description="Minimum SOP compliance score (0.0-1.0)",
+        ge=0.0,
+        le=1.0,
+    )
+
+
 class QualityConfig(BaseModel):
     """Configuration for quality gate thresholds.
 
@@ -129,6 +170,7 @@ class QualityConfig(BaseModel):
         test_coverage_threshold: Global test coverage threshold (0.0-1.0).
         confidence_threshold: Global confidence score threshold (0.0-1.0).
         gate_thresholds: Per-gate threshold configuration overrides.
+        seed_thresholds: Seed quality threshold configuration (Story 4.7).
 
     Example:
         >>> from yolo_developer.config.schema import QualityConfig, GateThreshold
@@ -153,6 +195,10 @@ class QualityConfig(BaseModel):
     gate_thresholds: dict[str, GateThreshold] = Field(
         default_factory=dict,
         description="Per-gate threshold configuration overrides",
+    )
+    seed_thresholds: SeedThresholdConfig = Field(
+        default_factory=SeedThresholdConfig,
+        description="Seed quality threshold configuration (Story 4.7)",
     )
 
     def validate_thresholds(self) -> list[str]:

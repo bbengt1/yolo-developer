@@ -77,14 +77,14 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Seed Input & Validation (7 stories)
-  epic-4: in-progress
+  epic-4: done
   4-1-parse-natural-language-seed-documents: done
   4-2-cli-seed-command-implementation: done
   4-3-ambiguity-detection: done
   4-4-clarification-question-generation: done
   4-5-sop-constraint-validation: done
   4-6-semantic-validation-reports: done
-  4-7-quality-threshold-rejection: backlog
+  4-7-quality-threshold-rejection: done
   epic-4-retrospective: optional
 
   # Epic 5: Analyst Agent (7 stories)

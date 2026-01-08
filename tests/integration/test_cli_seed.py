@@ -1127,3 +1127,351 @@ class TestValidationReportFeatures:
 
         assert result.exit_code == 1
         assert "Unknown report format" in result.output
+
+
+# ============================================================================
+# Test Quality Threshold Rejection Features (Story 4.7)
+# ============================================================================
+
+
+class TestQualityThresholdRejection:
+    """Integration tests for Story 4.7 quality threshold rejection."""
+
+    def test_force_flag_appears_in_help(self) -> None:
+        """Test that --force flag appears in help."""
+        result = runner.invoke(app, ["seed", "--help"])
+        assert result.exit_code == 0
+        assert "--force" in result.output
+        assert "-f" in result.output
+
+    def test_low_quality_seed_rejected_with_exit_code_1(
+        self,
+        simple_seed_path: Path,
+    ) -> None:
+        """Test that low quality seeds are rejected with exit code 1."""
+        from yolo_developer.seed.ambiguity import (
+            Ambiguity,
+            AmbiguitySeverity,
+            AmbiguityType,
+        )
+        from yolo_developer.seed.rejection import QualityThreshold
+        from yolo_developer.seed.types import SeedGoal, SeedParseResult, SeedSource
+
+        # Create low quality result with many ambiguities
+        ambiguities = tuple(
+            Ambiguity(
+                ambiguity_type=AmbiguityType.UNDEFINED,
+                severity=AmbiguitySeverity.HIGH,
+                source_text=f"undefined term {i}",
+                location=f"line {i}",
+                description=f"Term {i} is undefined",
+            )
+            for i in range(10)
+        )
+
+        low_quality_result = SeedParseResult(
+            goals=(SeedGoal(title="G1", description="D1", priority=1),),
+            features=(),
+            constraints=(),
+            raw_content="Test content",
+            source=SeedSource.FILE,
+            ambiguities=ambiguities,
+            ambiguity_confidence=0.2,  # Very low confidence = many issues
+        )
+
+        with (
+            patch(
+                "yolo_developer.cli.commands.seed.parse_seed",
+                new_callable=AsyncMock,
+                return_value=low_quality_result,
+            ),
+            # Use strict thresholds to ensure rejection
+            patch(
+                "yolo_developer.cli.commands.seed._load_thresholds_from_config",
+                return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
+            )
+
+        assert result.exit_code == 1
+        assert "Rejected" in result.output or "rejected" in result.output.lower()
+
+    def test_force_flag_bypasses_rejection(
+        self,
+        simple_seed_path: Path,
+    ) -> None:
+        """Test that --force flag bypasses threshold rejection."""
+        from yolo_developer.seed.ambiguity import (
+            Ambiguity,
+            AmbiguitySeverity,
+            AmbiguityType,
+        )
+        from yolo_developer.seed.rejection import QualityThreshold
+        from yolo_developer.seed.types import SeedGoal, SeedParseResult, SeedSource
+
+        # Create low quality result
+        ambiguities = tuple(
+            Ambiguity(
+                ambiguity_type=AmbiguityType.UNDEFINED,
+                severity=AmbiguitySeverity.HIGH,
+                source_text=f"term {i}",
+                location=f"line {i}",
+                description="Undefined",
+            )
+            for i in range(5)
+        )
+
+        low_quality_result = SeedParseResult(
+            goals=(SeedGoal(title="G1", description="D1", priority=1),),
+            features=(),
+            constraints=(),
+            raw_content="Test content",
+            source=SeedSource.FILE,
+            ambiguities=ambiguities,
+            ambiguity_confidence=0.3,
+        )
+
+        with (
+            patch(
+                "yolo_developer.cli.commands.seed.parse_seed",
+                new_callable=AsyncMock,
+                return_value=low_quality_result,
+            ),
+            patch(
+                "yolo_developer.cli.commands.seed._load_thresholds_from_config",
+                return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich", "--force"]
+            )
+
+        assert result.exit_code == 0
+        assert "Warning" in result.output or "Bypass" in result.output
+
+    def test_high_quality_seed_passes(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that high quality seeds pass without --force."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        # No ambiguities = high quality
+        mock_ambiguity_response = {"ambiguities": []}
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+                new_callable=AsyncMock,
+                return_value=mock_ambiguity_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=SOPValidationResult(passed=True),
+            ),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--report-format",
+                    "rich",
+                    "--validate-sop",
+                ],
+            )
+
+        assert result.exit_code == 0
+        # Should NOT contain rejection message
+        assert "Rejected" not in result.output
+
+    def test_rejection_shows_remediation_steps(
+        self,
+        simple_seed_path: Path,
+    ) -> None:
+        """Test that rejection includes remediation steps."""
+        from yolo_developer.seed.ambiguity import (
+            Ambiguity,
+            AmbiguitySeverity,
+            AmbiguityType,
+        )
+        from yolo_developer.seed.rejection import QualityThreshold
+        from yolo_developer.seed.types import SeedGoal, SeedParseResult, SeedSource
+
+        # Create low quality result with high-severity ambiguities
+        ambiguities = tuple(
+            Ambiguity(
+                ambiguity_type=AmbiguityType.UNDEFINED,
+                severity=AmbiguitySeverity.HIGH,
+                source_text=f"unclear term {i}",
+                location=f"line {i}",
+                description="Term undefined",
+            )
+            for i in range(8)
+        )
+
+        low_quality_result = SeedParseResult(
+            goals=(SeedGoal(title="G1", description="D1", priority=1),),
+            features=(),
+            constraints=(),
+            raw_content="Test content",
+            source=SeedSource.FILE,
+            ambiguities=ambiguities,
+            ambiguity_confidence=0.2,
+        )
+
+        with (
+            patch(
+                "yolo_developer.cli.commands.seed.parse_seed",
+                new_callable=AsyncMock,
+                return_value=low_quality_result,
+            ),
+            patch(
+                "yolo_developer.cli.commands.seed._load_thresholds_from_config",
+                return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
+            )
+
+        assert result.exit_code == 1
+        # Should show remediation steps
+        assert "Remediation" in result.output or "high-severity" in result.output.lower()
+
+    def test_rejection_shows_force_tip(
+        self,
+        simple_seed_path: Path,
+    ) -> None:
+        """Test that rejection message includes --force tip."""
+        from yolo_developer.seed.ambiguity import (
+            Ambiguity,
+            AmbiguitySeverity,
+            AmbiguityType,
+        )
+        from yolo_developer.seed.rejection import QualityThreshold
+        from yolo_developer.seed.types import SeedGoal, SeedParseResult, SeedSource
+
+        # Create low quality result
+        ambiguities = tuple(
+            Ambiguity(
+                ambiguity_type=AmbiguityType.SCOPE,
+                severity=AmbiguitySeverity.HIGH,
+                source_text=f"scope issue {i}",
+                location=f"line {i}",
+                description="Scope unclear",
+            )
+            for i in range(5)
+        )
+
+        low_quality_result = SeedParseResult(
+            goals=(SeedGoal(title="G1", description="D1", priority=1),),
+            features=(),
+            constraints=(),
+            raw_content="Test content",
+            source=SeedSource.FILE,
+            ambiguities=ambiguities,
+            ambiguity_confidence=0.3,
+        )
+
+        with (
+            patch(
+                "yolo_developer.cli.commands.seed.parse_seed",
+                new_callable=AsyncMock,
+                return_value=low_quality_result,
+            ),
+            patch(
+                "yolo_developer.cli.commands.seed._load_thresholds_from_config",
+                return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
+            )
+
+        assert result.exit_code == 1
+        assert "--force" in result.output
+
+    def test_force_short_flag_works(
+        self,
+        simple_seed_path: Path,
+    ) -> None:
+        """Test that -f short flag works same as --force."""
+        from yolo_developer.seed.ambiguity import (
+            Ambiguity,
+            AmbiguitySeverity,
+            AmbiguityType,
+        )
+        from yolo_developer.seed.rejection import QualityThreshold
+        from yolo_developer.seed.types import SeedGoal, SeedParseResult, SeedSource
+
+        # Create low quality result
+        ambiguities = tuple(
+            Ambiguity(
+                ambiguity_type=AmbiguityType.UNDEFINED,
+                severity=AmbiguitySeverity.HIGH,
+                source_text=f"term {i}",
+                location=f"line {i}",
+                description="Undefined",
+            )
+            for i in range(5)
+        )
+
+        low_quality_result = SeedParseResult(
+            goals=(SeedGoal(title="G1", description="D1", priority=1),),
+            features=(),
+            constraints=(),
+            raw_content="Test content",
+            source=SeedSource.FILE,
+            ambiguities=ambiguities,
+            ambiguity_confidence=0.3,
+        )
+
+        with (
+            patch(
+                "yolo_developer.cli.commands.seed.parse_seed",
+                new_callable=AsyncMock,
+                return_value=low_quality_result,
+            ),
+            patch(
+                "yolo_developer.cli.commands.seed._load_thresholds_from_config",
+                return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--report-format", "rich", "-f"]
+            )
+
+        assert result.exit_code == 0
+
+    def test_threshold_rejection_only_applies_to_report_mode(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that threshold rejection only applies when --report-format is used."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        # Without --report-format, no rejection happens
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(app, ["seed", str(simple_seed_path)])
+
+        assert result.exit_code == 0
+        # Should not mention rejection
+        assert "Rejected" not in result.output

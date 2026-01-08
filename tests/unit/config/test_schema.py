@@ -123,6 +123,77 @@ class TestQualityConfig:
         assert hints["confidence_threshold"] is float
 
 
+class TestSeedThresholdConfig:
+    """Tests for SeedThresholdConfig nested model (Story 4.7)."""
+
+    def test_seed_threshold_config_exists(self) -> None:
+        """Verify SeedThresholdConfig class exists and can be imported."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        assert SeedThresholdConfig is not None
+
+    def test_seed_threshold_default_values(self) -> None:
+        """Verify SeedThresholdConfig has correct default values."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        config = SeedThresholdConfig()
+        assert config.overall == 0.70
+        assert config.ambiguity == 0.60
+        assert config.sop == 0.80
+
+    def test_seed_threshold_custom_values(self) -> None:
+        """Verify SeedThresholdConfig accepts custom values."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        config = SeedThresholdConfig(overall=0.85, ambiguity=0.75, sop=0.90)
+        assert config.overall == 0.85
+        assert config.ambiguity == 0.75
+        assert config.sop == 0.90
+
+    def test_seed_threshold_rejects_above_one(self) -> None:
+        """Verify threshold values above 1.0 are rejected."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            SeedThresholdConfig(overall=1.5)
+        assert "overall" in str(exc_info.value)
+
+    def test_seed_threshold_rejects_negative(self) -> None:
+        """Verify negative threshold values are rejected."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            SeedThresholdConfig(ambiguity=-0.1)
+        assert "ambiguity" in str(exc_info.value)
+
+    def test_seed_threshold_accepts_boundaries(self) -> None:
+        """Verify 0.0 and 1.0 are valid boundary values."""
+        from yolo_developer.config.schema import SeedThresholdConfig
+
+        low = SeedThresholdConfig(overall=0.0, ambiguity=0.0, sop=0.0)
+        assert low.overall == 0.0
+
+        high = SeedThresholdConfig(overall=1.0, ambiguity=1.0, sop=1.0)
+        assert high.overall == 1.0
+
+    def test_quality_config_has_seed_thresholds(self) -> None:
+        """Verify QualityConfig includes seed_thresholds field."""
+        from yolo_developer.config.schema import QualityConfig, SeedThresholdConfig
+
+        config = QualityConfig()
+        assert hasattr(config, "seed_thresholds")
+        assert isinstance(config.seed_thresholds, SeedThresholdConfig)
+
+    def test_quality_config_seed_thresholds_uses_defaults(self) -> None:
+        """Verify QualityConfig seed_thresholds has correct defaults."""
+        from yolo_developer.config.schema import QualityConfig
+
+        config = QualityConfig()
+        assert config.seed_thresholds.overall == 0.70
+        assert config.seed_thresholds.ambiguity == 0.60
+        assert config.seed_thresholds.sop == 0.80
+
+
 class TestMemoryConfig:
     """Tests for MemoryConfig nested model (Task 3)."""
 

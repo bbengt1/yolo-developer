@@ -68,6 +68,21 @@ Example:
     >>> json_output = format_report_json(report)  # JSON format
     >>> md_output = format_report_markdown(report)  # Markdown format
     >>> format_report_rich(report)  # Rich console output
+    >>>
+    >>> # Quality threshold rejection (Story 4.7)
+    >>> from yolo_developer.seed import (
+    ...     QualityThreshold,
+    ...     RejectionReason,
+    ...     RejectionResult,
+    ...     validate_quality_thresholds,
+    ...     generate_remediation_steps,
+    ...     create_rejection_with_remediation,
+    ... )
+    >>> thresholds = QualityThreshold()  # uses defaults
+    >>> result = validate_quality_thresholds(report.quality_metrics, thresholds)
+    >>> if not result.passed:
+    ...     for reason in result.reasons:
+    ...         print(f"- {reason.description}")
 """
 
 from __future__ import annotations
@@ -93,6 +108,14 @@ from yolo_developer.seed.parser import (
     SeedParser,
     detect_source_format,
     normalize_content,
+)
+from yolo_developer.seed.rejection import (
+    QualityThreshold,
+    RejectionReason,
+    RejectionResult,
+    create_rejection_with_remediation,
+    generate_remediation_steps,
+    validate_quality_thresholds,
 )
 from yolo_developer.seed.report import (
     QualityMetrics,
@@ -127,26 +150,28 @@ from yolo_developer.seed.types import (
 )
 
 __all__ = [
-    # Types
     "Ambiguity",
     "AmbiguityResult",
     "AmbiguitySeverity",
     "AmbiguityType",
-    "AnswerFormat",  # Story 4.4
+    "AnswerFormat",
     "ComponentType",
-    "ConflictSeverity",  # Story 4.5
+    "ConflictSeverity",
     "ConstraintCategory",
-    "InMemorySOPStore",  # Story 4.5
+    "InMemorySOPStore",
     "LLMSeedParser",
-    "QualityMetrics",  # Story 4.6
-    "ReportFormat",  # Story 4.6
+    "QualityMetrics",
+    "QualityThreshold",
+    "RejectionReason",
+    "RejectionResult",
+    "ReportFormat",
     "Resolution",
     "ResolutionPrompt",
-    "SOPCategory",  # Story 4.5
-    "SOPConflict",  # Story 4.5
-    "SOPConstraint",  # Story 4.5
-    "SOPStore",  # Story 4.5
-    "SOPValidationResult",  # Story 4.5
+    "SOPCategory",
+    "SOPConflict",
+    "SOPConstraint",
+    "SOPStore",
+    "SOPValidationResult",
     "SeedComponent",
     "SeedConstraint",
     "SeedContext",
@@ -155,21 +180,23 @@ __all__ = [
     "SeedParseResult",
     "SeedParser",
     "SeedSource",
-    "ValidationReport",  # Story 4.6
-    # Functions
+    "ValidationReport",
     "calculate_ambiguity_confidence",
-    "calculate_quality_score",  # Story 4.6
-    "calculate_question_priority",  # Story 4.4
+    "calculate_quality_score",
+    "calculate_question_priority",
+    "create_rejection_with_remediation",
     "detect_ambiguities",
     "detect_source_format",
-    "format_report_json",  # Story 4.6
-    "format_report_markdown",  # Story 4.6
-    "format_report_rich",  # Story 4.6
-    "generate_constraint_id",  # Story 4.5
-    "generate_validation_report",  # Story 4.6
+    "format_report_json",
+    "format_report_markdown",
+    "format_report_rich",
+    "generate_constraint_id",
+    "generate_remediation_steps",
+    "generate_validation_report",
     "normalize_content",
     "parse_seed",
-    "prioritize_questions",  # Story 4.4
-    "validate_against_sop",  # Story 4.5
-    "validate_question_quality",  # Story 4.4
+    "prioritize_questions",
+    "validate_against_sop",
+    "validate_quality_thresholds",
+    "validate_question_quality",
 ]

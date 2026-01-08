@@ -1,10 +1,11 @@
-"""CLI command for parsing seed documents (Story 4.2, 4.3, 4.5, 4.6).
+"""CLI command for parsing seed documents (Story 4.2, 4.3, 4.5, 4.6, 4.7).
 
 This module implements the `yolo seed` command that parses natural language
 seed documents into structured components (goals, features, constraints).
 It also supports interactive ambiguity resolution via --interactive flag,
-SOP constraint validation via --validate-sop flag, and semantic validation
-reports via --report-format flag (Story 4.6).
+SOP constraint validation via --validate-sop flag, semantic validation
+reports via --report-format flag (Story 4.6), and quality threshold rejection
+via automatic quality checks (Story 4.7).
 
 Example:
     $ yolo seed requirements.md
@@ -15,6 +16,7 @@ Example:
     $ yolo seed requirements.md --validate-sop --override-soft
     $ yolo seed requirements.md --report-format json
     $ yolo seed requirements.md --report-format markdown --report-output report.md
+    $ yolo seed requirements.md --report-format rich --force  # bypass threshold rejection
 """
 
 from __future__ import annotations
@@ -42,6 +44,11 @@ from yolo_developer.seed.ambiguity import (
     calculate_question_priority,
     detect_ambiguities,
     prioritize_questions,
+)
+from yolo_developer.seed.rejection import (
+    QualityThreshold,
+    RejectionResult,
+    create_rejection_with_remediation,
 )
 from yolo_developer.seed.report import (
     format_report_json,
@@ -331,6 +338,72 @@ def _display_sop_conflicts(
                     console.print(f"       - {opt}")
 
 
+def _display_rejection(rejection_result: RejectionResult) -> None:
+    """Display rejection panel with failed thresholds and remediation (Story 4.7).
+
+    Args:
+        rejection_result: The RejectionResult containing failure details.
+    """
+    # Build panel content with failed thresholds
+    content_lines = ["[red bold]Seed Rejected - Quality Below Threshold[/red bold]\n"]
+
+    # Show failed thresholds
+    content_lines.append("[red]Failed Thresholds:[/red]")
+    for reason in rejection_result.reasons:
+        content_lines.append(
+            f"  [red]x[/red] {reason.threshold_name.title()} Score: "
+            f"{reason.actual_score:.2f} < {reason.required_score:.2f} required"
+        )
+
+    # Show remediation recommendations
+    if rejection_result.recommendations:
+        content_lines.append("\n[yellow]Remediation Steps:[/yellow]")
+        for i, rec in enumerate(rejection_result.recommendations, 1):
+            content_lines.append(f"  {i}. {rec}")
+
+    # Add tip about --force
+    content_lines.append("\n[dim]Tip: Use --force to proceed despite low quality scores[/dim]")
+
+    panel = Panel(
+        "\n".join(content_lines),
+        title="Seed Rejected",
+        border_style="red",
+    )
+    console.print()
+    console.print(panel)
+
+
+def _display_threshold_warning(rejection_result: RejectionResult) -> None:
+    """Display warning when --force bypasses threshold rejection (Story 4.7).
+
+    Args:
+        rejection_result: The RejectionResult containing failure details.
+    """
+    # Build warning content
+    content_lines = ["[yellow bold]Quality Threshold Bypassed with --force[/yellow bold]\n"]
+
+    # Show which thresholds would have failed
+    content_lines.append("[yellow]Thresholds that would have rejected:[/yellow]")
+    for reason in rejection_result.reasons:
+        content_lines.append(
+            f"  [yellow]![/yellow] {reason.threshold_name.title()} Score: "
+            f"{reason.actual_score:.2f} < {reason.required_score:.2f} required"
+        )
+
+    # Show remediation as recommendations for future
+    if rejection_result.recommendations:
+        content_lines.append("\n[dim]Consider addressing before production use:[/dim]")
+        for rec in rejection_result.recommendations:
+            content_lines.append(f"  - {rec}")
+
+    panel = Panel(
+        "\n".join(content_lines),
+        title="Warning: Quality Bypass",
+        border_style="yellow",
+    )
+    console.print(panel)
+
+
 def _prompt_for_sop_override(
     conflict: SOPConflict,
     index: int,
@@ -610,6 +683,35 @@ def _output_json(result: SeedParseResult) -> None:
     console.print_json(json.dumps(result_dict, indent=2))
 
 
+def _load_thresholds_from_config() -> QualityThreshold:
+    """Load quality thresholds from config if available (Story 4.7).
+
+    Attempts to load YoloConfig from the current directory's yolo.yaml.
+    Falls back to default thresholds if config is not available.
+
+    Returns:
+        QualityThreshold configured from yolo.yaml or defaults.
+    """
+    try:
+        from yolo_developer.config import ConfigurationError, load_config
+
+        config = load_config()
+        seed_config = config.quality.seed_thresholds
+        return QualityThreshold(
+            overall=seed_config.overall,
+            ambiguity=seed_config.ambiguity,
+            sop=seed_config.sop,
+        )
+    except (FileNotFoundError, ConfigurationError) as e:
+        # Config file not found or invalid - use defaults
+        logger.debug("config_load_failed_using_defaults", error=str(e))
+        return QualityThreshold()
+    except (ImportError, AttributeError) as e:
+        # Missing config module or schema changes - use defaults
+        logger.warning("config_module_error_using_defaults", error=str(e))
+        return QualityThreshold()
+
+
 def _read_seed_file(file_path: Path) -> str:
     """Read and validate seed file content.
 
@@ -737,6 +839,7 @@ def seed_command(
     override_soft: bool = False,
     report_format: str | None = None,
     report_output: Path | None = None,
+    force: bool = False,
 ) -> None:
     """Parse a seed document and display structured results.
 
@@ -745,6 +848,7 @@ def seed_command(
     In interactive mode, detects ambiguities and prompts for resolution.
     With --validate-sop, validates against SOP constraints.
     With --report-format, generates semantic validation reports (Story 4.6).
+    With threshold enforcement, rejects low-quality seeds (Story 4.7).
 
     Args:
         file_path: Path to the seed document file.
@@ -756,6 +860,7 @@ def seed_command(
         override_soft: If True, auto-override all SOFT conflicts (Story 4.5).
         report_format: Output format for validation report (json, markdown, rich).
         report_output: File path to write report to (optional).
+        force: If True, bypass quality threshold rejection (Story 4.7).
     """
     logger.info(
         "seed_command_started",
@@ -767,6 +872,7 @@ def seed_command(
         override_soft=override_soft,
         report_format=report_format,
         report_output=str(report_output) if report_output else None,
+        force=force,
     )
 
     # Read the seed file
@@ -986,6 +1092,37 @@ def seed_command(
             overall_score=report.quality_metrics.overall_score,
             format=report_format,
         )
+
+        # Check quality thresholds (Story 4.7)
+        thresholds = _load_thresholds_from_config()
+        rejection_result = create_rejection_with_remediation(
+            report.quality_metrics, report, thresholds
+        )
+
+        if not rejection_result.passed:
+            if force:
+                # User bypassed rejection with --force
+                logger.warning(
+                    "quality_threshold_rejection_bypassed",
+                    force=True,
+                    failure_count=rejection_result.failure_count,
+                    reasons=[r.to_dict() for r in rejection_result.reasons],
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                if not json_output:
+                    console.print()
+                    _display_threshold_warning(rejection_result)
+            else:
+                # Display rejection and exit
+                logger.warning(
+                    "quality_threshold_rejection",
+                    passed=False,
+                    failure_count=rejection_result.failure_count,
+                    reasons=[r.to_dict() for r in rejection_result.reasons],
+                )
+                if not json_output:
+                    _display_rejection(rejection_result)
+                raise typer.Exit(code=1)
 
         # Generate formatted output
         if report_format == "json":

@@ -111,6 +111,12 @@ def seed(
         "-o",
         help="File path to write the validation report to.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force processing even if quality thresholds are not met.",
+    ),
 ) -> None:
     """Parse a seed document into structured components.
 
@@ -135,7 +141,12 @@ def seed(
     1. Parse the seed document
     2. Calculate quality metrics (ambiguity, SOP, extraction scores)
     3. Generate a comprehensive validation report
-    4. Output in the specified format (json, markdown, or rich console)
+    4. Check quality thresholds (reject if below minimum)
+    5. Output in the specified format (json, markdown, or rich console)
+
+    Quality thresholds are checked when generating reports. Seeds that fail
+    minimum thresholds are rejected with remediation guidance. Use --force
+    to proceed despite low quality scores (Story 4.7).
 
     Examples:
         yolo seed requirements.md
@@ -147,6 +158,7 @@ def seed(
         yolo seed requirements.md --report-format json
         yolo seed requirements.md --report-format markdown -o report.md
         yolo seed requirements.md --report-format rich
+        yolo seed requirements.md --report-format rich --force  # bypass threshold rejection
     """
     seed_command(
         file_path=file_path,
@@ -158,6 +170,7 @@ def seed(
         override_soft=override_soft,
         report_format=report_format,
         report_output=report_output,
+        force=force,
     )
 
 

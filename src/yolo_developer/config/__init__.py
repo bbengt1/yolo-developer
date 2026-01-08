@@ -23,6 +23,7 @@ from yolo_developer.config.schema import (
     LLMConfig,
     MemoryConfig,
     QualityConfig,
+    SeedThresholdConfig,
     YoloConfig,
 )
 from yolo_developer.config.validators import (
@@ -37,6 +38,7 @@ __all__ = [
     "LLMConfig",
     "MemoryConfig",
     "QualityConfig",
+    "SeedThresholdConfig",
     "ValidationIssue",
     "ValidationResult",
     "YoloConfig",
