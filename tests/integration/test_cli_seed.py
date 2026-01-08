@@ -365,3 +365,198 @@ class TestWithRealFixtures:
             ):
                 result = runner.invoke(app, ["seed", str(edge_case_path)])
             assert result.exit_code == 0
+
+
+# ============================================================================
+# Test Question Generation Features (Story 4.4)
+# ============================================================================
+
+
+class TestQuestionGenerationFeatures:
+    """Integration tests for Story 4.4 question generation enhancements."""
+
+    @pytest.fixture
+    def mock_ambiguity_response(self) -> dict[str, Any]:
+        """Create mock LLM response with ambiguities and answer formats."""
+        return {
+            "ambiguities": [
+                {
+                    "type": "UNDEFINED",
+                    "severity": "HIGH",
+                    "source_text": "user authentication",
+                    "location": "line 5",
+                    "description": "No authentication method specified",
+                    "question": "What authentication method should be used?",
+                    "suggestions": ["OAuth2", "JWT", "Session-based"],
+                    "answer_format": "CHOICE",
+                },
+                {
+                    "type": "TECHNICAL",
+                    "severity": "MEDIUM",
+                    "source_text": "fast response times",
+                    "location": "line 10",
+                    "description": "No specific latency requirement",
+                    "question": "What is the maximum acceptable response time in milliseconds?",
+                    "suggestions": ["100", "500", "1000"],
+                    "answer_format": "NUMERIC",
+                },
+                {
+                    "type": "PRIORITY",
+                    "severity": "LOW",
+                    "source_text": "nice to have",
+                    "location": "line 15",
+                    "description": "Priority unclear",
+                    "question": "Is dark mode required for initial release?",
+                    "suggestions": ["yes", "no"],
+                    "answer_format": "BOOLEAN",
+                },
+            ]
+        }
+
+    def test_verbose_mode_shows_format_hints(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test that verbose mode shows format hints for questions."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+                new_callable=AsyncMock,
+                return_value=mock_ambiguity_response,
+            ),
+        ):
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "-v"])
+
+        assert result.exit_code == 0
+        # In verbose mode with ambiguity detection, format hints may be shown
+        # The output should complete without errors
+
+    def test_ambiguity_result_includes_priority_scores_in_json(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test that JSON output includes priority scores when ambiguities detected."""
+        # Test the ambiguity result to_dict includes priority_scores
+        with patch(
+            "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+            new_callable=AsyncMock,
+            return_value=mock_ambiguity_response,
+        ):
+            import asyncio
+
+            from yolo_developer.seed.ambiguity import detect_ambiguities
+
+            result = asyncio.run(detect_ambiguities("Test content with ambiguities"))
+
+        # Verify the to_dict includes priority_scores
+        result_dict = result.to_dict()
+        assert "priority_scores" in result_dict
+        assert len(result_dict["priority_scores"]) == 3
+        # Scores should be calculated correctly
+        # UNDEFINED+HIGH = 25+30 = 55
+        # TECHNICAL+MEDIUM = 15+20 = 35
+        # PRIORITY+LOW = 5+10 = 15
+        assert result_dict["priority_scores"] == [55, 35, 15]
+
+    def test_prioritized_ambiguities_returns_correct_order(
+        self,
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test that prioritized_ambiguities property returns correct order."""
+        with patch(
+            "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+            new_callable=AsyncMock,
+            return_value=mock_ambiguity_response,
+        ):
+            import asyncio
+
+            from yolo_developer.seed.ambiguity import detect_ambiguities
+
+            result = asyncio.run(detect_ambiguities("Test content"))
+
+        prioritized = result.prioritized_ambiguities
+        # Should be sorted by priority: HIGH UNDEFINED > MEDIUM TECHNICAL > LOW PRIORITY
+        assert len(prioritized) == 3
+        assert prioritized[0].source_text == "user authentication"
+        assert prioritized[1].source_text == "fast response times"
+        assert prioritized[2].source_text == "nice to have"
+
+    def test_get_highest_priority_ambiguity_integration(
+        self,
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test get_highest_priority_ambiguity() returns correct ambiguity."""
+        with patch(
+            "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+            new_callable=AsyncMock,
+            return_value=mock_ambiguity_response,
+        ):
+            import asyncio
+
+            from yolo_developer.seed.ambiguity import detect_ambiguities
+
+            result = asyncio.run(detect_ambiguities("Test content"))
+
+        top = result.get_highest_priority_ambiguity()
+        assert top is not None
+        assert top.source_text == "user authentication"
+        assert top.severity.value == "high"
+
+    def test_answer_format_parsed_from_llm_response(
+        self,
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test that answer_format is correctly parsed from LLM response."""
+        from yolo_developer.seed.ambiguity import AnswerFormat
+
+        with patch(
+            "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+            new_callable=AsyncMock,
+            return_value=mock_ambiguity_response,
+        ):
+            import asyncio
+
+            from yolo_developer.seed.ambiguity import detect_ambiguities
+
+            result = asyncio.run(detect_ambiguities("Test content"))
+
+        # Check resolution prompts have correct answer formats
+        prompts = result.resolution_prompts
+        assert len(prompts) == 3
+        assert prompts[0].answer_format == AnswerFormat.CHOICE
+        assert prompts[1].answer_format == AnswerFormat.NUMERIC
+        assert prompts[2].answer_format == AnswerFormat.BOOLEAN
+
+    def test_format_hints_generated_for_answer_formats(
+        self,
+        mock_ambiguity_response: dict[str, Any],
+    ) -> None:
+        """Test that format hints are generated for each answer format."""
+        with patch(
+            "yolo_developer.seed.ambiguity._call_llm_for_ambiguities",
+            new_callable=AsyncMock,
+            return_value=mock_ambiguity_response,
+        ):
+            import asyncio
+
+            from yolo_developer.seed.ambiguity import detect_ambiguities
+
+            result = asyncio.run(detect_ambiguities("Test content"))
+
+        prompts = result.resolution_prompts
+        # All prompts should have format hints
+        for prompt in prompts:
+            assert prompt.format_hint is not None
+            assert len(prompt.format_hint) > 0

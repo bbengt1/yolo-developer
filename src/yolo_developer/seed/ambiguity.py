@@ -86,6 +86,33 @@ class AmbiguitySeverity(Enum):
     HIGH = "high"
 
 
+class AnswerFormat(str, Enum):
+    """Expected format for user responses to clarification questions.
+
+    Categorizes the type of response expected to help with validation
+    and user guidance.
+
+    Values:
+        BOOLEAN: Yes/No questions
+        NUMERIC: Number input (possibly with range)
+        CHOICE: Pick from suggestions
+        FREE_TEXT: Open-ended text response
+        DATE: Date/time input (YYYY-MM-DD format)
+        LIST: Multiple items (comma-separated)
+
+    Example:
+        >>> format_type = AnswerFormat.NUMERIC
+        >>> print(format_type.value)  # "numeric"
+    """
+
+    BOOLEAN = "boolean"
+    NUMERIC = "numeric"
+    CHOICE = "choice"
+    FREE_TEXT = "free_text"
+    DATE = "date"
+    LIST = "list"
+
+
 @dataclass(frozen=True)
 class Ambiguity:
     """A detected ambiguity in a seed document.
@@ -136,35 +163,48 @@ class ResolutionPrompt:
     """A clarification prompt for an ambiguity.
 
     Contains the question to ask the user and suggested answers
-    to help resolve an ambiguity.
+    to help resolve an ambiguity. Enhanced in Story 4.4 with
+    answer format and validation support.
 
     Attributes:
         question: The clarification question to ask
         suggestions: Tuple of suggested answers
         default: Default answer if user doesn't provide one (optional)
+        answer_format: Expected response format (default: FREE_TEXT)
+        format_hint: Human-readable format guidance (optional)
+        validation_pattern: Regex pattern for validation (optional)
 
     Example:
         >>> prompt = ResolutionPrompt(
         ...     question="What response time is acceptable?",
         ...     suggestions=("< 100ms", "< 500ms", "< 1 second"),
         ...     default="< 500ms",
+        ...     answer_format=AnswerFormat.CHOICE,
+        ...     format_hint="Choose from the options above",
         ... )
     """
 
     question: str
     suggestions: tuple[str, ...]
     default: str | None = None
+    answer_format: AnswerFormat = AnswerFormat.FREE_TEXT
+    format_hint: str | None = None
+    validation_pattern: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
-            Dictionary with all fields, suggestions as list.
+            Dictionary with all fields, suggestions as list,
+            answer_format as string value.
         """
         return {
             "question": self.question,
             "suggestions": list(self.suggestions),
             "default": self.default,
+            "answer_format": self.answer_format.value,
+            "format_hint": self.format_hint,
+            "validation_pattern": self.validation_pattern,
         }
 
 
@@ -173,7 +213,8 @@ class AmbiguityResult:
     """Complete result from ambiguity detection.
 
     Contains all detected ambiguities, confidence score, and
-    resolution prompts for user interaction.
+    resolution prompts for user interaction. Enhanced in Story 4.4
+    with prioritization support.
 
     Attributes:
         ambiguities: Tuple of detected ambiguities
@@ -188,27 +229,101 @@ class AmbiguityResult:
         ... )
         >>> print(result.has_ambiguities)
         False
+        >>> # Get prioritized ambiguities (Story 4.4)
+        >>> sorted_ambs = result.prioritized_ambiguities
     """
 
     ambiguities: tuple[Ambiguity, ...]
     overall_confidence: float
     resolution_prompts: tuple[ResolutionPrompt, ...]
 
+    # Cache for prioritized ambiguities (Story 4.4)
+    # Using __slots__ is not possible with frozen dataclass, so we use a workaround
+    # by computing on access (Python's functools.cached_property would work but
+    # doesn't play well with frozen dataclasses; we simply compute on demand)
+
     @property
     def has_ambiguities(self) -> bool:
         """Return True if any ambiguities were detected."""
         return len(self.ambiguities) > 0
 
+    @property
+    def prioritized_ambiguities(self) -> tuple[Ambiguity, ...]:
+        """Return ambiguities sorted by priority (highest first).
+
+        Uses the priority scoring algorithm from calculate_question_priority()
+        with deterministic tie-breaking by source_text.
+
+        Returns:
+            Tuple of Ambiguity objects sorted by priority (highest first).
+
+        Example:
+            >>> result = AmbiguityResult(ambiguities=(amb1, amb2), ...)
+            >>> for amb in result.prioritized_ambiguities:
+            ...     print(f"{amb.source_text}: priority score")
+        """
+        # Import here to avoid circular import at module load time
+        # (prioritize_questions is defined later in this module)
+        from yolo_developer.seed.ambiguity import prioritize_questions
+
+        return tuple(prioritize_questions(list(self.ambiguities)))
+
+    def get_highest_priority_ambiguity(self) -> Ambiguity | None:
+        """Return the highest priority ambiguity, if any.
+
+        Convenience method for accessing the most critical ambiguity.
+
+        Returns:
+            The highest priority Ambiguity, or None if no ambiguities.
+
+        Example:
+            >>> result = AmbiguityResult(ambiguities=(amb1, amb2), ...)
+            >>> top_amb = result.get_highest_priority_ambiguity()
+            >>> if top_amb:
+            ...     print(f"Most critical: {top_amb.source_text}")
+        """
+        if not self.ambiguities:
+            return None
+        return self.prioritized_ambiguities[0]
+
+    def get_priority_score(self, ambiguity: Ambiguity) -> int:
+        """Get the priority score for a specific ambiguity.
+
+        Args:
+            ambiguity: The Ambiguity to score.
+
+        Returns:
+            Priority score (higher = more important).
+
+        Example:
+            >>> result = AmbiguityResult(ambiguities=(amb,), ...)
+            >>> score = result.get_priority_score(amb)
+            >>> print(f"Priority score: {score}")
+        """
+        # Import here to avoid circular import
+        from yolo_developer.seed.ambiguity import calculate_question_priority
+
+        return calculate_question_priority(ambiguity)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
+        Includes priority scores for each ambiguity (Story 4.4).
+
         Returns:
-            Dictionary with all fields, nested objects serialized.
+            Dictionary with all fields, nested objects serialized,
+            and priority_scores list.
         """
+        # Import here to avoid circular import
+        from yolo_developer.seed.ambiguity import calculate_question_priority
+
         return {
             "ambiguities": [amb.to_dict() for amb in self.ambiguities],
             "overall_confidence": self.overall_confidence,
             "resolution_prompts": [prompt.to_dict() for prompt in self.resolution_prompts],
+            "priority_scores": [
+                calculate_question_priority(amb) for amb in self.ambiguities
+            ],
         }
 
 
@@ -271,6 +386,157 @@ class SeedContext:
     original_content: str
     resolutions: tuple[Resolution, ...]
     clarified_content: str
+
+
+# =============================================================================
+# Question Quality Validation (Story 4.4)
+# =============================================================================
+
+# Vague phrases that indicate non-actionable questions
+_VAGUE_PHRASES: tuple[str, ...] = (
+    "please clarify",
+    "more information",
+    "elaborate",
+    "explain further",
+    "tell me more",
+    "what do you mean",
+    "can you expand",
+    "be more specific",
+)
+
+# Minimum question length (>10 characters)
+_MIN_QUESTION_LENGTH = 10
+
+
+def validate_question_quality(question: str) -> tuple[bool, list[str]]:
+    """Validate that a clarification question is actionable and specific.
+
+    Checks for:
+    - Minimum length (>10 characters)
+    - Absence of vague phrases that indicate non-actionable questions
+    - Non-empty, non-whitespace content
+
+    Args:
+        question: The clarification question to validate.
+
+    Returns:
+        Tuple of (is_valid, suggestions) where:
+        - is_valid: True if question passes all quality checks
+        - suggestions: List of improvement suggestions (empty if valid)
+
+    Example:
+        >>> is_valid, suggestions = validate_question_quality(
+        ...     "Please clarify what you mean."
+        ... )
+        >>> is_valid
+        False
+        >>> "vague phrase" in suggestions[0].lower()
+        True
+    """
+    suggestions: list[str] = []
+    question_stripped = question.strip()
+
+    # Check for empty/whitespace-only
+    if not question_stripped:
+        suggestions.append("Question is empty. Provide a specific question.")
+        return False, suggestions
+
+    # Check minimum length
+    if len(question_stripped) <= _MIN_QUESTION_LENGTH:
+        suggestions.append(
+            f"Question is too short (must be > {_MIN_QUESTION_LENGTH} characters). "
+            "Make it more specific."
+        )
+
+    # Check for vague phrases (case-insensitive)
+    question_lower = question_stripped.lower()
+    found_vague_phrases = [
+        phrase for phrase in _VAGUE_PHRASES if phrase in question_lower
+    ]
+    if found_vague_phrases:
+        phrases_str = ", ".join(f'"{p}"' for p in found_vague_phrases)
+        suggestions.append(
+            f"Contains vague phrase(s): {phrases_str}. "
+            "Rewrite with specific, answerable questions."
+        )
+
+    is_valid = len(suggestions) == 0
+    return is_valid, suggestions
+
+
+# =============================================================================
+# Question Prioritization (Story 4.4)
+# =============================================================================
+
+# Severity weights for priority scoring
+_PRIORITY_SEVERITY_WEIGHTS: dict[AmbiguitySeverity, int] = {
+    AmbiguitySeverity.HIGH: 30,
+    AmbiguitySeverity.MEDIUM: 20,
+    AmbiguitySeverity.LOW: 10,
+}
+
+# Type weights for priority scoring (blocking types rank higher)
+_PRIORITY_TYPE_WEIGHTS: dict[AmbiguityType, int] = {
+    AmbiguityType.UNDEFINED: 25,  # Missing info is most critical
+    AmbiguityType.SCOPE: 20,  # Scope unclear blocks planning
+    AmbiguityType.TECHNICAL: 15,  # Tech unclear affects design
+    AmbiguityType.DEPENDENCY: 10,  # Dependencies can be clarified later
+    AmbiguityType.PRIORITY: 5,  # Priority is lowest impact
+}
+
+
+def calculate_question_priority(ambiguity: Ambiguity) -> int:
+    """Calculate priority score for question ordering.
+
+    Higher score = higher priority (shown first).
+    Score is based on severity weight + type weight.
+
+    Args:
+        ambiguity: The Ambiguity to score.
+
+    Returns:
+        Priority score (higher = more important).
+
+    Example:
+        >>> amb = Ambiguity(
+        ...     ambiguity_type=AmbiguityType.UNDEFINED,
+        ...     severity=AmbiguitySeverity.HIGH,
+        ...     source_text="test",
+        ...     location="line 1",
+        ...     description="test",
+        ... )
+        >>> calculate_question_priority(amb)
+        55
+    """
+    severity_weight = _PRIORITY_SEVERITY_WEIGHTS[ambiguity.severity]
+    type_weight = _PRIORITY_TYPE_WEIGHTS[ambiguity.ambiguity_type]
+    return severity_weight + type_weight
+
+
+def prioritize_questions(ambiguities: list[Ambiguity]) -> list[Ambiguity]:
+    """Sort ambiguities by priority (highest first).
+
+    Uses deterministic tie-breaking by source_text for consistency.
+
+    Args:
+        ambiguities: List of Ambiguity objects to sort.
+
+    Returns:
+        New list sorted by priority (highest first), then source_text.
+
+    Example:
+        >>> from yolo_developer.seed.ambiguity import prioritize_questions
+        >>> sorted_ambs = prioritize_questions([amb1, amb2, amb3])
+        >>> # Highest priority ambiguity is first
+    """
+    if not ambiguities:
+        return []
+
+    # Sort by priority (descending), then source_text (ascending) for tie-breaking
+    return sorted(
+        ambiguities,
+        key=lambda a: (-calculate_question_priority(a), a.source_text),
+    )
 
 
 # =============================================================================
@@ -357,8 +623,11 @@ For each ambiguity, provide:
 - source_text: The exact ambiguous phrase from the document
 - location: Line number or section where found
 - description: Why this is ambiguous
-- question: A specific question to clarify this ambiguity
+- question: A SPECIFIC, ACTIONABLE question to clarify this ambiguity (avoid vague phrases like "please clarify" or "more information")
 - suggestions: 2-3 possible interpretations or answers
+- answer_format: One of BOOLEAN (yes/no), NUMERIC (number), CHOICE (pick from suggestions), FREE_TEXT (open text), DATE (date value), LIST (multiple items)
+
+IMPORTANT: Questions must be actionable and answerable with a definitive response. Avoid open-ended questions without bounds.
 
 Output as JSON:
 {{
@@ -369,8 +638,9 @@ Output as JSON:
       "source_text": "exact phrase",
       "location": "line X or section name",
       "description": "why this is ambiguous",
-      "question": "clarification question",
-      "suggestions": ["option 1", "option 2", "option 3"]
+      "question": "specific actionable question",
+      "suggestions": ["option 1", "option 2", "option 3"],
+      "answer_format": "BOOLEAN|NUMERIC|CHOICE|FREE_TEXT|DATE|LIST"
     }}
   ]
 }}
@@ -390,6 +660,29 @@ Respond ONLY with the JSON object."""
 # Default model for ambiguity detection
 _DEFAULT_MODEL = "gpt-4o-mini"
 _DEFAULT_TEMPERATURE = 0.1
+
+
+# Default format hints for each answer format
+_DEFAULT_FORMAT_HINTS: dict[AnswerFormat, str] = {
+    AnswerFormat.BOOLEAN: "Answer yes or no",
+    AnswerFormat.NUMERIC: "Enter a number (e.g., 100, 1000)",
+    AnswerFormat.CHOICE: "Choose from the options above",
+    AnswerFormat.FREE_TEXT: "Provide a brief description",
+    AnswerFormat.DATE: "Enter a date (YYYY-MM-DD)",
+    AnswerFormat.LIST: "Enter items separated by commas",
+}
+
+
+def _get_format_hint(answer_format: AnswerFormat) -> str:
+    """Get the default format hint for an answer format.
+
+    Args:
+        answer_format: The AnswerFormat enum value.
+
+    Returns:
+        Human-readable format hint string.
+    """
+    return _DEFAULT_FORMAT_HINTS.get(answer_format, "Provide your response")
 
 
 @retry(
@@ -483,6 +776,15 @@ def _parse_ambiguity_response(
         "MEDIUM": AmbiguitySeverity.MEDIUM,
         "HIGH": AmbiguitySeverity.HIGH,
     }
+    # Map string formats to AnswerFormat enum (Story 4.4)
+    format_map = {
+        "BOOLEAN": AnswerFormat.BOOLEAN,
+        "NUMERIC": AnswerFormat.NUMERIC,
+        "CHOICE": AnswerFormat.CHOICE,
+        "FREE_TEXT": AnswerFormat.FREE_TEXT,
+        "DATE": AnswerFormat.DATE,
+        "LIST": AnswerFormat.LIST,
+    }
 
     for raw_amb in raw_ambiguities:
         try:
@@ -510,10 +812,30 @@ def _parse_ambiguity_response(
             question = raw_amb.get("question", "")
             suggestions = raw_amb.get("suggestions", [])
             if question:
+                question_str = str(question)
+
+                # Validate question quality (Story 4.4 - AC2)
+                is_valid, quality_issues = validate_question_quality(question_str)
+                if not is_valid:
+                    logger.warning(
+                        "question_quality_issues",
+                        question=question_str[:50],
+                        issues=quality_issues,
+                    )
+
+                # Parse answer_format with fallback to FREE_TEXT (Story 4.4)
+                raw_format = str(raw_amb.get("answer_format", "FREE_TEXT")).upper()
+                # Handle underscore variations
+                raw_format = raw_format.replace(" ", "_")
+                answer_format = format_map.get(raw_format, AnswerFormat.FREE_TEXT)
+                format_hint = _get_format_hint(answer_format)
+
                 prompt = ResolutionPrompt(
-                    question=str(question),
+                    question=question_str,
                     suggestions=tuple(str(s) for s in suggestions) if suggestions else (),
                     default=None,
+                    answer_format=answer_format,
+                    format_hint=format_hint,
                 )
                 prompts.append(prompt)
 

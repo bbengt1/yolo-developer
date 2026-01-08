@@ -29,9 +29,12 @@ from yolo_developer.seed import SeedParseResult, parse_seed
 from yolo_developer.seed.ambiguity import (
     Ambiguity,
     AmbiguityResult,
+    AnswerFormat,
     Resolution,
     ResolutionPrompt,
+    calculate_question_priority,
     detect_ambiguities,
+    prioritize_questions,
 )
 
 logger = structlog.get_logger(__name__)
@@ -136,7 +139,7 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
 
     Args:
         ambiguity_result: The ambiguity detection result to display.
-        verbose: If True, show resolution prompts.
+        verbose: If True, show resolution prompts and format hints.
     """
     if not ambiguity_result.has_ambiguities:
         console.print(
@@ -145,25 +148,44 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
         )
         return
 
-    # Ambiguities table
+    # Ambiguities table with priority column (Story 4.4)
     table = Table(title="Ambiguities Detected", show_header=True, header_style="bold red")
     table.add_column("#", justify="right", style="dim")
+    table.add_column("Priority", justify="center")
     table.add_column("Type", style="cyan")
     table.add_column("Severity", justify="center")
     table.add_column("Description")
 
-    for i, amb in enumerate(ambiguity_result.ambiguities, 1):
+    # Sort by priority for display (Story 4.4)
+    sorted_ambiguities = prioritize_questions(list(ambiguity_result.ambiguities))
+
+    for i, amb in enumerate(sorted_ambiguities, 1):
         severity_style = {
             "low": "green",
             "medium": "yellow",
             "high": "red",
         }.get(amb.severity.value, "white")
 
+        # Calculate priority score (Story 4.4)
+        priority_score = calculate_question_priority(amb)
+        # Check if blocking type (UNDEFINED, SCOPE per AC4)
+        is_blocking = amb.ambiguity_type.value in ("undefined", "scope")
+        # Blocking types with severity >= MEDIUM should show as HIGH priority
+        if is_blocking and priority_score >= 40:
+            priority_label = "[red bold]HIGH[/red bold]"
+        elif priority_score >= 50:
+            priority_label = "[red bold]HIGH[/red bold]"
+        elif priority_score >= 35:
+            priority_label = "[yellow]MED[/yellow]"
+        else:
+            priority_label = "[dim]LOW[/dim]"
+
         table.add_row(
             str(i),
+            priority_label,
             amb.ambiguity_type.value.title(),
             f"[{severity_style}]{amb.severity.value.upper()}[/{severity_style}]",
-            amb.description[:60] + "..." if len(amb.description) > 60 else amb.description,
+            amb.description[:50] + "..." if len(amb.description) > 50 else amb.description,
         )
 
     console.print(table)
@@ -180,13 +202,13 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
         f"[{confidence_style}]{ambiguity_result.overall_confidence:.0%}[/{confidence_style}]"
     )
 
-    # Verbose: show resolution prompts
+    # Verbose: show resolution prompts with format hints (Story 4.4)
     if verbose and ambiguity_result.resolution_prompts:
         console.print()
         console.print("[dim]Resolution Prompts (Verbose):[/dim]")
         for i, (amb, prompt) in enumerate(
             zip(
-                ambiguity_result.ambiguities,
+                sorted_ambiguities,
                 ambiguity_result.resolution_prompts,
                 strict=False,
             ),
@@ -196,12 +218,16 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
             console.print(f"     Question: {prompt.question}")
             if prompt.suggestions:
                 console.print(f"     Suggestions: {', '.join(prompt.suggestions)}")
+            # Show format hint in verbose mode (Story 4.4)
+            if prompt.format_hint:
+                console.print(f"     [cyan]Format:[/cyan] {prompt.format_hint}")
 
 
 def _prompt_for_resolution(
     amb: Ambiguity,
     prompt: ResolutionPrompt,
     index: int,
+    priority_score: int | None = None,
 ) -> Resolution | None:
     """Prompt user for resolution of an ambiguity.
 
@@ -209,14 +235,31 @@ def _prompt_for_resolution(
         amb: The ambiguity to resolve.
         prompt: The resolution prompt with question and suggestions.
         index: The ambiguity index (1-based).
+        priority_score: Optional priority score for display (Story 4.4).
 
     Returns:
         Resolution if user provided input, None if skipped.
     """
-    # Display ambiguity context
+    # Calculate priority if not provided (Story 4.4)
+    if priority_score is None:
+        priority_score = calculate_question_priority(amb)
+
+    # Build priority indicator (Story 4.4)
+    # Check if blocking type (UNDEFINED, SCOPE per AC4)
+    is_blocking = amb.ambiguity_type.value in ("undefined", "scope")
+    priority_indicator = ""
+    # Blocking types with severity >= MEDIUM should show as HIGH priority
+    if is_blocking and priority_score >= 40:
+        priority_indicator = " [red bold][HIGH PRIORITY][/red bold]"
+    elif priority_score >= 50:
+        priority_indicator = " [red bold][HIGH PRIORITY][/red bold]"
+    elif priority_score >= 35:
+        priority_indicator = " [yellow][MEDIUM PRIORITY][/yellow]"
+
+    # Display ambiguity context with priority (Story 4.4)
     panel_content = (
         f"[bold]{amb.ambiguity_type.value.title()}[/bold] "
-        f"([{amb.severity.value}] severity)\n\n"
+        f"([{amb.severity.value}] severity){priority_indicator}\n\n"
         f"[yellow]Source text:[/yellow] \"{amb.source_text}\"\n"
         f"[yellow]Location:[/yellow] {amb.location}\n"
         f"[yellow]Issue:[/yellow] {amb.description}"
@@ -225,6 +268,10 @@ def _prompt_for_resolution(
 
     # Show question
     console.print(f"\n[bold]{prompt.question}[/bold]")
+
+    # Show format hint if available (Story 4.4)
+    if prompt.format_hint:
+        console.print(f"[cyan]Expected format:[/cyan] {prompt.format_hint}")
 
     # Build choices list
     choices = list(prompt.suggestions) if prompt.suggestions else []
@@ -255,12 +302,80 @@ def _prompt_for_resolution(
             response = prompt.suggestions[idx]
             console.print(f"[green]Selected:[/green] {response}")
 
+    # Format-specific validation (Story 4.4)
+    validated_response = _validate_format_response(response, prompt)
+    if validated_response is None:
+        return None
+
     # Create resolution
     return Resolution(
         ambiguity_id=f"amb-{index}",
-        user_response=response,
+        user_response=validated_response,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+
+
+def _validate_format_response(response: str, prompt: ResolutionPrompt) -> str | None:
+    """Validate user response based on answer format (Story 4.4).
+
+    Args:
+        response: The user's response text.
+        prompt: The resolution prompt with format info.
+
+    Returns:
+        Validated response (possibly normalized), or None if invalid and user skips.
+    """
+    import re
+
+    # Validation pattern takes precedence if defined
+    if prompt.validation_pattern:
+        if not re.match(prompt.validation_pattern, response):
+            console.print(
+                f"[yellow]Warning:[/yellow] Response doesn't match expected pattern. "
+                f"[dim]({prompt.format_hint or 'see format hint'})[/dim]"
+            )
+            retry = Prompt.ask(
+                "[bold]Keep this response anyway?[/bold] (y/n)",
+                default="y",
+            )
+            if retry.lower() != "y":
+                console.print("[dim]Skipped[/dim]")
+                return None
+
+    # Format-specific validation
+    if prompt.answer_format == AnswerFormat.BOOLEAN:
+        normalized = response.lower().strip()
+        if normalized in ("yes", "y", "true", "1"):
+            return "yes"
+        elif normalized in ("no", "n", "false", "0"):
+            return "no"
+        else:
+            console.print(
+                "[yellow]Note:[/yellow] Expected yes/no answer. "
+                f"Keeping original: '{response}'"
+            )
+
+    elif prompt.answer_format == AnswerFormat.NUMERIC:
+        # Try to extract a number
+        try:
+            # Handle numbers with commas like "1,000"
+            cleaned = response.replace(",", "")
+            float(cleaned)  # Just validate it's a number
+        except ValueError:
+            console.print(
+                "[yellow]Note:[/yellow] Expected numeric answer. "
+                f"Keeping original: '{response}'"
+            )
+
+    elif prompt.answer_format == AnswerFormat.DATE:
+        # Basic date format check (YYYY-MM-DD)
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", response):
+            console.print(
+                "[yellow]Note:[/yellow] Expected date format (YYYY-MM-DD). "
+                f"Keeping original: '{response}'"
+            )
+
+    return response
 
 
 async def _detect_ambiguities_async(content: str) -> AmbiguityResult:
@@ -458,16 +573,29 @@ def seed_command(
                 )
                 console.print()
 
-                for i, (amb, prompt) in enumerate(
-                    zip(
-                        ambiguity_result.ambiguities,
-                        ambiguity_result.resolution_prompts,
-                        strict=False,
-                    ),
-                    1,
-                ):
+                # Sort ambiguities by priority before prompting (Story 4.4)
+                sorted_ambiguities = prioritize_questions(list(ambiguity_result.ambiguities))
+
+                # Build a mapping from sorted ambiguities to their original prompts
+                amb_to_prompt = dict(
+                    zip(ambiguity_result.ambiguities, ambiguity_result.resolution_prompts, strict=False)
+                )
+
+                for i, amb in enumerate(sorted_ambiguities, 1):
+                    prompt = amb_to_prompt.get(amb)
+                    if prompt is None:
+                        logger.warning(
+                            "ambiguity_missing_prompt",
+                            ambiguity_source=amb.source_text[:50],
+                            index=i,
+                        )
+                        continue
+
+                    # Calculate priority score for display (Story 4.4)
+                    priority_score = calculate_question_priority(amb)
+
                     console.print()
-                    resolution = _prompt_for_resolution(amb, prompt, i)
+                    resolution = _prompt_for_resolution(amb, prompt, i, priority_score)
                     if resolution:
                         resolutions.append(resolution)
 

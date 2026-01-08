@@ -20,6 +20,17 @@ Example:
     >>> if result.has_ambiguities:
     ...     for amb in result.ambiguities:
     ...         print(f"- {amb.description}")
+    >>>
+    >>> # Use question prioritization (Story 4.4)
+    >>> from yolo_developer.seed import prioritize_questions, calculate_question_priority
+    >>> sorted_ambs = prioritize_questions(list(result.ambiguities))
+    >>> for amb in sorted_ambs:
+    ...     score = calculate_question_priority(amb)
+    ...     print(f"Priority {score}: {amb.description}")
+    >>>
+    >>> # Validate question quality (Story 4.4)
+    >>> from yolo_developer.seed import validate_question_quality
+    >>> is_valid, suggestions = validate_question_quality("What response time is needed?")
 """
 
 from __future__ import annotations
@@ -29,11 +40,15 @@ from yolo_developer.seed.ambiguity import (
     AmbiguityResult,
     AmbiguitySeverity,
     AmbiguityType,
+    AnswerFormat,
     Resolution,
     ResolutionPrompt,
     SeedContext,
     calculate_ambiguity_confidence,
+    calculate_question_priority,
     detect_ambiguities,
+    prioritize_questions,
+    validate_question_quality,
 )
 from yolo_developer.seed.api import parse_seed
 from yolo_developer.seed.parser import (
@@ -54,10 +69,12 @@ from yolo_developer.seed.types import (
 )
 
 __all__ = [
+    # Types
     "Ambiguity",
     "AmbiguityResult",
     "AmbiguitySeverity",
     "AmbiguityType",
+    "AnswerFormat",  # Story 4.4
     "ComponentType",
     "ConstraintCategory",
     "LLMSeedParser",
@@ -71,9 +88,13 @@ __all__ = [
     "SeedParseResult",
     "SeedParser",
     "SeedSource",
+    # Functions
     "calculate_ambiguity_confidence",
+    "calculate_question_priority",  # Story 4.4
     "detect_ambiguities",
     "detect_source_format",
     "normalize_content",
     "parse_seed",
+    "prioritize_questions",  # Story 4.4
+    "validate_question_quality",  # Story 4.4
 ]
