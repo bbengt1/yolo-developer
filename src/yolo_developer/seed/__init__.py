@@ -14,10 +14,27 @@ Example:
     >>> with open("requirements.md") as f:
     ...     content = f.read()
     >>> result = await parse_seed(content, filename="requirements.md")
+    >>>
+    >>> # Parse with ambiguity detection (Story 4.3)
+    >>> result = await parse_seed(content, detect_ambiguities=True)
+    >>> if result.has_ambiguities:
+    ...     for amb in result.ambiguities:
+    ...         print(f"- {amb.description}")
 """
 
 from __future__ import annotations
 
+from yolo_developer.seed.ambiguity import (
+    Ambiguity,
+    AmbiguityResult,
+    AmbiguitySeverity,
+    AmbiguityType,
+    Resolution,
+    ResolutionPrompt,
+    SeedContext,
+    calculate_ambiguity_confidence,
+    detect_ambiguities,
+)
 from yolo_developer.seed.api import parse_seed
 from yolo_developer.seed.parser import (
     LLMSeedParser,
@@ -37,21 +54,26 @@ from yolo_developer.seed.types import (
 )
 
 __all__ = [
-    # Types
+    "Ambiguity",
+    "AmbiguityResult",
+    "AmbiguitySeverity",
+    "AmbiguityType",
     "ComponentType",
     "ConstraintCategory",
-    # Parser classes
     "LLMSeedParser",
+    "Resolution",
+    "ResolutionPrompt",
     "SeedComponent",
     "SeedConstraint",
+    "SeedContext",
     "SeedFeature",
     "SeedGoal",
     "SeedParseResult",
     "SeedParser",
     "SeedSource",
-    # Utilities
+    "calculate_ambiguity_confidence",
+    "detect_ambiguities",
     "detect_source_format",
     "normalize_content",
-    # Main API
     "parse_seed",
 ]

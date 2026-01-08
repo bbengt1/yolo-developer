@@ -1,10 +1,11 @@
-"""Unit tests for seed CLI command (Story 4.2).
+"""Unit tests for seed CLI command (Story 4.2, 4.3).
 
 Tests the seed command implementation including:
 - File reading and validation
 - Parse result display formatting
 - JSON output mode
 - Error handling for various failure cases
+- Ambiguity display and interactive resolution (Story 4.3)
 """
 
 from __future__ import annotations
@@ -18,10 +19,21 @@ import typer
 from rich.console import Console
 
 from yolo_developer.cli.commands.seed import (
+    _apply_resolutions_to_content,
+    _display_ambiguities,
     _display_parse_results,
     _output_json,
+    _prompt_for_resolution,
     _read_seed_file,
     seed_command,
+)
+from yolo_developer.seed.ambiguity import (
+    Ambiguity,
+    AmbiguityResult,
+    AmbiguitySeverity,
+    AmbiguityType,
+    Resolution,
+    ResolutionPrompt,
 )
 from yolo_developer.seed.types import (
     ConstraintCategory,
@@ -478,3 +490,322 @@ class TestEdgeCases:
         # Should be valid JSON
         data = json.loads(json_str)
         assert "" in data["goals"][0]["title"]
+
+
+# ============================================================================
+# Test Ambiguity Display (Story 4.3)
+# ============================================================================
+
+
+@pytest.fixture
+def sample_ambiguity() -> Ambiguity:
+    """Create a sample ambiguity for testing."""
+    return Ambiguity(
+        ambiguity_type=AmbiguityType.TECHNICAL,
+        severity=AmbiguitySeverity.HIGH,
+        source_text="fast response times",
+        location="line 5",
+        description="No specific time threshold defined",
+    )
+
+
+@pytest.fixture
+def sample_resolution_prompt() -> ResolutionPrompt:
+    """Create a sample resolution prompt for testing."""
+    return ResolutionPrompt(
+        question="What response time is acceptable?",
+        suggestions=("< 100ms", "< 500ms", "< 1 second"),
+        default="< 500ms",
+    )
+
+
+@pytest.fixture
+def sample_ambiguity_result(
+    sample_ambiguity: Ambiguity,
+    sample_resolution_prompt: ResolutionPrompt,
+) -> AmbiguityResult:
+    """Create a sample ambiguity result for testing."""
+    return AmbiguityResult(
+        ambiguities=(sample_ambiguity,),
+        overall_confidence=0.85,
+        resolution_prompts=(sample_resolution_prompt,),
+    )
+
+
+@pytest.fixture
+def empty_ambiguity_result() -> AmbiguityResult:
+    """Create an empty ambiguity result for testing."""
+    return AmbiguityResult(
+        ambiguities=(),
+        overall_confidence=1.0,
+        resolution_prompts=(),
+    )
+
+
+class TestDisplayAmbiguities:
+    """Tests for _display_ambiguities function."""
+
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_display_no_ambiguities(
+        self,
+        mock_console: MagicMock,
+        empty_ambiguity_result: AmbiguityResult,
+    ) -> None:
+        """Test displaying when no ambiguities found."""
+        _display_ambiguities(empty_ambiguity_result, verbose=False)
+
+        # Should print "No ambiguities detected" message
+        assert mock_console.print.call_count >= 1
+        call_args = str(mock_console.print.call_args_list)
+        assert "No ambiguities detected" in call_args
+
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_display_with_ambiguities(
+        self,
+        mock_console: MagicMock,
+        sample_ambiguity_result: AmbiguityResult,
+    ) -> None:
+        """Test displaying ambiguities table."""
+        _display_ambiguities(sample_ambiguity_result, verbose=False)
+
+        # Should print table and confidence
+        assert mock_console.print.call_count >= 2
+
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_display_verbose_shows_prompts(
+        self,
+        mock_console: MagicMock,
+        sample_ambiguity_result: AmbiguityResult,
+    ) -> None:
+        """Test verbose mode shows resolution prompts."""
+        _display_ambiguities(sample_ambiguity_result, verbose=True)
+
+        # Verbose should produce more output
+        assert mock_console.print.call_count >= 3
+
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_display_high_confidence(self, mock_console: MagicMock) -> None:
+        """Test display with high confidence (>= 0.8)."""
+        result = AmbiguityResult(
+            ambiguities=(),
+            overall_confidence=0.95,
+            resolution_prompts=(),
+        )
+        _display_ambiguities(result, verbose=False)
+        # Should show green styling for high confidence
+        assert mock_console.print.call_count >= 1
+
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_display_multiple_ambiguities(self, mock_console: MagicMock) -> None:
+        """Test displaying multiple ambiguities."""
+        ambiguities = (
+            Ambiguity(
+                ambiguity_type=AmbiguityType.SCOPE,
+                severity=AmbiguitySeverity.HIGH,
+                source_text="handle all edge cases",
+                location="line 2",
+                description="Unclear scope",
+            ),
+            Ambiguity(
+                ambiguity_type=AmbiguityType.TECHNICAL,
+                severity=AmbiguitySeverity.MEDIUM,
+                source_text="scalable",
+                location="line 5",
+                description="No scale defined",
+            ),
+            Ambiguity(
+                ambiguity_type=AmbiguityType.PRIORITY,
+                severity=AmbiguitySeverity.LOW,
+                source_text="nice to have",
+                location="line 8",
+                description="Unclear priority",
+            ),
+        )
+        result = AmbiguityResult(
+            ambiguities=ambiguities,
+            overall_confidence=0.70,
+            resolution_prompts=(),
+        )
+        _display_ambiguities(result, verbose=False)
+        assert mock_console.print.call_count >= 2
+
+
+class TestPromptForResolution:
+    """Tests for _prompt_for_resolution function."""
+
+    @patch("yolo_developer.cli.commands.seed.Prompt.ask", return_value="s")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_skip_resolution(
+        self,
+        mock_console: MagicMock,
+        mock_prompt: MagicMock,
+        sample_ambiguity: Ambiguity,
+        sample_resolution_prompt: ResolutionPrompt,
+    ) -> None:
+        """Test skipping an ambiguity resolution."""
+        result = _prompt_for_resolution(sample_ambiguity, sample_resolution_prompt, 1)
+        assert result is None
+
+    @patch("yolo_developer.cli.commands.seed.Prompt.ask", return_value="1")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_select_numbered_option(
+        self,
+        mock_console: MagicMock,
+        mock_prompt: MagicMock,
+        sample_ambiguity: Ambiguity,
+        sample_resolution_prompt: ResolutionPrompt,
+    ) -> None:
+        """Test selecting a numbered option."""
+        result = _prompt_for_resolution(sample_ambiguity, sample_resolution_prompt, 1)
+        assert result is not None
+        assert result.user_response == "< 100ms"  # First suggestion
+        assert result.ambiguity_id == "amb-1"
+
+    @patch("yolo_developer.cli.commands.seed.Prompt.ask", return_value="custom answer")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_custom_answer(
+        self,
+        mock_console: MagicMock,
+        mock_prompt: MagicMock,
+        sample_ambiguity: Ambiguity,
+        sample_resolution_prompt: ResolutionPrompt,
+    ) -> None:
+        """Test providing a custom answer."""
+        result = _prompt_for_resolution(sample_ambiguity, sample_resolution_prompt, 2)
+        assert result is not None
+        assert result.user_response == "custom answer"
+        assert result.ambiguity_id == "amb-2"
+
+    @patch("yolo_developer.cli.commands.seed.Prompt.ask", return_value="")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_empty_input_skips(
+        self,
+        mock_console: MagicMock,
+        mock_prompt: MagicMock,
+        sample_ambiguity: Ambiguity,
+        sample_resolution_prompt: ResolutionPrompt,
+    ) -> None:
+        """Test empty input is treated as skip."""
+        result = _prompt_for_resolution(sample_ambiguity, sample_resolution_prompt, 1)
+        assert result is None
+
+
+class TestApplyResolutionsToContent:
+    """Tests for _apply_resolutions_to_content function."""
+
+    def test_no_resolutions(self, sample_ambiguity_result: AmbiguityResult) -> None:
+        """Test with no resolutions returns original content."""
+        content = "Original content"
+        result = _apply_resolutions_to_content(content, sample_ambiguity_result, [])
+        assert result == content
+
+    def test_with_resolutions(self, sample_ambiguity_result: AmbiguityResult) -> None:
+        """Test with resolutions appends clarifications."""
+        content = "Original content"
+        resolutions = [
+            Resolution(
+                ambiguity_id="amb-1",
+                user_response="< 100ms response time",
+                timestamp="2026-01-08T10:00:00",
+            )
+        ]
+        result = _apply_resolutions_to_content(
+            content, sample_ambiguity_result, resolutions
+        )
+        assert "## Clarifications (User-Provided)" in result
+        assert "fast response times" in result
+        assert "< 100ms response time" in result
+
+    def test_multiple_resolutions(self) -> None:
+        """Test with multiple resolutions."""
+        ambiguities = (
+            Ambiguity(
+                ambiguity_type=AmbiguityType.SCOPE,
+                severity=AmbiguitySeverity.HIGH,
+                source_text="edge cases",
+                location="line 2",
+                description="Unclear scope",
+            ),
+            Ambiguity(
+                ambiguity_type=AmbiguityType.TECHNICAL,
+                severity=AmbiguitySeverity.MEDIUM,
+                source_text="scalable",
+                location="line 5",
+                description="No scale defined",
+            ),
+        )
+        ambiguity_result = AmbiguityResult(
+            ambiguities=ambiguities,
+            overall_confidence=0.75,
+            resolution_prompts=(),
+        )
+        resolutions = [
+            Resolution(
+                ambiguity_id="amb-1",
+                user_response="network errors and timeouts",
+                timestamp="2026-01-08T10:00:00",
+            ),
+            Resolution(
+                ambiguity_id="amb-2",
+                user_response="1000 concurrent users",
+                timestamp="2026-01-08T10:01:00",
+            ),
+        ]
+        content = "Build a scalable app"
+        result = _apply_resolutions_to_content(content, ambiguity_result, resolutions)
+        assert "edge cases" in result
+        assert "network errors" in result
+        assert "scalable" in result
+        assert "1000 concurrent users" in result
+
+
+class TestSeedCommandInteractive:
+    """Tests for seed_command with interactive mode."""
+
+    @patch("yolo_developer.cli.commands.seed._display_parse_results")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_interactive_mode_no_ambiguities(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_display: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+        empty_ambiguity_result: AmbiguityResult,
+    ) -> None:
+        """Test interactive mode when no ambiguities found."""
+        # First call is ambiguity detection, second is parsing
+        mock_asyncio_run.side_effect = [empty_ambiguity_result, sample_parse_result]
+
+        seed_command(
+            temp_seed_file, verbose=False, json_output=False, interactive=True
+        )
+
+        # Should call asyncio.run twice (ambiguity detection + parsing)
+        assert mock_asyncio_run.call_count == 2
+
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @patch("yolo_developer.cli.commands.seed._display_parse_results")
+    @patch("yolo_developer.cli.commands.seed._prompt_for_resolution")
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    @patch("yolo_developer.cli.commands.seed.console")
+    def test_interactive_mode_with_skip_all(
+        self,
+        mock_console: MagicMock,
+        mock_asyncio_run: MagicMock,
+        mock_prompt: MagicMock,
+        mock_display: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+        sample_ambiguity_result: AmbiguityResult,
+    ) -> None:
+        """Test interactive mode with all ambiguities skipped."""
+        mock_asyncio_run.side_effect = [sample_ambiguity_result, sample_parse_result]
+        mock_prompt.return_value = None  # Skip all
+
+        seed_command(
+            temp_seed_file, verbose=False, json_output=False, interactive=True
+        )
+
+        assert mock_asyncio_run.call_count == 2

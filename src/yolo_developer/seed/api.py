@@ -1,7 +1,8 @@
-"""High-level seed parsing API (Story 4.1 - Task 9).
+"""High-level seed parsing API (Story 4.1 - Task 9, Story 4.3).
 
 This module provides the main entry point for parsing seed documents.
-It handles format detection, preprocessing, and LLM-based extraction.
+It handles format detection, preprocessing, LLM-based extraction,
+and optional ambiguity detection.
 
 Example:
     >>> from yolo_developer.seed.api import parse_seed
@@ -14,6 +15,11 @@ Example:
     >>> # Parse from file
     >>> result = await parse_seed(content, filename="requirements.md")
     >>> print(f"Found {result.feature_count} features")
+    >>>
+    >>> # Parse with ambiguity detection
+    >>> result = await parse_seed(content, detect_ambiguities=True)
+    >>> if result.has_ambiguities:
+    ...     print(f"Found {result.ambiguity_count} ambiguities")
 """
 
 from __future__ import annotations
@@ -22,6 +28,9 @@ from dataclasses import replace
 
 import structlog
 
+from yolo_developer.seed.ambiguity import (
+    detect_ambiguities as _detect_ambiguities,
+)
 from yolo_developer.seed.parser import (
     LLMSeedParser,
     _parse_markdown,
@@ -42,6 +51,7 @@ async def parse_seed(
     model: str = "gpt-4o-mini",
     temperature: float = 0.1,
     preprocess: bool = True,
+    detect_ambiguities: bool = False,
 ) -> SeedParseResult:
     """Parse a seed document into structured components.
 
@@ -50,6 +60,7 @@ async def parse_seed(
     2. Normalizes the content
     3. Applies format-specific preprocessing (optional)
     4. Invokes the LLM parser to extract goals, features, and constraints
+    5. Optionally runs ambiguity detection on the content
 
     Args:
         content: The raw seed document content.
@@ -58,9 +69,11 @@ async def parse_seed(
         model: LLM model to use (default: gpt-4o-mini).
         temperature: LLM sampling temperature (default: 0.1).
         preprocess: Whether to apply format-specific preprocessing (default: True).
+        detect_ambiguities: Whether to run ambiguity detection (default: False).
 
     Returns:
-        SeedParseResult containing extracted goals, features, and constraints.
+        SeedParseResult containing extracted goals, features, constraints,
+        and optionally ambiguity detection results.
 
     Example:
         >>> # Simple text input
@@ -74,12 +87,19 @@ async def parse_seed(
         >>> result = await parse_seed(content, filename="requirements.md")
         >>> for goal in result.goals:
         ...     print(f"- {goal.title}")
+
+        >>> # With ambiguity detection
+        >>> result = await parse_seed(content, detect_ambiguities=True)
+        >>> if result.has_ambiguities:
+        ...     for amb in result.ambiguities:
+        ...         print(f"- {amb.description}")
     """
     logger.info(
         "parse_seed_started",
         content_length=len(content),
         source=source.value if source else "auto",
         filename=filename,
+        detect_ambiguities=detect_ambiguities,
     )
 
     # Auto-detect source format if not provided
@@ -104,11 +124,31 @@ async def parse_seed(
     # The parser stores preprocessed content, but raw_content should be original
     result = replace(result, raw_content=content)
 
+    # Optionally run ambiguity detection
+    if detect_ambiguities:
+        logger.info("running_ambiguity_detection")
+        ambiguity_result = await _detect_ambiguities(
+            content,
+            model=model,
+            temperature=temperature,
+        )
+        result = replace(
+            result,
+            ambiguities=ambiguity_result.ambiguities,
+            ambiguity_confidence=ambiguity_result.overall_confidence,
+        )
+        logger.info(
+            "ambiguity_detection_completed",
+            ambiguity_count=len(ambiguity_result.ambiguities),
+            ambiguity_confidence=ambiguity_result.overall_confidence,
+        )
+
     logger.info(
         "parse_seed_completed",
         goals=result.goal_count,
         features=result.feature_count,
         constraints=result.constraint_count,
+        ambiguities=result.ambiguity_count if detect_ambiguities else 0,
     )
 
     return result

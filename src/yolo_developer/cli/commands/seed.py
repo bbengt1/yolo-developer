@@ -1,27 +1,38 @@
-"""CLI command for parsing seed documents (Story 4.2).
+"""CLI command for parsing seed documents (Story 4.2, 4.3).
 
 This module implements the `yolo seed` command that parses natural language
 seed documents into structured components (goals, features, constraints).
+It also supports interactive ambiguity resolution via --interactive flag.
 
 Example:
     $ yolo seed requirements.md
     $ yolo seed requirements.md --verbose
     $ yolo seed requirements.md --json
+    $ yolo seed requirements.md --interactive
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import structlog
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.table import Table
 
 from yolo_developer.seed import SeedParseResult, parse_seed
+from yolo_developer.seed.ambiguity import (
+    Ambiguity,
+    AmbiguityResult,
+    Resolution,
+    ResolutionPrompt,
+    detect_ambiguities,
+)
 
 logger = structlog.get_logger(__name__)
 console = Console()
@@ -120,6 +131,150 @@ def _display_parse_results(result: SeedParseResult, verbose: bool = False) -> No
                 console.print(f"     Related Goals: {', '.join(feature.related_goals)}")
 
 
+def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = False) -> None:
+    """Display detected ambiguities in a Rich table.
+
+    Args:
+        ambiguity_result: The ambiguity detection result to display.
+        verbose: If True, show resolution prompts.
+    """
+    if not ambiguity_result.has_ambiguities:
+        console.print(
+            "[green]No ambiguities detected![/green] "
+            "[dim]The seed document appears clear.[/dim]"
+        )
+        return
+
+    # Ambiguities table
+    table = Table(title="Ambiguities Detected", show_header=True, header_style="bold red")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Type", style="cyan")
+    table.add_column("Severity", justify="center")
+    table.add_column("Description")
+
+    for i, amb in enumerate(ambiguity_result.ambiguities, 1):
+        severity_style = {
+            "low": "green",
+            "medium": "yellow",
+            "high": "red",
+        }.get(amb.severity.value, "white")
+
+        table.add_row(
+            str(i),
+            amb.ambiguity_type.value.title(),
+            f"[{severity_style}]{amb.severity.value.upper()}[/{severity_style}]",
+            amb.description[:60] + "..." if len(amb.description) > 60 else amb.description,
+        )
+
+    console.print(table)
+
+    # Confidence summary
+    console.print()
+    confidence_style = (
+        "green" if ambiguity_result.overall_confidence >= 0.8 else
+        "yellow" if ambiguity_result.overall_confidence >= 0.5 else
+        "red"
+    )
+    console.print(
+        f"[bold]Ambiguity Confidence:[/bold] "
+        f"[{confidence_style}]{ambiguity_result.overall_confidence:.0%}[/{confidence_style}]"
+    )
+
+    # Verbose: show resolution prompts
+    if verbose and ambiguity_result.resolution_prompts:
+        console.print()
+        console.print("[dim]Resolution Prompts (Verbose):[/dim]")
+        for i, (amb, prompt) in enumerate(
+            zip(
+                ambiguity_result.ambiguities,
+                ambiguity_result.resolution_prompts,
+                strict=False,
+            ),
+            1,
+        ):
+            console.print(f"  {i}. [bold]{amb.source_text}[/bold]")
+            console.print(f"     Question: {prompt.question}")
+            if prompt.suggestions:
+                console.print(f"     Suggestions: {', '.join(prompt.suggestions)}")
+
+
+def _prompt_for_resolution(
+    amb: Ambiguity,
+    prompt: ResolutionPrompt,
+    index: int,
+) -> Resolution | None:
+    """Prompt user for resolution of an ambiguity.
+
+    Args:
+        amb: The ambiguity to resolve.
+        prompt: The resolution prompt with question and suggestions.
+        index: The ambiguity index (1-based).
+
+    Returns:
+        Resolution if user provided input, None if skipped.
+    """
+    # Display ambiguity context
+    panel_content = (
+        f"[bold]{amb.ambiguity_type.value.title()}[/bold] "
+        f"([{amb.severity.value}] severity)\n\n"
+        f"[yellow]Source text:[/yellow] \"{amb.source_text}\"\n"
+        f"[yellow]Location:[/yellow] {amb.location}\n"
+        f"[yellow]Issue:[/yellow] {amb.description}"
+    )
+    console.print(Panel(panel_content, title=f"Ambiguity #{index}", border_style="yellow"))
+
+    # Show question
+    console.print(f"\n[bold]{prompt.question}[/bold]")
+
+    # Build choices list
+    choices = list(prompt.suggestions) if prompt.suggestions else []
+    choices.append("skip")
+
+    # Show suggestions
+    if prompt.suggestions:
+        console.print("[dim]Suggestions:[/dim]")
+        for i, suggestion in enumerate(prompt.suggestions, 1):
+            console.print(f"  [{i}] {suggestion}")
+        console.print("  [s] Skip this ambiguity")
+
+    # Get user input
+    response = Prompt.ask(
+        "\n[bold]Your answer (number, 's' to skip, or custom text)[/bold]",
+        default="s",
+    )
+
+    # Handle skip
+    if response.lower() in ("s", "skip", ""):
+        console.print("[dim]Skipped[/dim]")
+        return None
+
+    # Handle numbered choice
+    if response.isdigit() and prompt.suggestions:
+        idx = int(response) - 1
+        if 0 <= idx < len(prompt.suggestions):
+            response = prompt.suggestions[idx]
+            console.print(f"[green]Selected:[/green] {response}")
+
+    # Create resolution
+    return Resolution(
+        ambiguity_id=f"amb-{index}",
+        user_response=response,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+async def _detect_ambiguities_async(content: str) -> AmbiguityResult:
+    """Async wrapper for detect_ambiguities.
+
+    Args:
+        content: The seed document content.
+
+    Returns:
+        The ambiguity detection result.
+    """
+    return await detect_ambiguities(content)
+
+
 def _output_json(result: SeedParseResult) -> None:
     """Output parse result as formatted JSON.
 
@@ -184,39 +339,87 @@ def _read_seed_file(file_path: Path) -> str:
         raise typer.Exit(code=1) from e
 
 
-async def _parse_seed_async(content: str, filename: str) -> SeedParseResult:
+async def _parse_seed_async(
+    content: str,
+    filename: str,
+    detect_ambiguities_flag: bool = False,
+) -> SeedParseResult:
     """Async wrapper for parse_seed.
 
     Args:
         content: The seed document content.
         filename: The original filename for format detection.
+        detect_ambiguities_flag: Whether to run ambiguity detection.
 
     Returns:
         The parsed seed result.
     """
-    return await parse_seed(content, filename=filename)
+    return await parse_seed(
+        content,
+        filename=filename,
+        detect_ambiguities=detect_ambiguities_flag,
+    )
+
+
+def _apply_resolutions_to_content(
+    content: str,
+    ambiguity_result: AmbiguityResult,
+    resolutions: list[Resolution],
+) -> str:
+    """Apply user resolutions to seed content.
+
+    Appends clarifications to the end of the content as a "Clarifications" section.
+
+    Args:
+        content: Original seed content.
+        ambiguity_result: The detected ambiguities.
+        resolutions: User-provided resolutions.
+
+    Returns:
+        Modified content with clarifications appended.
+    """
+    if not resolutions:
+        return content
+
+    # Build clarification section
+    clarification_lines = ["\n\n## Clarifications (User-Provided)\n"]
+
+    for resolution in resolutions:
+        # Find matching ambiguity
+        amb_idx = int(resolution.ambiguity_id.split("-")[1]) - 1
+        if 0 <= amb_idx < len(ambiguity_result.ambiguities):
+            amb = ambiguity_result.ambiguities[amb_idx]
+            clarification_lines.append(
+                f"- **{amb.source_text}**: {resolution.user_response}\n"
+            )
+
+    return content + "".join(clarification_lines)
 
 
 def seed_command(
     file_path: Path,
     verbose: bool = False,
     json_output: bool = False,
+    interactive: bool = False,
 ) -> None:
     """Parse a seed document and display structured results.
 
     Reads a natural language seed document, parses it into structured
     components (goals, features, constraints), and displays the results.
+    In interactive mode, detects ambiguities and prompts for resolution.
 
     Args:
         file_path: Path to the seed document file.
         verbose: If True, show additional details in output.
         json_output: If True, output results as JSON instead of tables.
+        interactive: If True, detect ambiguities and prompt for resolution.
     """
     logger.info(
         "seed_command_started",
         file_path=str(file_path),
         verbose=verbose,
         json_output=json_output,
+        interactive=interactive,
     )
 
     # Read the seed file
@@ -230,9 +433,82 @@ def seed_command(
         )
         console.print()
 
-    # Parse the seed content
+    # Interactive mode: detect ambiguities first
+    resolutions: list[Resolution] = []
+    if interactive:
+        console.print("[blue]Detecting ambiguities...[/blue]")
+        console.print()
+
+        try:
+            ambiguity_result = asyncio.run(_detect_ambiguities_async(content))
+            logger.info(
+                "ambiguity_detection_complete",
+                ambiguity_count=len(ambiguity_result.ambiguities),
+            )
+
+            # Display ambiguities
+            _display_ambiguities(ambiguity_result, verbose=verbose)
+
+            # Prompt for resolutions if ambiguities found
+            if ambiguity_result.has_ambiguities:
+                console.print()
+                console.print(
+                    "[bold]Would you like to clarify these ambiguities?[/bold] "
+                    "[dim](This will re-parse with your clarifications)[/dim]"
+                )
+                console.print()
+
+                for i, (amb, prompt) in enumerate(
+                    zip(
+                        ambiguity_result.ambiguities,
+                        ambiguity_result.resolution_prompts,
+                        strict=False,
+                    ),
+                    1,
+                ):
+                    console.print()
+                    resolution = _prompt_for_resolution(amb, prompt, i)
+                    if resolution:
+                        resolutions.append(resolution)
+
+                # Apply resolutions to content
+                if resolutions:
+                    console.print()
+                    console.print(
+                        f"[green]Applied {len(resolutions)} clarification(s)[/green]"
+                    )
+                    content = _apply_resolutions_to_content(
+                        content, ambiguity_result, resolutions
+                    )
+                    console.print()
+                    console.print("[blue]Re-parsing with clarifications...[/blue]")
+                    console.print()
+
+                # Show unresolved ambiguities count
+                unresolved = len(ambiguity_result.ambiguities) - len(resolutions)
+                if unresolved > 0:
+                    console.print(
+                        f"[yellow]Note:[/yellow] {unresolved} ambiguity(ies) "
+                        f"were not resolved."
+                    )
+                    console.print()
+
+        except Exception as e:
+            logger.error("ambiguity_detection_failed", error=str(e))
+            console.print(
+                f"[yellow]Warning:[/yellow] Ambiguity detection failed: {e!s}\n"
+                f"[dim]Continuing with normal parsing...[/dim]"
+            )
+            console.print()
+
+    # Parse the seed content (with ambiguity detection if not interactive)
     try:
-        result = asyncio.run(_parse_seed_async(content, file_path.name))
+        # In interactive mode, we already did ambiguity detection separately
+        # In normal mode with verbose, we can show ambiguities inline
+        detect_flag = verbose and not interactive
+        result = asyncio.run(
+            _parse_seed_async(content, file_path.name, detect_flag)
+        )
         logger.info(
             "seed_parsing_success",
             goals=result.goal_count,
@@ -254,6 +530,16 @@ def seed_command(
         _output_json(result)
     else:
         _display_parse_results(result, verbose=verbose)
+
+        # Show ambiguity summary in verbose mode (non-interactive)
+        if verbose and not interactive and result.has_ambiguities:
+            console.print()
+            console.print(
+                f"[yellow]Ambiguities:[/yellow] {result.ambiguity_count} detected "
+                f"(confidence: {result.ambiguity_confidence:.0%})"
+            )
+            console.print("[dim]Use --interactive mode to resolve ambiguities.[/dim]")
+
         console.print()
         console.print(
             "[green]Seed parsing complete![/green] "

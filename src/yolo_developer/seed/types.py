@@ -64,7 +64,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from yolo_developer.seed.ambiguity import Ambiguity
 
 
 class SeedSource(Enum):
@@ -303,6 +306,7 @@ class SeedParseResult:
 
     Contains all extracted goals, features, and constraints,
     along with the original content and metadata about the parse.
+    Optionally includes ambiguity detection results.
 
     Attributes:
         goals: Tuple of extracted goals
@@ -311,6 +315,8 @@ class SeedParseResult:
         raw_content: Original seed document content
         source: Where the seed content came from
         metadata: Additional key-value pairs as tuple of tuples
+        ambiguities: Tuple of detected ambiguities (optional)
+        ambiguity_confidence: Confidence score reflecting ambiguity impact (0.0-1.0)
 
     Example:
         >>> result = SeedParseResult(
@@ -330,6 +336,8 @@ class SeedParseResult:
     raw_content: str
     source: SeedSource
     metadata: tuple[tuple[str, Any], ...] = ()
+    ambiguities: tuple[Ambiguity, ...] = ()
+    ambiguity_confidence: float = 1.0
 
     @property
     def goal_count(self) -> int:
@@ -346,6 +354,16 @@ class SeedParseResult:
         """Return the number of constraints extracted."""
         return len(self.constraints)
 
+    @property
+    def has_ambiguities(self) -> bool:
+        """Return True if any ambiguities were detected."""
+        return len(self.ambiguities) > 0
+
+    @property
+    def ambiguity_count(self) -> int:
+        """Return the number of ambiguities detected."""
+        return len(self.ambiguities)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
@@ -359,4 +377,6 @@ class SeedParseResult:
             "raw_content": self.raw_content,
             "source": self.source.value,
             "metadata": dict(self.metadata),
+            "ambiguities": [amb.to_dict() for amb in self.ambiguities],
+            "ambiguity_confidence": self.ambiguity_confidence,
         }

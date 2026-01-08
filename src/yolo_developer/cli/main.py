@@ -78,6 +78,12 @@ def seed(
         "-j",
         help="Output results as JSON instead of formatted tables.",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Detect ambiguities and prompt for clarification before parsing.",
+    ),
 ) -> None:
     """Parse a seed document into structured components.
 
@@ -86,12 +92,24 @@ def seed(
     - Features: Discrete functional capabilities
     - Constraints: Technical, business, or other limitations
 
+    In interactive mode (--interactive), the command will:
+    1. Detect ambiguities in the seed document
+    2. Display ambiguities with resolution prompts
+    3. Allow you to clarify each ambiguity
+    4. Re-parse with your clarifications applied
+
     Examples:
         yolo seed requirements.md
         yolo seed requirements.md --verbose
         yolo seed requirements.md --json
+        yolo seed requirements.md --interactive
     """
-    seed_command(file_path=file_path, verbose=verbose, json_output=json_output)
+    seed_command(
+        file_path=file_path,
+        verbose=verbose,
+        json_output=json_output,
+        interactive=interactive,
+    )
 
 
 if __name__ == "__main__":
