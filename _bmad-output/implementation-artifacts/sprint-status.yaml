@@ -79,7 +79,7 @@ development_status:
   # Epic 4: Seed Input & Validation (7 stories)
   epic-4: in-progress
   4-1-parse-natural-language-seed-documents: done
-  4-2-cli-seed-command-implementation: backlog
+  4-2-cli-seed-command-implementation: done
   4-3-ambiguity-detection: backlog
   4-4-clarification-question-generation: backlog
   4-5-sop-constraint-validation: backlog

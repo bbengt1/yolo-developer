@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 
 from yolo_developer.cli.commands.init import init_command
+from yolo_developer.cli.commands.seed import seed_command
 
 app = typer.Typer(
     name="yolo",
@@ -54,6 +57,41 @@ def version() -> None:
     from yolo_developer import __version__
 
     console.print(f"YOLO Developer v{__version__}")
+
+
+@app.command("seed")
+def seed(
+    file_path: Path = typer.Argument(  # noqa: B008
+        ...,
+        help="Path to the seed document file to parse.",
+        exists=False,  # We handle existence check in command for better error messages
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output including confidence scores and metadata.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output results as JSON instead of formatted tables.",
+    ),
+) -> None:
+    """Parse a seed document into structured components.
+
+    Reads a natural language requirements document and extracts:
+    - Goals: High-level project objectives
+    - Features: Discrete functional capabilities
+    - Constraints: Technical, business, or other limitations
+
+    Examples:
+        yolo seed requirements.md
+        yolo seed requirements.md --verbose
+        yolo seed requirements.md --json
+    """
+    seed_command(file_path=file_path, verbose=verbose, json_output=json_output)
 
 
 if __name__ == "__main__":
