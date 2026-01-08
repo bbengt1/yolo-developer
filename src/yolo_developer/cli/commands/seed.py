@@ -1,14 +1,17 @@
-"""CLI command for parsing seed documents (Story 4.2, 4.3).
+"""CLI command for parsing seed documents (Story 4.2, 4.3, 4.5).
 
 This module implements the `yolo seed` command that parses natural language
 seed documents into structured components (goals, features, constraints).
-It also supports interactive ambiguity resolution via --interactive flag.
+It also supports interactive ambiguity resolution via --interactive flag
+and SOP constraint validation via --validate-sop flag.
 
 Example:
     $ yolo seed requirements.md
     $ yolo seed requirements.md --verbose
     $ yolo seed requirements.md --json
     $ yolo seed requirements.md --interactive
+    $ yolo seed requirements.md --validate-sop
+    $ yolo seed requirements.md --validate-sop --override-soft
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 import typer
@@ -36,6 +40,16 @@ from yolo_developer.seed.ambiguity import (
     detect_ambiguities,
     prioritize_questions,
 )
+from yolo_developer.seed.sop import (
+    ConflictSeverity,
+    InMemorySOPStore,
+    SOPConflict,
+    SOPConstraint,
+    SOPValidationResult,
+)
+
+if TYPE_CHECKING:
+    from yolo_developer.seed.sop import SOPStore
 
 logger = structlog.get_logger(__name__)
 console = Console()
@@ -221,6 +235,193 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
             # Show format hint in verbose mode (Story 4.4)
             if prompt.format_hint:
                 console.print(f"     [cyan]Format:[/cyan] {prompt.format_hint}")
+
+
+def _display_sop_conflicts(
+    sop_result: SOPValidationResult,
+    verbose: bool = False,
+) -> None:
+    """Display SOP validation conflicts in a Rich table (Story 4.5).
+
+    Args:
+        sop_result: The SOP validation result to display.
+        verbose: If True, show additional details like resolution options.
+    """
+    if not sop_result.has_conflicts:
+        console.print(
+            "[green]No SOP conflicts detected![/green] "
+            "[dim]The seed document is compatible with all constraints.[/dim]"
+        )
+        return
+
+    # SOP Conflicts table
+    table = Table(
+        title="SOP Conflicts Detected",
+        show_header=True,
+        header_style="bold red",
+    )
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Severity", justify="center")
+    table.add_column("Category", style="cyan")
+    table.add_column("Rule", width=30)
+    table.add_column("Conflict", width=30)
+
+    for i, conflict in enumerate(sop_result.conflicts, 1):
+        # Style based on severity
+        severity_label = (
+            "[red bold]HARD[/red bold]"
+            if conflict.severity == ConflictSeverity.HARD
+            else "[yellow]SOFT[/yellow]"
+        )
+
+        table.add_row(
+            str(i),
+            severity_label,
+            conflict.constraint.category.value.title(),
+            (
+                conflict.constraint.rule_text[:30] + "..."
+                if len(conflict.constraint.rule_text) > 30
+                else conflict.constraint.rule_text
+            ),
+            (
+                conflict.description[:30] + "..."
+                if len(conflict.description) > 30
+                else conflict.description
+            ),
+        )
+
+    console.print(table)
+
+    # Summary
+    console.print()
+    console.print(
+        f"[bold]HARD conflicts:[/bold] [red]{sop_result.hard_conflict_count}[/red] "
+        f"(blocks processing)"
+    )
+    console.print(
+        f"[bold]SOFT conflicts:[/bold] [yellow]{sop_result.soft_conflict_count}[/yellow] "
+        f"(can override)"
+    )
+
+    # Verbose: show detailed conflict info
+    if verbose:
+        console.print()
+        console.print("[dim]Conflict Details (Verbose):[/dim]")
+        for i, conflict in enumerate(sop_result.conflicts, 1):
+            severity_color = (
+                "red" if conflict.severity == ConflictSeverity.HARD else "yellow"
+            )
+            console.print(f"\n  [{severity_color}]{i}. {conflict.severity.value.upper()}[/{severity_color}]")
+            console.print(f"     [bold]Rule:[/bold] {conflict.constraint.rule_text}")
+            console.print(f"     [bold]Source:[/bold] {conflict.constraint.source}")
+            console.print(f"     [bold]Seed text:[/bold] \"{conflict.seed_text}\"")
+            console.print(f"     [bold]Description:[/bold] {conflict.description}")
+            if conflict.resolution_options:
+                console.print("     [bold]Resolution options:[/bold]")
+                for opt in conflict.resolution_options:
+                    console.print(f"       - {opt}")
+
+
+def _prompt_for_sop_override(
+    conflict: SOPConflict,
+    index: int,
+) -> bool:
+    """Prompt user to override a SOFT SOP conflict (Story 4.5).
+
+    Args:
+        conflict: The SOFT conflict to potentially override.
+        index: The conflict index (1-based).
+
+    Returns:
+        True if user chose to override, False otherwise.
+    """
+    # Display conflict details
+    panel_content = (
+        f"[bold yellow]SOFT Conflict[/bold yellow] - Can be overridden\n\n"
+        f"[bold]Rule:[/bold] {conflict.constraint.rule_text}\n"
+        f"[bold]Category:[/bold] {conflict.constraint.category.value.title()}\n"
+        f"[bold]Source:[/bold] {conflict.constraint.source}\n\n"
+        f"[yellow]Conflicting text:[/yellow] \"{conflict.seed_text}\"\n"
+        f"[yellow]Why it conflicts:[/yellow] {conflict.description}"
+    )
+
+    if conflict.resolution_options:
+        panel_content += "\n\n[bold]Resolution options:[/bold]"
+        for opt in conflict.resolution_options:
+            panel_content += f"\n  - {opt}"
+
+    console.print(
+        Panel(panel_content, title=f"SOP Conflict #{index}", border_style="yellow")
+    )
+
+    # Prompt for override
+    response = Prompt.ask(
+        "\n[bold]Override this conflict?[/bold] (y/n)",
+        default="n",
+    )
+
+    return response.lower() in ("y", "yes")
+
+
+def _load_sop_store(store_path: Path | None) -> SOPStore:
+    """Load SOP store from path or return empty in-memory store (Story 4.5).
+
+    Args:
+        store_path: Optional path to SOP store file (JSON format).
+
+    Returns:
+        SOPStore instance with loaded constraints.
+    """
+    store = InMemorySOPStore()
+
+    if store_path is None:
+        logger.debug("using_empty_sop_store")
+        return store
+
+    if not store_path.exists():
+        logger.warning("sop_store_file_not_found", path=str(store_path))
+        console.print(
+            f"[yellow]Warning:[/yellow] SOP store file not found: {store_path}\n"
+            f"[dim]Using empty constraint store.[/dim]"
+        )
+        return store
+
+    try:
+        import json as json_module
+
+        content = store_path.read_text(encoding="utf-8")
+        data = json_module.loads(content)
+        constraints = data.get("constraints", [])
+
+        # Load constraints into store - use internal dict directly for sync loading
+        for constraint_data in constraints:
+            constraint = SOPConstraint.from_dict(constraint_data)
+            # Access internal dict directly to avoid async in sync context
+            store._constraints[constraint.id] = constraint
+
+        logger.info(
+            "sop_store_loaded",
+            path=str(store_path),
+            constraint_count=len(constraints),
+        )
+        console.print(
+            f"[blue]Loaded {len(constraints)} SOP constraint(s) from:[/blue] {store_path}"
+        )
+
+    except json.JSONDecodeError as e:
+        logger.error("sop_store_parse_error", path=str(store_path), error=str(e))
+        console.print(
+            f"[red]Error:[/red] Failed to parse SOP store: {store_path}\n"
+            f"[dim]{e!s}[/dim]"
+        )
+    except Exception as e:
+        logger.error("sop_store_load_error", path=str(store_path), error=str(e))
+        console.print(
+            f"[red]Error:[/red] Failed to load SOP store: {store_path}\n"
+            f"[dim]{e!s}[/dim]"
+        )
+
+    return store
 
 
 def _prompt_for_resolution(
@@ -458,6 +659,8 @@ async def _parse_seed_async(
     content: str,
     filename: str,
     detect_ambiguities_flag: bool = False,
+    validate_sop_flag: bool = False,
+    sop_store: SOPStore | None = None,
 ) -> SeedParseResult:
     """Async wrapper for parse_seed.
 
@@ -465,6 +668,8 @@ async def _parse_seed_async(
         content: The seed document content.
         filename: The original filename for format detection.
         detect_ambiguities_flag: Whether to run ambiguity detection.
+        validate_sop_flag: Whether to run SOP validation (Story 4.5).
+        sop_store: SOP store for validation (Story 4.5).
 
     Returns:
         The parsed seed result.
@@ -473,6 +678,8 @@ async def _parse_seed_async(
         content,
         filename=filename,
         detect_ambiguities=detect_ambiguities_flag,
+        validate_sop=validate_sop_flag,
+        sop_store=sop_store,
     )
 
 
@@ -516,18 +723,25 @@ def seed_command(
     verbose: bool = False,
     json_output: bool = False,
     interactive: bool = False,
+    validate_sop: bool = False,
+    sop_store_path: Path | None = None,
+    override_soft: bool = False,
 ) -> None:
     """Parse a seed document and display structured results.
 
     Reads a natural language seed document, parses it into structured
     components (goals, features, constraints), and displays the results.
     In interactive mode, detects ambiguities and prompts for resolution.
+    With --validate-sop, validates against SOP constraints.
 
     Args:
         file_path: Path to the seed document file.
         verbose: If True, show additional details in output.
         json_output: If True, output results as JSON instead of tables.
         interactive: If True, detect ambiguities and prompt for resolution.
+        validate_sop: If True, validate against SOP constraints (Story 4.5).
+        sop_store_path: Path to SOP store JSON file (Story 4.5).
+        override_soft: If True, auto-override all SOFT conflicts (Story 4.5).
     """
     logger.info(
         "seed_command_started",
@@ -535,6 +749,8 @@ def seed_command(
         verbose=verbose,
         json_output=json_output,
         interactive=interactive,
+        validate_sop=validate_sop,
+        override_soft=override_soft,
     )
 
     # Read the seed file
@@ -629,19 +845,40 @@ def seed_command(
             )
             console.print()
 
+    # Load SOP store if validation requested (Story 4.5)
+    sop_store: SOPStore | None = None
+    if validate_sop:
+        if not json_output:
+            console.print("[blue]Loading SOP constraints...[/blue]")
+        sop_store = _load_sop_store(sop_store_path)
+        if not json_output:
+            console.print()
+
     # Parse the seed content (with ambiguity detection if not interactive)
     try:
         # In interactive mode, we already did ambiguity detection separately
         # In normal mode with verbose, we can show ambiguities inline
         detect_flag = verbose and not interactive
         result = asyncio.run(
-            _parse_seed_async(content, file_path.name, detect_flag)
+            _parse_seed_async(
+                content,
+                file_path.name,
+                detect_flag,
+                validate_sop_flag=validate_sop,
+                sop_store=sop_store,
+            )
         )
         logger.info(
             "seed_parsing_success",
             goals=result.goal_count,
             features=result.feature_count,
             constraints=result.constraint_count,
+            sop_conflicts=(
+                result.sop_validation.hard_conflict_count
+                + result.sop_validation.soft_conflict_count
+                if result.sop_validation
+                else 0
+            ),
         )
     except Exception as e:
         logger.error("seed_parsing_failed", error=str(e))
@@ -652,6 +889,77 @@ def seed_command(
             f"Check your API configuration and try again.[/dim]"
         )
         raise typer.Exit(code=1) from e
+
+    # Handle SOP conflicts (Story 4.5)
+    sop_blocked = False
+    if validate_sop and result.sop_validation:
+        if not json_output:
+            console.print()
+            _display_sop_conflicts(result.sop_validation, verbose=verbose)
+
+        # Check for HARD conflicts - these block processing
+        if result.sop_validation.hard_conflict_count > 0:
+            if not json_output:
+                console.print()
+                console.print(
+                    "[red bold]BLOCKED:[/red bold] Seed cannot proceed due to "
+                    f"{result.sop_validation.hard_conflict_count} HARD conflict(s).\n"
+                    "[dim]Resolve these conflicts before continuing.[/dim]"
+                )
+            sop_blocked = True
+
+        # Handle SOFT conflicts - offer override option
+        elif result.sop_validation.soft_conflict_count > 0:
+            if override_soft:
+                # Auto-override all SOFT conflicts
+                if not json_output:
+                    console.print()
+                    console.print(
+                        f"[yellow]Auto-overriding {result.sop_validation.soft_conflict_count} "
+                        f"SOFT conflict(s) (--override-soft)[/yellow]"
+                    )
+                # Log override decision
+                for conflict in result.sop_validation.soft_conflicts:
+                    logger.info(
+                        "sop_soft_conflict_overridden",
+                        constraint_id=conflict.constraint.id,
+                        rule=conflict.constraint.rule_text[:50],
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        auto_override=True,
+                    )
+                result.sop_validation.override_applied = True
+            elif not json_output:
+                # Interactive override prompt for SOFT conflicts
+                console.print()
+                console.print(
+                    "[bold]Would you like to override SOFT conflicts?[/bold]"
+                )
+                console.print()
+
+                overrides_applied = 0
+                for i, conflict in enumerate(result.sop_validation.soft_conflicts, 1):
+                    if _prompt_for_sop_override(conflict, i):
+                        overrides_applied += 1
+                        logger.info(
+                            "sop_soft_conflict_overridden",
+                            constraint_id=conflict.constraint.id,
+                            rule=conflict.constraint.rule_text[:50],
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            auto_override=False,
+                        )
+                    console.print()
+
+                if overrides_applied > 0:
+                    console.print(
+                        f"[green]Overrode {overrides_applied} SOFT conflict(s)[/green]"
+                    )
+                    result.sop_validation.override_applied = True
+
+    # Exit if blocked by HARD conflicts
+    if sop_blocked:
+        if json_output:
+            _output_json(result)
+        raise typer.Exit(code=1)
 
     # Output results
     if json_output:
@@ -667,6 +975,16 @@ def seed_command(
                 f"(confidence: {result.ambiguity_confidence:.0%})"
             )
             console.print("[dim]Use --interactive mode to resolve ambiguities.[/dim]")
+
+        # Show SOP summary
+        if validate_sop and result.sop_validation:
+            console.print()
+            if result.sop_validation.passed:
+                console.print("[green]SOP validation passed![/green]")
+            elif result.sop_validation.override_applied:
+                console.print(
+                    "[yellow]SOP validation passed with overrides[/yellow]"
+                )
 
         console.print()
         console.print(

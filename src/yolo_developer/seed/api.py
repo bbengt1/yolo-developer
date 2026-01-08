@@ -1,8 +1,8 @@
-"""High-level seed parsing API (Story 4.1 - Task 9, Story 4.3).
+"""High-level seed parsing API (Story 4.1 - Task 9, Story 4.3, Story 4.5).
 
 This module provides the main entry point for parsing seed documents.
 It handles format detection, preprocessing, LLM-based extraction,
-and optional ambiguity detection.
+optional ambiguity detection, and optional SOP constraint validation.
 
 Example:
     >>> from yolo_developer.seed.api import parse_seed
@@ -20,11 +20,19 @@ Example:
     >>> result = await parse_seed(content, detect_ambiguities=True)
     >>> if result.has_ambiguities:
     ...     print(f"Found {result.ambiguity_count} ambiguities")
+    >>>
+    >>> # Parse with SOP validation
+    >>> from yolo_developer.seed.sop import InMemorySOPStore
+    >>> store = InMemorySOPStore()
+    >>> result = await parse_seed(content, validate_sop=True, sop_store=store)
+    >>> if not result.sop_passed:
+    ...     print(f"Found SOP conflicts")
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -38,7 +46,13 @@ from yolo_developer.seed.parser import (
     detect_source_format,
     normalize_content,
 )
+from yolo_developer.seed.sop import (
+    validate_against_sop as _validate_against_sop,
+)
 from yolo_developer.seed.types import SeedParseResult, SeedSource
+
+if TYPE_CHECKING:
+    from yolo_developer.seed.sop import SOPStore
 
 logger = structlog.get_logger(__name__)
 
@@ -52,6 +66,8 @@ async def parse_seed(
     temperature: float = 0.1,
     preprocess: bool = True,
     detect_ambiguities: bool = False,
+    validate_sop: bool = False,
+    sop_store: SOPStore | None = None,
 ) -> SeedParseResult:
     """Parse a seed document into structured components.
 
@@ -61,6 +77,7 @@ async def parse_seed(
     3. Applies format-specific preprocessing (optional)
     4. Invokes the LLM parser to extract goals, features, and constraints
     5. Optionally runs ambiguity detection on the content
+    6. Optionally validates against SOP constraints
 
     Args:
         content: The raw seed document content.
@@ -70,10 +87,15 @@ async def parse_seed(
         temperature: LLM sampling temperature (default: 0.1).
         preprocess: Whether to apply format-specific preprocessing (default: True).
         detect_ambiguities: Whether to run ambiguity detection (default: False).
+        validate_sop: Whether to run SOP constraint validation (default: False).
+        sop_store: Store containing SOP constraints. Required if validate_sop is True.
 
     Returns:
         SeedParseResult containing extracted goals, features, constraints,
-        and optionally ambiguity detection results.
+        and optionally ambiguity detection and SOP validation results.
+
+    Raises:
+        ValueError: If validate_sop is True but sop_store is None.
 
     Example:
         >>> # Simple text input
@@ -93,13 +115,29 @@ async def parse_seed(
         >>> if result.has_ambiguities:
         ...     for amb in result.ambiguities:
         ...         print(f"- {amb.description}")
+
+        >>> # With SOP validation
+        >>> result = await parse_seed(
+        ...     content,
+        ...     validate_sop=True,
+        ...     sop_store=my_store,
+        ... )
+        >>> if not result.sop_passed:
+        ...     print("SOP conflicts found!")
     """
+    # Validate parameters
+    if validate_sop and sop_store is None:
+        raise ValueError(
+            "sop_store is required when validate_sop is True"
+        )
+
     logger.info(
         "parse_seed_started",
         content_length=len(content),
         source=source.value if source else "auto",
         filename=filename,
         detect_ambiguities=detect_ambiguities,
+        validate_sop=validate_sop,
     )
 
     # Auto-detect source format if not provided
@@ -143,12 +181,35 @@ async def parse_seed(
             ambiguity_confidence=ambiguity_result.overall_confidence,
         )
 
+    # Optionally run SOP validation (after ambiguity detection)
+    if validate_sop and sop_store is not None:
+        logger.info("running_sop_validation")
+        sop_result = await _validate_against_sop(
+            content,
+            sop_store,
+            model=model,
+        )
+        result = replace(result, sop_validation=sop_result)
+        logger.info(
+            "sop_validation_completed",
+            conflict_count=len(sop_result.conflicts),
+            hard_conflicts=sop_result.hard_conflict_count,
+            soft_conflicts=sop_result.soft_conflict_count,
+            passed=sop_result.passed,
+        )
+
     logger.info(
         "parse_seed_completed",
         goals=result.goal_count,
         features=result.feature_count,
         constraints=result.constraint_count,
         ambiguities=result.ambiguity_count if detect_ambiguities else 0,
+        sop_conflicts=(
+            result.sop_validation.hard_conflict_count
+            + result.sop_validation.soft_conflict_count
+            if result.sop_validation
+            else 0
+        ),
     )
 
     return result

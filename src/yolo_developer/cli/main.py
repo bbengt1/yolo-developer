@@ -84,6 +84,21 @@ def seed(
         "-i",
         help="Detect ambiguities and prompt for clarification before parsing.",
     ),
+    validate_sop: bool = typer.Option(
+        False,
+        "--validate-sop",
+        help="Validate seed against SOP constraints.",
+    ),
+    sop_store: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--sop-store",
+        help="Path to SOP store JSON file with constraints.",
+    ),
+    override_soft: bool = typer.Option(
+        False,
+        "--override-soft",
+        help="Auto-override all SOFT SOP conflicts without prompting.",
+    ),
 ) -> None:
     """Parse a seed document into structured components.
 
@@ -98,17 +113,28 @@ def seed(
     3. Allow you to clarify each ambiguity
     4. Re-parse with your clarifications applied
 
+    With SOP validation (--validate-sop), the command will:
+    1. Load constraints from the SOP store
+    2. Validate seed against constraints
+    3. Report HARD conflicts (block processing)
+    4. Prompt for SOFT conflict overrides (or auto-override with --override-soft)
+
     Examples:
         yolo seed requirements.md
         yolo seed requirements.md --verbose
         yolo seed requirements.md --json
         yolo seed requirements.md --interactive
+        yolo seed requirements.md --validate-sop --sop-store constraints.json
+        yolo seed requirements.md --validate-sop --override-soft
     """
     seed_command(
         file_path=file_path,
         verbose=verbose,
         json_output=json_output,
         interactive=interactive,
+        validate_sop=validate_sop,
+        sop_store_path=sop_store,
+        override_soft=override_soft,
     )
 
 

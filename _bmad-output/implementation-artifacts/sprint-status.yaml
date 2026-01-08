@@ -82,7 +82,7 @@ development_status:
   4-2-cli-seed-command-implementation: done
   4-3-ambiguity-detection: done
   4-4-clarification-question-generation: done
-  4-5-sop-constraint-validation: backlog
+  4-5-sop-constraint-validation: done
   4-6-semantic-validation-reports: backlog
   4-7-quality-threshold-rejection: backlog
   epic-4-retrospective: optional

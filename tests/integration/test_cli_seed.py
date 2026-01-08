@@ -560,3 +560,275 @@ class TestQuestionGenerationFeatures:
         for prompt in prompts:
             assert prompt.format_hint is not None
             assert len(prompt.format_hint) > 0
+
+
+# ============================================================================
+# Test SOP Validation Features (Story 4.5)
+# ============================================================================
+
+
+class TestSOPValidationFeatures:
+    """Integration tests for Story 4.5 SOP constraint validation."""
+
+    def test_validate_sop_flag_appears_in_help(self) -> None:
+        """Test that --validate-sop flag appears in help."""
+        result = runner.invoke(app, ["seed", "--help"])
+        assert result.exit_code == 0
+        assert "--validate-sop" in result.output
+        assert "--sop-store" in result.output
+        assert "--override-soft" in result.output
+
+    def test_validate_sop_with_empty_store(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test --validate-sop with no constraints passes."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=SOPValidationResult(passed=True),
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--validate-sop"]
+            )
+
+        assert result.exit_code == 0
+        assert "SOP validation passed" in result.output or "No SOP conflicts" in result.output
+
+    def test_validate_sop_hard_conflict_blocks(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that HARD conflicts block processing with exit code 1."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import (
+            ConflictSeverity,
+            SOPCategory,
+            SOPConflict,
+            SOPConstraint,
+            SOPValidationResult,
+        )
+
+        hard_constraint = SOPConstraint(
+            id="arch-001",
+            rule_text="Must use REST API",
+            category=SOPCategory.ARCHITECTURE,
+            source="architecture.md",
+            severity=ConflictSeverity.HARD,
+        )
+        hard_conflict = SOPConflict(
+            constraint=hard_constraint,
+            seed_text="Use GraphQL",
+            severity=ConflictSeverity.HARD,
+            description="GraphQL conflicts with REST requirement",
+        )
+        mock_sop_result = SOPValidationResult(
+            conflicts=[hard_conflict],
+            passed=False,
+        )
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=mock_sop_result,
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--validate-sop"]
+            )
+
+        assert result.exit_code == 1
+        assert "HARD" in result.output or "BLOCKED" in result.output
+
+    def test_validate_sop_soft_conflict_with_override_soft(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that --override-soft auto-overrides SOFT conflicts."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import (
+            ConflictSeverity,
+            SOPCategory,
+            SOPConflict,
+            SOPConstraint,
+            SOPValidationResult,
+        )
+
+        soft_constraint = SOPConstraint(
+            id="name-001",
+            rule_text="Use snake_case",
+            category=SOPCategory.NAMING,
+            source="style.md",
+            severity=ConflictSeverity.SOFT,
+        )
+        soft_conflict = SOPConflict(
+            constraint=soft_constraint,
+            seed_text="Use camelCase",
+            severity=ConflictSeverity.SOFT,
+            description="camelCase conflicts with snake_case convention",
+        )
+        mock_sop_result = SOPValidationResult(
+            conflicts=[soft_conflict],
+            passed=True,  # SOFT conflicts don't fail
+        )
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=mock_sop_result,
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--validate-sop", "--override-soft"]
+            )
+
+        assert result.exit_code == 0
+        assert "Auto-overriding" in result.output or "override" in result.output.lower()
+
+    def test_validate_sop_json_output_includes_conflicts(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+    ) -> None:
+        """Test that JSON output includes SOP validation results."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        mock_sop_result = SOPValidationResult(passed=True)
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=mock_sop_result,
+            ),
+        ):
+            result = runner.invoke(
+                app, ["seed", str(simple_seed_path), "--validate-sop", "--json"]
+            )
+
+        assert result.exit_code == 0
+        # JSON output should contain sop_validation field
+        assert "sop_validation" in result.output
+
+    def test_sop_store_file_not_found_warning(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
+        """Test warning when --sop-store file doesn't exist."""
+        from yolo_developer.seed.parser import LLMSeedParser
+
+        nonexistent_store = tmp_path / "nonexistent.json"
+
+        with patch.object(
+            LLMSeedParser,
+            "_call_llm",
+            new_callable=AsyncMock,
+            return_value=mock_llm_response,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--validate-sop",
+                    "--sop-store",
+                    str(nonexistent_store),
+                ],
+            )
+
+        # Should complete with warning about missing file
+        assert result.exit_code == 0
+        assert "Warning" in result.output or "not found" in result.output.lower()
+
+    def test_sop_store_loads_constraints_from_json(
+        self,
+        simple_seed_path: Path,
+        mock_llm_response: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
+        """Test that --sop-store loads constraints from JSON file."""
+        from yolo_developer.seed.parser import LLMSeedParser
+        from yolo_developer.seed.sop import SOPValidationResult
+
+        # Create a test SOP store file
+        sop_store_path = tmp_path / "constraints.json"
+        sop_store_path.write_text(
+            json.dumps(
+                {
+                    "constraints": [
+                        {
+                            "id": "test-001",
+                            "rule_text": "Test rule",
+                            "category": "testing",
+                            "source": "test.md",
+                            "severity": "soft",
+                        }
+                    ]
+                }
+            )
+        )
+
+        with (
+            patch.object(
+                LLMSeedParser,
+                "_call_llm",
+                new_callable=AsyncMock,
+                return_value=mock_llm_response,
+            ),
+            patch(
+                "yolo_developer.seed.api._validate_against_sop",
+                new_callable=AsyncMock,
+                return_value=SOPValidationResult(passed=True),
+            ),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "seed",
+                    str(simple_seed_path),
+                    "--validate-sop",
+                    "--sop-store",
+                    str(sop_store_path),
+                ],
+            )
+
+        assert result.exit_code == 0
+        # Should indicate constraints were loaded
+        assert "Loaded 1 SOP constraint" in result.output

@@ -68,6 +68,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from yolo_developer.seed.ambiguity import Ambiguity
+    from yolo_developer.seed.sop import SOPValidationResult
 
 
 class SeedSource(Enum):
@@ -306,7 +307,7 @@ class SeedParseResult:
 
     Contains all extracted goals, features, and constraints,
     along with the original content and metadata about the parse.
-    Optionally includes ambiguity detection results.
+    Optionally includes ambiguity detection and SOP validation results.
 
     Attributes:
         goals: Tuple of extracted goals
@@ -317,6 +318,7 @@ class SeedParseResult:
         metadata: Additional key-value pairs as tuple of tuples
         ambiguities: Tuple of detected ambiguities (optional)
         ambiguity_confidence: Confidence score reflecting ambiguity impact (0.0-1.0)
+        sop_validation: SOP constraint validation result (optional)
 
     Example:
         >>> result = SeedParseResult(
@@ -338,6 +340,7 @@ class SeedParseResult:
     metadata: tuple[tuple[str, Any], ...] = ()
     ambiguities: tuple[Ambiguity, ...] = ()
     ambiguity_confidence: float = 1.0
+    sop_validation: SOPValidationResult | None = None
 
     @property
     def goal_count(self) -> int:
@@ -364,6 +367,19 @@ class SeedParseResult:
         """Return the number of ambiguities detected."""
         return len(self.ambiguities)
 
+    @property
+    def has_sop_conflicts(self) -> bool:
+        """Return True if any SOP conflicts were detected."""
+        return (
+            self.sop_validation is not None
+            and self.sop_validation.has_conflicts
+        )
+
+    @property
+    def sop_passed(self) -> bool:
+        """Return True if SOP validation passed (no HARD conflicts)."""
+        return self.sop_validation is None or self.sop_validation.passed
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
@@ -379,4 +395,9 @@ class SeedParseResult:
             "metadata": dict(self.metadata),
             "ambiguities": [amb.to_dict() for amb in self.ambiguities],
             "ambiguity_confidence": self.ambiguity_confidence,
+            "sop_validation": (
+                self.sop_validation.to_dict()
+                if self.sop_validation is not None
+                else None
+            ),
         }
