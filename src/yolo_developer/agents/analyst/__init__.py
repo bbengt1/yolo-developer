@@ -1,4 +1,4 @@
-"""Analyst agent module for requirement crystallization (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6).
+"""Analyst agent module for requirement crystallization (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7).
 
 The Analyst agent is responsible for:
 - Crystallizing raw requirements from seed content
@@ -8,6 +8,7 @@ The Analyst agent is responsible for:
 - Assessing requirement testability
 - Detecting edge cases, implied requirements, and pattern-based suggestions
 - Validating requirement implementability (Story 5.5)
+- Escalating unresolvable issues to PM agent (Story 5.7)
 
 Example:
     >>> from yolo_developer.agents.analyst import (
@@ -70,6 +71,9 @@ from yolo_developer.agents.analyst.types import (
     ContradictionType,
     CrystallizedRequirement,
     DependencyType,
+    Escalation,
+    EscalationPriority,
+    EscalationReason,
     ExternalDependency,
     FunctionalSubCategory,
     GapType,
@@ -90,6 +94,9 @@ __all__ = [
     "ContradictionType",
     "CrystallizedRequirement",
     "DependencyType",
+    "Escalation",
+    "EscalationPriority",
+    "EscalationReason",
     "ExternalDependency",
     "FunctionalSubCategory",
     "GapType",

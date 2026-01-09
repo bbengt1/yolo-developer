@@ -1,4 +1,4 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
@@ -47,6 +47,9 @@ from yolo_developer.agents.analyst.types import (
     ContradictionType,
     CrystallizedRequirement,
     DependencyType,
+    Escalation,
+    EscalationPriority,
+    EscalationReason,
     ExternalDependency,
     GapType,
     IdentifiedGap,
@@ -3078,19 +3081,36 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
     for gap in output.structured_gaps:
         severity_counts[gap.severity.value] = severity_counts.get(gap.severity.value, 0) + 1
 
-    # Create decision record with gap analysis details
+    # Story 5.7: Count escalations by priority
+    escalation_counts: dict[str, int] = {"urgent": 0, "high": 0, "normal": 0}
+    for esc in output.escalations:
+        escalation_counts[esc.priority.value] = escalation_counts.get(esc.priority.value, 0) + 1
+
+    # Build escalation summary for decision rationale
+    escalation_rationale = ""
+    if output.escalation_needed:
+        escalation_rationale = (
+            f" Escalations to PM: {len(output.escalations)} "
+            f"({escalation_counts['urgent']} urgent, {escalation_counts['high']} high, "
+            f"{escalation_counts['normal']} normal priority)."
+        )
+
+    # Create decision record with gap analysis and escalation details
     decision = Decision(
         agent="analyst",
-        summary=f"Crystallized {len(output.requirements)} requirements, identified {len(output.structured_gaps)} gaps",
+        summary=f"Crystallized {len(output.requirements)} requirements, identified {len(output.structured_gaps)} gaps"
+        + (f", {len(output.escalations)} escalations" if output.escalation_needed else ""),
         rationale=(
             f"Analyzed seed content and extracted structured requirements. "
             f"Gap analysis found: {severity_counts['critical']} critical, "
             f"{severity_counts['high']} high, {severity_counts['medium']} medium, "
             f"{severity_counts['low']} low severity gaps. "
             f"Contradictions: {len(output.contradictions)}."
+            f"{escalation_rationale}"
         ),
         related_artifacts=tuple(r.id for r in output.requirements)
-        + tuple(g.id for g in output.structured_gaps),
+        + tuple(g.id for g in output.structured_gaps)
+        + tuple(e.id for e in output.escalations),
     )
 
     # Create output message with analyst attribution
@@ -3102,11 +3122,20 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
             f"{severity_counts['medium']} medium, {severity_counts['low']} low)."
         )
 
+    # Story 5.7: Add escalation summary to message
+    escalation_summary = ""
+    if output.escalation_needed:
+        escalation_summary = (
+            f" ESCALATIONS TO PM: {len(output.escalations)} "
+            f"({escalation_counts['urgent']} urgent, {escalation_counts['high']} high)."
+        )
+
     message = create_agent_message(
         content=(
             f"Analysis complete: {len(output.requirements)} requirements crystallized."
             f"{gap_summary} "
             f"Contradictions: {len(output.contradictions)}."
+            f"{escalation_summary}"
         ),
         agent="analyst",
         metadata={"output": output.to_dict()},
@@ -3119,13 +3148,23 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
         structured_gaps_count=len(output.structured_gaps),
         gap_severity_counts=severity_counts,
         contradictions_count=len(output.contradictions),
+        escalations_count=len(output.escalations),
+        escalation_needed=output.escalation_needed,
+        escalation_priority_counts=escalation_counts,
     )
 
     # Return ONLY the updates, not full state
-    return {
+    # Story 5.7: Include escalation_needed flag for orchestrator routing
+    result: dict[str, Any] = {
         "messages": [message],
         "decisions": [decision],
     }
+
+    # Add escalation_needed flag for orchestrator conditional routing
+    if output.escalation_needed:
+        result["escalation_needed"] = True
+
+    return result
 
 
 def _extract_seed_from_messages(messages: list[BaseMessage]) -> str:
@@ -3372,8 +3411,540 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
     return _enhance_with_gap_analysis(initial_output)
 
 
+# =============================================================================
+# Story 5.7: Escalation to PM Functions
+# =============================================================================
+
+# Escalation trigger thresholds
+_UNRESOLVABLE_AMBIGUITY_THRESHOLD = 3  # Multiple gaps in same area triggers scope clarification
+
+# Decision request templates by escalation reason
+ESCALATION_DECISION_TEMPLATES: dict[str, str] = {
+    "conflicting_requirements": (
+        "Should we prioritize {req1} over {req2}, or should both be supported with different scopes?"
+    ),
+    "unresolvable_ambiguity": (
+        "What is the expected behavior when {scenario}? Please clarify the requirement intent."
+    ),
+    "missing_domain_knowledge": (
+        "What does '{term}' mean in the context of this domain? We need business rules clarification."
+    ),
+    "stakeholder_decision_needed": (
+        "Multiple valid interpretations exist for '{requirement}'. Which interpretation should we implement?"
+    ),
+    "scope_clarification": (
+        "Is '{feature}' in scope for the current iteration, or should it be deferred?"
+    ),
+}
+
+
+def _should_escalate_for_contradiction(
+    contradiction: Contradiction,
+) -> bool:
+    """Check if a contradiction should trigger escalation to PM.
+
+    Critical contradictions that block implementation require PM decision.
+
+    Args:
+        contradiction: The contradiction to evaluate.
+
+    Returns:
+        True if the contradiction requires escalation.
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import Contradiction, ContradictionType, Severity
+        >>> c = Contradiction(
+        ...     id="c-001", contradiction_type=ContradictionType.DIRECT,
+        ...     requirement_ids=("req-001", "req-002"), description="test",
+        ...     explanation="test", severity=Severity.CRITICAL,
+        ...     resolution_suggestions=(),
+        ... )
+        >>> _should_escalate_for_contradiction(c)
+        True
+    """
+    # Critical contradictions always need escalation
+    if contradiction.severity == Severity.CRITICAL:
+        return True
+    return False
+
+
+def _should_escalate_for_gap(
+    gap: IdentifiedGap,
+    all_gaps: tuple[IdentifiedGap, ...],
+) -> bool:
+    """Check if a gap should trigger escalation to PM.
+
+    Gaps requiring domain knowledge or affecting critical functionality
+    need PM input.
+
+    Args:
+        gap: The gap to evaluate.
+        all_gaps: All gaps for context (to detect patterns).
+
+    Returns:
+        True if the gap requires escalation.
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import IdentifiedGap, GapType, Severity
+        >>> g = IdentifiedGap(
+        ...     id="gap-001", description="Missing business rule",
+        ...     gap_type=GapType.IMPLIED_REQUIREMENT, severity=Severity.CRITICAL,
+        ...     source_requirements=("req-001",), rationale="Domain knowledge needed",
+        ... )
+        >>> _should_escalate_for_gap(g, (g,))
+        True
+    """
+    # Critical severity gaps need escalation
+    if gap.severity == Severity.CRITICAL:
+        return True
+
+    # Check for patterns suggesting domain knowledge is missing
+    domain_keywords = ["business rule", "domain", "stakeholder", "policy", "regulation"]
+    gap_text = (gap.description + " " + gap.rationale).lower()
+    if any(kw in gap_text for kw in domain_keywords):
+        return True
+
+    return False
+
+
+def _should_escalate_for_requirement(
+    req: CrystallizedRequirement,
+    gaps: tuple[IdentifiedGap, ...],
+    contradictions: tuple[Contradiction, ...],
+) -> bool:
+    """Check if a requirement has issues that require PM escalation.
+
+    Evaluates if the requirement has unresolvable issues based on:
+    - Failed implementability with critical issues
+    - Multiple related gaps suggesting scope confusion
+    - Involvement in critical contradictions
+
+    Args:
+        req: The requirement to evaluate.
+        gaps: All identified gaps.
+        contradictions: All identified contradictions.
+
+    Returns:
+        True if the requirement requires PM escalation.
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import CrystallizedRequirement
+        >>> r = CrystallizedRequirement(
+        ...     id="req-001", original_text="test", refined_text="test",
+        ...     category="functional", testable=True,
+        ...     implementability_status="not_implementable",
+        ... )
+        >>> _should_escalate_for_requirement(r, (), ())
+        True
+    """
+    # Not implementable requirements need escalation
+    if req.implementability_status == "not_implementable":
+        return True
+
+    # Requirements with many related gaps may need scope clarification
+    related_gaps = [g for g in gaps if req.id in g.source_requirements]
+    if len(related_gaps) >= _UNRESOLVABLE_AMBIGUITY_THRESHOLD:
+        return True
+
+    # Requirements involved in critical contradictions
+    for c in contradictions:
+        if req.id in c.requirement_ids and c.severity == Severity.CRITICAL:
+            return True
+
+    return False
+
+
+def _identify_escalation_reason(
+    req: CrystallizedRequirement | None,
+    gap: IdentifiedGap | None,
+    contradiction: Contradiction | None,
+) -> EscalationReason:
+    """Determine the appropriate escalation reason based on the triggering issue.
+
+    Args:
+        req: Requirement that triggered escalation (if applicable).
+        gap: Gap that triggered escalation (if applicable).
+        contradiction: Contradiction that triggered escalation (if applicable).
+
+    Returns:
+        The most appropriate EscalationReason.
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import Contradiction, ContradictionType, Severity
+        >>> c = Contradiction(
+        ...     id="c-001", contradiction_type=ContradictionType.DIRECT,
+        ...     requirement_ids=("req-001",), description="test",
+        ...     explanation="test", severity=Severity.CRITICAL,
+        ...     resolution_suggestions=(),
+        ... )
+        >>> _identify_escalation_reason(None, None, c)
+        <EscalationReason.CONFLICTING_REQUIREMENTS: 'conflicting_requirements'>
+    """
+    # Contradiction takes precedence
+    if contradiction is not None:
+        return EscalationReason.CONFLICTING_REQUIREMENTS
+
+    # Gap-based reasons
+    if gap is not None:
+        gap_text = (gap.description + " " + gap.rationale).lower()
+        # Keywords aligned with _should_escalate_for_gap for consistency
+        if any(kw in gap_text for kw in ["domain", "business rule", "policy", "stakeholder", "regulation"]):
+            return EscalationReason.MISSING_DOMAIN_KNOWLEDGE
+        if any(kw in gap_text for kw in ["scope", "in scope", "out of scope"]):
+            return EscalationReason.SCOPE_CLARIFICATION
+        return EscalationReason.UNRESOLVABLE_AMBIGUITY
+
+    # Requirement-based reasons
+    if req is not None:
+        if req.implementability_status == "not_implementable":
+            return EscalationReason.STAKEHOLDER_DECISION_NEEDED
+        if req.implementability_status == "needs_clarification":
+            return EscalationReason.UNRESOLVABLE_AMBIGUITY
+
+    # Default
+    return EscalationReason.STAKEHOLDER_DECISION_NEEDED
+
+
+def _determine_escalation_priority(
+    reason: EscalationReason,
+    severity: Severity | None,
+) -> EscalationPriority:
+    """Determine escalation priority based on reason and severity.
+
+    Args:
+        reason: The escalation reason.
+        severity: The severity of the underlying issue (if available).
+
+    Returns:
+        The appropriate priority level.
+
+    Example:
+        >>> _determine_escalation_priority(
+        ...     EscalationReason.CONFLICTING_REQUIREMENTS,
+        ...     Severity.CRITICAL
+        ... )
+        <EscalationPriority.URGENT: 'urgent'>
+    """
+    # Critical severity always urgent
+    if severity == Severity.CRITICAL:
+        return EscalationPriority.URGENT
+
+    # Conflicting requirements are high priority
+    if reason == EscalationReason.CONFLICTING_REQUIREMENTS:
+        return EscalationPriority.HIGH
+
+    # Missing domain knowledge is high priority (blocks understanding)
+    if reason == EscalationReason.MISSING_DOMAIN_KNOWLEDGE:
+        return EscalationPriority.HIGH
+
+    # Scope clarification and ambiguity are normal priority
+    return EscalationPriority.NORMAL
+
+
+def _format_decision_request(
+    reason: EscalationReason,
+    context_vars: dict[str, str],
+) -> str:
+    """Format a clear, actionable decision request for PM.
+
+    Args:
+        reason: The escalation reason.
+        context_vars: Variables to fill in the template.
+
+    Returns:
+        A formatted decision request string.
+
+    Example:
+        >>> _format_decision_request(
+        ...     EscalationReason.CONFLICTING_REQUIREMENTS,
+        ...     {"req1": "real-time updates", "req2": "batch processing"}
+        ... )
+        'Should we prioritize real-time updates over batch processing, or should both be supported with different scopes?'
+    """
+    template = ESCALATION_DECISION_TEMPLATES.get(
+        reason.value,
+        "Please clarify the expected behavior for {requirement}.",
+    )
+
+    try:
+        return template.format(**context_vars)
+    except KeyError:
+        # Fallback if variables don't match template
+        return f"Please provide clarification regarding: {', '.join(context_vars.values())}"
+
+
+def _package_escalation(
+    escalation_id: str,
+    reason: EscalationReason,
+    priority: EscalationPriority,
+    summary: str,
+    requirements: tuple[CrystallizedRequirement, ...],
+    gaps: tuple[IdentifiedGap, ...],
+    contradiction: Contradiction | None,
+    decision_request: str,
+) -> Escalation:
+    """Package an escalation with full context for PM decision-making.
+
+    Assembles all relevant context so PM can make a decision without
+    re-analyzing the requirements.
+
+    Args:
+        escalation_id: Unique ID for this escalation.
+        reason: Why escalation is needed.
+        priority: How urgent the escalation is.
+        summary: Brief description of the issue.
+        requirements: Requirements involved in this escalation.
+        gaps: Gaps related to this escalation.
+        contradiction: Contradiction triggering escalation (if applicable).
+        decision_request: Clear question for PM.
+
+    Returns:
+        Fully packaged Escalation object.
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import CrystallizedRequirement
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001", original_text="Be fast", refined_text="Response < 200ms",
+        ...     category="non_functional", testable=True,
+        ... )
+        >>> esc = _package_escalation(
+        ...     "esc-001", EscalationReason.UNRESOLVABLE_AMBIGUITY,
+        ...     EscalationPriority.NORMAL, "Ambiguous performance requirement",
+        ...     (req,), (), None, "What is acceptable latency?"
+        ... )
+        >>> esc.id
+        'esc-001'
+    """
+    # Build context string with all relevant information
+    context_parts: list[str] = []
+
+    # Add requirement context
+    if requirements:
+        context_parts.append("**Requirements involved:**")
+        for req in requirements:
+            context_parts.append(f"- [{req.id}] {req.refined_text}")
+            if req.implementability_issues:
+                context_parts.append(f"  Issues: {', '.join(req.implementability_issues)}")
+
+    # Add gap context
+    if gaps:
+        context_parts.append("\n**Related gaps:**")
+        for gap in gaps:
+            context_parts.append(f"- [{gap.id}] {gap.description} (Severity: {gap.severity.value})")
+
+    # Add contradiction context
+    if contradiction:
+        context_parts.append("\n**Contradiction:**")
+        context_parts.append(f"- {contradiction.description}")
+        context_parts.append(f"  Explanation: {contradiction.explanation}")
+        if contradiction.resolution_suggestions:
+            context_parts.append(f"  Suggestions: {', '.join(contradiction.resolution_suggestions)}")
+
+    context = "\n".join(context_parts)
+
+    # Build analysis attempts
+    analysis_attempts: list[str] = [
+        "Attempted requirement crystallization",
+        "Validated implementability",
+        "Analyzed for contradictions",
+    ]
+    if contradiction:
+        analysis_attempts.append("Evaluated resolution suggestions - none applicable without PM input")
+
+    return Escalation(
+        id=escalation_id,
+        reason=reason,
+        priority=priority,
+        summary=summary,
+        context=context,
+        original_requirements=tuple(r.id for r in requirements),
+        analysis_attempts=tuple(analysis_attempts),
+        decision_requested=decision_request,
+        related_gaps=tuple(g.id for g in gaps),
+        related_contradictions=(contradiction.id,) if contradiction else (),
+    )
+
+
+def _analyze_escalations(
+    requirements: tuple[CrystallizedRequirement, ...],
+    gaps: tuple[IdentifiedGap, ...],
+    contradictions: tuple[Contradiction, ...],
+) -> tuple[Escalation, ...]:
+    """Analyze requirements, gaps, and contradictions to identify escalations needed.
+
+    Evaluates all analysis results to determine which issues require PM
+    decision-making before implementation can proceed.
+
+    Args:
+        requirements: All crystallized requirements.
+        gaps: All identified gaps.
+        contradictions: All identified contradictions.
+
+    Returns:
+        Tuple of Escalation objects sorted by priority (urgent first).
+
+    Example:
+        >>> from yolo_developer.agents.analyst.types import (
+        ...     CrystallizedRequirement, Contradiction, ContradictionType, Severity
+        ... )
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001", original_text="test", refined_text="test",
+        ...     category="functional", testable=True,
+        ... )
+        >>> c = Contradiction(
+        ...     id="c-001", contradiction_type=ContradictionType.DIRECT,
+        ...     requirement_ids=("req-001",), description="Critical conflict",
+        ...     explanation="test", severity=Severity.CRITICAL,
+        ...     resolution_suggestions=(),
+        ... )
+        >>> escalations = _analyze_escalations((req,), (), (c,))
+        >>> len(escalations) >= 1
+        True
+    """
+    escalations: list[Escalation] = []
+    escalation_counter = 0
+
+    # Track which requirements have already been escalated
+    escalated_req_ids: set[str] = set()
+
+    # Check contradictions for escalation needs
+    for contradiction in contradictions:
+        if _should_escalate_for_contradiction(contradiction):
+            escalation_counter += 1
+            reason = EscalationReason.CONFLICTING_REQUIREMENTS
+            severity = contradiction.severity
+            priority = _determine_escalation_priority(reason, severity)
+
+            # Get involved requirements
+            involved_reqs = tuple(
+                r for r in requirements if r.id in contradiction.requirement_ids
+            )
+
+            # Format decision request
+            req_texts = [r.refined_text[:50] for r in involved_reqs[:2]]
+            context_vars = {
+                "req1": req_texts[0] if req_texts else "requirement 1",
+                "req2": req_texts[1] if len(req_texts) > 1 else "requirement 2",
+            }
+            decision_request = _format_decision_request(reason, context_vars)
+
+            # Get related gaps
+            related_gaps = tuple(
+                g for g in gaps
+                if any(rid in g.source_requirements for rid in contradiction.requirement_ids)
+            )
+
+            esc = _package_escalation(
+                escalation_id=f"esc-{escalation_counter:03d}",
+                reason=reason,
+                priority=priority,
+                summary=f"Critical contradiction: {contradiction.description[:60]}",
+                requirements=involved_reqs,
+                gaps=related_gaps,
+                contradiction=contradiction,
+                decision_request=decision_request,
+            )
+            escalations.append(esc)
+
+            # Mark requirements as escalated
+            escalated_req_ids.update(contradiction.requirement_ids)
+
+    # Check gaps for escalation needs
+    for gap in gaps:
+        if _should_escalate_for_gap(gap, gaps):
+            # Skip if all source requirements already escalated
+            if all(rid in escalated_req_ids for rid in gap.source_requirements):
+                continue
+
+            escalation_counter += 1
+            reason = _identify_escalation_reason(None, gap, None)
+            priority = _determine_escalation_priority(reason, gap.severity)
+
+            involved_reqs = tuple(
+                r for r in requirements if r.id in gap.source_requirements
+            )
+
+            # Format decision request based on gap
+            gap_term = gap.description.split()[0] if gap.description else "this aspect"
+            context_vars = {
+                "term": gap_term,
+                "scenario": gap.description[:60],
+                "requirement": involved_reqs[0].refined_text[:50] if involved_reqs else "the requirement",
+            }
+            decision_request = _format_decision_request(reason, context_vars)
+
+            esc = _package_escalation(
+                escalation_id=f"esc-{escalation_counter:03d}",
+                reason=reason,
+                priority=priority,
+                summary=f"Gap requires clarification: {gap.description[:60]}",
+                requirements=involved_reqs,
+                gaps=(gap,),
+                contradiction=None,
+                decision_request=decision_request,
+            )
+            escalations.append(esc)
+
+            escalated_req_ids.update(gap.source_requirements)
+
+    # Check requirements for escalation needs
+    for req in requirements:
+        if req.id in escalated_req_ids:
+            continue
+
+        if _should_escalate_for_requirement(req, gaps, contradictions):
+            escalation_counter += 1
+            reason = _identify_escalation_reason(req, None, None)
+
+            # Determine severity from requirement issues
+            severity = Severity.HIGH if req.implementability_status == "not_implementable" else Severity.MEDIUM
+            priority = _determine_escalation_priority(reason, severity)
+
+            # Get related gaps
+            related_gaps = tuple(g for g in gaps if req.id in g.source_requirements)
+
+            context_vars = {
+                "requirement": req.refined_text[:50],
+                "feature": req.refined_text[:30],
+                "scenario": req.implementability_issues[0] if req.implementability_issues else "unclear behavior",
+            }
+            decision_request = _format_decision_request(reason, context_vars)
+
+            esc = _package_escalation(
+                escalation_id=f"esc-{escalation_counter:03d}",
+                reason=reason,
+                priority=priority,
+                summary=f"Requirement needs clarification: {req.id}",
+                requirements=(req,),
+                gaps=related_gaps,
+                contradiction=None,
+                decision_request=decision_request,
+            )
+            escalations.append(esc)
+
+    # Sort by priority (URGENT first, then HIGH, then NORMAL)
+    priority_order = {
+        EscalationPriority.URGENT: 0,
+        EscalationPriority.HIGH: 1,
+        EscalationPriority.NORMAL: 2,
+    }
+    escalations.sort(key=lambda e: priority_order.get(e.priority, 3))
+
+    # Log escalation analysis
+    logger.info(
+        "escalation_analysis_complete",
+        total_escalations=len(escalations),
+        urgent_count=sum(1 for e in escalations if e.priority == EscalationPriority.URGENT),
+        high_count=sum(1 for e in escalations if e.priority == EscalationPriority.HIGH),
+        normal_count=sum(1 for e in escalations if e.priority == EscalationPriority.NORMAL),
+        reasons={r.value: sum(1 for e in escalations if e.reason == r) for r in EscalationReason},
+    )
+
+    return tuple(escalations)
+
+
 def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
-    """Enhance AnalystOutput with gap analysis, categorization, validation, and contradiction analysis.
+    """Enhance AnalystOutput with gap analysis, categorization, validation, contradiction, and escalation analysis.
 
     Runs:
     1. Requirement categorization (Story 5.4)
@@ -3382,13 +3953,14 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
     4. Edge case detection
     5. Implied requirement detection
     6. Pattern-based suggestion
+    7. Escalation analysis (Story 5.7)
 
     Args:
         output: Initial AnalystOutput with requirements.
 
     Returns:
         Enhanced AnalystOutput with categorized, validated requirements,
-        structured_gaps, and structured_contradictions populated.
+        structured_gaps, structured_contradictions, and escalations populated.
     """
     if not output.requirements:
         return output
@@ -3437,7 +4009,14 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         )
         renumbered_gaps.append(renumbered_gap)
 
-    # Log gap analysis results (including contradiction info)
+    # Story 5.7: Analyze escalations based on all analysis results
+    escalations = _analyze_escalations(
+        validated_requirements,
+        tuple(renumbered_gaps),
+        structured_contradictions,
+    )
+
+    # Log gap analysis results (including contradiction and escalation info)
     logger.info(
         "gap_analysis_complete",
         edge_cases_count=len(edge_cases),
@@ -3446,13 +4025,15 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         total_gaps=len(renumbered_gaps),
         implementability_score=round(implementability_score, 3),
         structured_contradictions_count=len(structured_contradictions),
+        escalations_count=len(escalations),
     )
 
-    # Create enhanced output with validated requirements, structured gaps, and contradictions
+    # Create enhanced output with validated requirements, structured gaps, contradictions, and escalations
     return AnalystOutput(
         requirements=validated_requirements,  # Story 5.5: Use validated requirements
         identified_gaps=output.identified_gaps,
         contradictions=output.contradictions,
         structured_gaps=tuple(renumbered_gaps),
         structured_contradictions=structured_contradictions,  # Story 5.6
+        escalations=escalations,  # Story 5.7
     )

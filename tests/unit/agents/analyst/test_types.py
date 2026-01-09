@@ -1,4 +1,4 @@
-"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3, Story 5.4, Story 5.5).
+"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3, Story 5.4, Story 5.5, Story 5.7).
 
 Tests for CrystallizedRequirement, AnalystOutput, gap analysis types,
 categorization types, and implementability types.
@@ -17,6 +17,9 @@ from yolo_developer.agents.analyst.types import (
     ContradictionType,
     CrystallizedRequirement,
     DependencyType,
+    Escalation,
+    EscalationPriority,
+    EscalationReason,
     ExternalDependency,
     FunctionalSubCategory,
     GapType,
@@ -1804,3 +1807,430 @@ class TestAnalystOutputWithStructuredContradictions:
         assert len(d["structured_contradictions"]) == 2
         assert d["structured_contradictions"][0]["id"] == "conflict-001"
         assert d["structured_contradictions"][1]["id"] == "conflict-002"
+
+
+# =============================================================================
+# Story 5.7: Escalation to PM Types Tests
+# =============================================================================
+
+
+class TestEscalationReason:
+    """Tests for EscalationReason enum (Story 5.7)."""
+
+    def test_escalation_reason_values(self) -> None:
+        """EscalationReason should have all expected values."""
+        assert EscalationReason.UNRESOLVABLE_AMBIGUITY.value == "unresolvable_ambiguity"
+        assert EscalationReason.CONFLICTING_REQUIREMENTS.value == "conflicting_requirements"
+        assert EscalationReason.MISSING_DOMAIN_KNOWLEDGE.value == "missing_domain_knowledge"
+        assert EscalationReason.STAKEHOLDER_DECISION_NEEDED.value == "stakeholder_decision_needed"
+        assert EscalationReason.SCOPE_CLARIFICATION.value == "scope_clarification"
+
+    def test_escalation_reason_is_str_enum(self) -> None:
+        """EscalationReason should be a str enum."""
+        assert isinstance(EscalationReason.UNRESOLVABLE_AMBIGUITY, str)
+        assert isinstance(EscalationReason.CONFLICTING_REQUIREMENTS, str)
+
+    def test_escalation_reason_from_string(self) -> None:
+        """EscalationReason should be constructible from string value."""
+        assert EscalationReason("unresolvable_ambiguity") == EscalationReason.UNRESOLVABLE_AMBIGUITY
+        assert EscalationReason("conflicting_requirements") == EscalationReason.CONFLICTING_REQUIREMENTS
+        assert EscalationReason("missing_domain_knowledge") == EscalationReason.MISSING_DOMAIN_KNOWLEDGE
+
+    def test_escalation_reason_invalid_value(self) -> None:
+        """EscalationReason should reject invalid values."""
+        with pytest.raises(ValueError):
+            EscalationReason("invalid_reason")
+
+    def test_escalation_reason_all_members(self) -> None:
+        """EscalationReason should have exactly 5 members."""
+        members = list(EscalationReason)
+        assert len(members) == 5
+
+
+class TestEscalationPriority:
+    """Tests for EscalationPriority enum (Story 5.7)."""
+
+    def test_escalation_priority_values(self) -> None:
+        """EscalationPriority should have all expected values."""
+        assert EscalationPriority.URGENT.value == "urgent"
+        assert EscalationPriority.HIGH.value == "high"
+        assert EscalationPriority.NORMAL.value == "normal"
+
+    def test_escalation_priority_is_str_enum(self) -> None:
+        """EscalationPriority should be a str enum."""
+        assert isinstance(EscalationPriority.URGENT, str)
+        assert isinstance(EscalationPriority.HIGH, str)
+        assert isinstance(EscalationPriority.NORMAL, str)
+
+    def test_escalation_priority_from_string(self) -> None:
+        """EscalationPriority should be constructible from string value."""
+        assert EscalationPriority("urgent") == EscalationPriority.URGENT
+        assert EscalationPriority("high") == EscalationPriority.HIGH
+        assert EscalationPriority("normal") == EscalationPriority.NORMAL
+
+    def test_escalation_priority_invalid_value(self) -> None:
+        """EscalationPriority should reject invalid values."""
+        with pytest.raises(ValueError):
+            EscalationPriority("low")  # "low" is not a valid priority
+
+    def test_escalation_priority_all_members(self) -> None:
+        """EscalationPriority should have exactly 3 members."""
+        members = list(EscalationPriority)
+        assert len(members) == 3
+
+
+class TestEscalation:
+    """Tests for Escalation dataclass (Story 5.7)."""
+
+    def test_creation_with_all_fields(self) -> None:
+        """Escalation should be creatable with all fields."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.HIGH,
+            summary="Real-time vs batch processing conflict",
+            context="req-001 requires real-time, req-002 requires batch",
+            original_requirements=("req-001", "req-002"),
+            analysis_attempts=("Tried scope separation", "Checked priority hints"),
+            decision_requested="Should we prioritize real-time or batch?",
+            related_gaps=("gap-001",),
+            related_contradictions=("conflict-001",),
+        )
+
+        assert esc.id == "esc-001"
+        assert esc.reason == EscalationReason.CONFLICTING_REQUIREMENTS
+        assert esc.priority == EscalationPriority.HIGH
+        assert esc.summary == "Real-time vs batch processing conflict"
+        assert esc.context == "req-001 requires real-time, req-002 requires batch"
+        assert esc.original_requirements == ("req-001", "req-002")
+        assert esc.analysis_attempts == ("Tried scope separation", "Checked priority hints")
+        assert esc.decision_requested == "Should we prioritize real-time or batch?"
+        assert esc.related_gaps == ("gap-001",)
+        assert esc.related_contradictions == ("conflict-001",)
+        assert esc.timestamp is not None  # Auto-generated
+
+    def test_creation_with_minimal_fields(self) -> None:
+        """Escalation should be creatable with only required fields."""
+        esc = Escalation(
+            id="esc-002",
+            reason=EscalationReason.SCOPE_CLARIFICATION,
+            priority=EscalationPriority.NORMAL,
+            summary="Is feature X in scope?",
+            context="Feature mentioned but not detailed",
+            original_requirements=("req-005",),
+            analysis_attempts=("Searched for scope hints",),
+            decision_requested="Is feature X in scope?",
+        )
+
+        assert esc.id == "esc-002"
+        assert esc.related_gaps == ()  # Default empty
+        assert esc.related_contradictions == ()  # Default empty
+
+    def test_immutability(self) -> None:
+        """Escalation should be immutable (frozen)."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.UNRESOLVABLE_AMBIGUITY,
+            priority=EscalationPriority.NORMAL,
+            summary="Ambiguous requirement",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=("Tried analysis",),
+            decision_requested="Please clarify",
+        )
+
+        with pytest.raises(AttributeError):
+            esc.id = "esc-002"  # type: ignore[misc]
+
+    def test_to_dict_serialization(self) -> None:
+        """Escalation.to_dict should serialize all fields correctly."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.MISSING_DOMAIN_KNOWLEDGE,
+            priority=EscalationPriority.HIGH,
+            summary="Missing business rules",
+            context="Domain context needed",
+            original_requirements=("req-001", "req-002"),
+            analysis_attempts=("Attempted inference",),
+            decision_requested="What are the business rules?",
+            related_gaps=("gap-001",),
+            related_contradictions=(),
+        )
+
+        d = esc.to_dict()
+
+        assert d["id"] == "esc-001"
+        assert d["reason"] == "missing_domain_knowledge"  # String value
+        assert d["priority"] == "high"  # String value
+        assert d["summary"] == "Missing business rules"
+        assert d["context"] == "Domain context needed"
+        assert d["original_requirements"] == ["req-001", "req-002"]  # List
+        assert d["analysis_attempts"] == ["Attempted inference"]  # List
+        assert d["decision_requested"] == "What are the business rules?"
+        assert d["related_gaps"] == ["gap-001"]  # List
+        assert d["related_contradictions"] == []  # List
+        assert "timestamp" in d
+        assert isinstance(d["timestamp"], str)  # ISO format string
+
+    def test_to_dict_converts_enums_to_strings(self) -> None:
+        """to_dict should convert enum values to their string representations."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.STAKEHOLDER_DECISION_NEEDED,
+            priority=EscalationPriority.URGENT,
+            summary="Test",
+            context="Test context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Test?",
+        )
+
+        d = esc.to_dict()
+
+        assert d["reason"] == "stakeholder_decision_needed"
+        assert d["priority"] == "urgent"
+        assert not isinstance(d["reason"], EscalationReason)
+        assert not isinstance(d["priority"], EscalationPriority)
+
+    def test_original_requirements_is_list_in_dict(self) -> None:
+        """original_requirements tuple should become list in to_dict."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.HIGH,
+            summary="Test",
+            context="Test context",
+            original_requirements=("req-001", "req-002", "req-003"),
+            analysis_attempts=("Attempt 1", "Attempt 2"),
+            decision_requested="Test?",
+        )
+
+        d = esc.to_dict()
+
+        assert isinstance(d["original_requirements"], list)
+        assert d["original_requirements"] == ["req-001", "req-002", "req-003"]
+        assert isinstance(d["analysis_attempts"], list)
+        assert d["analysis_attempts"] == ["Attempt 1", "Attempt 2"]
+
+    def test_equality(self) -> None:
+        """Two Escalation objects with same values should be equal."""
+        from datetime import datetime, timezone
+
+        fixed_time = datetime(2026, 1, 9, 12, 0, 0, tzinfo=timezone.utc)
+
+        esc1 = Escalation(
+            id="esc-001",
+            reason=EscalationReason.SCOPE_CLARIFICATION,
+            priority=EscalationPriority.NORMAL,
+            summary="Test",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Test?",
+            timestamp=fixed_time,
+        )
+        esc2 = Escalation(
+            id="esc-001",
+            reason=EscalationReason.SCOPE_CLARIFICATION,
+            priority=EscalationPriority.NORMAL,
+            summary="Test",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Test?",
+            timestamp=fixed_time,
+        )
+
+        assert esc1 == esc2
+
+    def test_hashability(self) -> None:
+        """Escalation should be hashable (for use in sets/dicts)."""
+        from datetime import datetime, timezone
+
+        fixed_time = datetime(2026, 1, 9, 12, 0, 0, tzinfo=timezone.utc)
+
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.HIGH,
+            summary="Test",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Test?",
+            timestamp=fixed_time,
+        )
+
+        # Should not raise
+        hash_value = hash(esc)
+        assert isinstance(hash_value, int)
+
+        # Should be usable in set
+        escalation_set = {esc}
+        assert len(escalation_set) == 1
+
+
+class TestAnalystOutputWithEscalations:
+    """Tests for AnalystOutput with escalations field (Story 5.7)."""
+
+    def test_escalations_default_empty(self) -> None:
+        """AnalystOutput.escalations should default to empty tuple."""
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        assert output.escalations == ()
+
+    def test_escalation_needed_false_when_empty(self) -> None:
+        """escalation_needed should be False when no escalations."""
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        assert output.escalation_needed is False
+
+    def test_escalation_needed_true_when_has_escalations(self) -> None:
+        """escalation_needed should be True when escalations exist."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.HIGH,
+            summary="Test",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Test?",
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            escalations=(esc,),
+        )
+
+        assert output.escalation_needed is True
+
+    def test_creation_with_escalations(self) -> None:
+        """AnalystOutput should accept escalations tuple."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.UNRESOLVABLE_AMBIGUITY,
+            priority=EscalationPriority.NORMAL,
+            summary="Ambiguous requirement",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=("Tried analysis",),
+            decision_requested="Please clarify",
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            escalations=(esc,),
+        )
+
+        assert len(output.escalations) == 1
+        assert output.escalations[0].id == "esc-001"
+
+    def test_to_dict_includes_escalations(self) -> None:
+        """to_dict should include escalations and escalation_needed."""
+        esc = Escalation(
+            id="esc-001",
+            reason=EscalationReason.MISSING_DOMAIN_KNOWLEDGE,
+            priority=EscalationPriority.HIGH,
+            summary="Missing business rules",
+            context="Context",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="What are the rules?",
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            escalations=(esc,),
+        )
+
+        d = output.to_dict()
+
+        assert "escalations" in d
+        assert "escalation_needed" in d
+        assert len(d["escalations"]) == 1
+        assert d["escalations"][0]["id"] == "esc-001"
+        assert d["escalation_needed"] is True
+
+    def test_to_dict_escalations_empty_when_none(self) -> None:
+        """to_dict should show escalation_needed=False when no escalations."""
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        d = output.to_dict()
+
+        assert d["escalations"] == []
+        assert d["escalation_needed"] is False
+
+    def test_backward_compatibility_without_escalations(self) -> None:
+        """AnalystOutput should work without escalations parameter."""
+        # This should work exactly as before Story 5.7
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=("Gap 1",),
+            contradictions=("Contradiction 1",),
+            structured_gaps=(),
+            structured_contradictions=(),
+        )
+
+        assert output.escalations == ()
+        assert output.escalation_needed is False
+        d = output.to_dict()
+        assert d["escalations"] == []
+        assert d["escalation_needed"] is False
+
+    def test_to_dict_with_multiple_escalations(self) -> None:
+        """to_dict should serialize multiple escalations correctly."""
+        esc1 = Escalation(
+            id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.URGENT,
+            summary="Critical conflict",
+            context="Context 1",
+            original_requirements=("req-001",),
+            analysis_attempts=(),
+            decision_requested="Question 1?",
+        )
+        esc2 = Escalation(
+            id="esc-002",
+            reason=EscalationReason.SCOPE_CLARIFICATION,
+            priority=EscalationPriority.NORMAL,
+            summary="Scope unclear",
+            context="Context 2",
+            original_requirements=("req-002",),
+            analysis_attempts=(),
+            decision_requested="Question 2?",
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            escalations=(esc1, esc2),
+        )
+
+        d = output.to_dict()
+
+        assert len(d["escalations"]) == 2
+        assert d["escalations"][0]["id"] == "esc-001"
+        assert d["escalations"][0]["priority"] == "urgent"
+        assert d["escalations"][1]["id"] == "esc-002"
+        assert d["escalations"][1]["priority"] == "normal"
+        assert d["escalation_needed"] is True

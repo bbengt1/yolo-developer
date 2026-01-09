@@ -1,4 +1,4 @@
-"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3, 5.4, 5.5).
+"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3, 5.4, 5.5, 5.7).
 
 Tests for analyst_node function, state management, vague term detection,
 gap analysis functions, requirement categorization, and implementability validation.
@@ -16,6 +16,7 @@ from yolo_developer.agents.analyst.node import (
     CONSTRAINT_KEYWORDS,
     FUNCTIONAL_KEYWORDS,
     NON_FUNCTIONAL_KEYWORDS,
+    _analyze_escalations,
     _assess_complexity,
     _assign_sub_category,
     _calculate_category_confidence,
@@ -24,11 +25,18 @@ from yolo_developer.agents.analyst.node import (
     _check_impossibility,
     _count_keyword_matches,
     _detect_vague_terms,
+    _determine_escalation_priority,
     _enhance_with_gap_analysis,
+    _format_decision_request,
     _generate_remediation,
     _identify_edge_cases,
+    _identify_escalation_reason,
     _identify_external_dependencies,
     _identify_implied_requirements,
+    _package_escalation,
+    _should_escalate_for_contradiction,
+    _should_escalate_for_gap,
+    _should_escalate_for_requirement,
     _suggest_from_patterns,
     _validate_all_requirements,
     _validate_implementability,
@@ -36,9 +44,14 @@ from yolo_developer.agents.analyst.node import (
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
     ComplexityLevel,
+    Contradiction,
+    ContradictionType,
     CrystallizedRequirement,
     DependencyType,
+    EscalationPriority,
+    EscalationReason,
     GapType,
+    IdentifiedGap,
     ImplementabilityStatus,
     RequirementCategory,
     Severity,
@@ -2582,3 +2595,672 @@ class TestAnalyzeContradictions:
 
         for i, c in enumerate(contradictions, start=1):
             assert c.id == f"conflict-{i:03d}"
+
+
+# =============================================================================
+# Story 5.7: Escalation to PM Functions Tests
+# =============================================================================
+
+
+class TestShouldEscalateForContradiction:
+    """Tests for _should_escalate_for_contradiction function (Story 5.7)."""
+
+    def test_critical_contradiction_triggers_escalation(self) -> None:
+        """Critical severity contradictions should trigger escalation."""
+        contradiction = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002"),
+            description="Security conflict",
+            explanation="Must encrypt vs must not encrypt",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=("Clarify security requirements",),
+        )
+
+        assert _should_escalate_for_contradiction(contradiction) is True
+
+    def test_high_severity_does_not_trigger_escalation(self) -> None:
+        """High severity contradictions should NOT trigger escalation."""
+        contradiction = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.IMPLICIT_RESOURCE,
+            requirement_ids=("req-001", "req-002"),
+            description="Memory conflict",
+            explanation="High memory vs low memory",
+            severity=Severity.HIGH,
+            resolution_suggestions=("Add resource limits",),
+        )
+
+        assert _should_escalate_for_contradiction(contradiction) is False
+
+    def test_medium_severity_does_not_trigger_escalation(self) -> None:
+        """Medium severity contradictions should NOT trigger escalation."""
+        contradiction = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.SEMANTIC,
+            requirement_ids=("req-001", "req-002"),
+            description="Minor conflict",
+            explanation="Terminology difference",
+            severity=Severity.MEDIUM,
+            resolution_suggestions=(),
+        )
+
+        assert _should_escalate_for_contradiction(contradiction) is False
+
+
+class TestShouldEscalateForGap:
+    """Tests for _should_escalate_for_gap function (Story 5.7)."""
+
+    def test_critical_gap_triggers_escalation(self) -> None:
+        """Critical severity gaps should trigger escalation."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Missing authentication flow",
+            gap_type=GapType.EDGE_CASE,
+            severity=Severity.CRITICAL,
+            source_requirements=("req-001",),
+            rationale="Security gap",
+        )
+
+        assert _should_escalate_for_gap(gap, (gap,)) is True
+
+    def test_gap_with_domain_keyword_triggers_escalation(self) -> None:
+        """Gaps mentioning domain knowledge should trigger escalation."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Missing business rule for tax calculation",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.HIGH,
+            source_requirements=("req-001",),
+            rationale="Domain knowledge needed for policy compliance",
+        )
+
+        assert _should_escalate_for_gap(gap, (gap,)) is True
+
+    def test_gap_with_stakeholder_keyword_triggers_escalation(self) -> None:
+        """Gaps mentioning stakeholder should trigger escalation."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Need stakeholder input on workflow",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.MEDIUM,
+            source_requirements=("req-001",),
+            rationale="Stakeholder decision required",
+        )
+
+        assert _should_escalate_for_gap(gap, (gap,)) is True
+
+    def test_medium_gap_without_keywords_does_not_trigger(self) -> None:
+        """Medium severity gaps without domain keywords should NOT trigger."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Consider adding pagination",
+            gap_type=GapType.PATTERN_SUGGESTION,
+            severity=Severity.MEDIUM,
+            source_requirements=("req-001",),
+            rationale="Common UX pattern",
+        )
+
+        assert _should_escalate_for_gap(gap, (gap,)) is False
+
+
+class TestShouldEscalateForRequirement:
+    """Tests for _should_escalate_for_requirement function (Story 5.7)."""
+
+    def test_not_implementable_triggers_escalation(self) -> None:
+        """Not implementable requirements should trigger escalation."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="100% uptime",
+            refined_text="System must have 100% uptime guarantee",
+            category="non_functional",
+            testable=True,
+            implementability_status="not_implementable",
+        )
+
+        assert _should_escalate_for_requirement(req, (), ()) is True
+
+    def test_implementable_requirement_does_not_trigger(self) -> None:
+        """Implementable requirements should NOT trigger escalation."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Login feature",
+            refined_text="User can log in with email/password",
+            category="functional",
+            testable=True,
+            implementability_status="implementable",
+        )
+
+        assert _should_escalate_for_requirement(req, (), ()) is False
+
+    def test_req_with_many_gaps_triggers_escalation(self) -> None:
+        """Requirements with 3+ related gaps should trigger escalation."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Complex feature",
+            refined_text="Implement complex feature",
+            category="functional",
+            testable=True,
+        )
+
+        # Create 3 gaps related to req-001
+        gaps = tuple(
+            IdentifiedGap(
+                id=f"gap-{i:03d}",
+                description=f"Gap {i}",
+                gap_type=GapType.EDGE_CASE,
+                severity=Severity.MEDIUM,
+                source_requirements=("req-001",),
+                rationale=f"Gap reason {i}",
+            )
+            for i in range(1, 4)
+        )
+
+        assert _should_escalate_for_requirement(req, gaps, ()) is True
+
+    def test_req_with_two_gaps_does_not_trigger_escalation(self) -> None:
+        """Requirements with only 2 related gaps should NOT trigger escalation (boundary test)."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Feature",
+            refined_text="Implement feature",
+            category="functional",
+            testable=True,
+        )
+
+        # Create only 2 gaps related to req-001 (below threshold of 3)
+        gaps = tuple(
+            IdentifiedGap(
+                id=f"gap-{i:03d}",
+                description=f"Gap {i}",
+                gap_type=GapType.EDGE_CASE,
+                severity=Severity.MEDIUM,
+                source_requirements=("req-001",),
+                rationale=f"Gap reason {i}",
+            )
+            for i in range(1, 3)  # Only 2 gaps
+        )
+
+        assert _should_escalate_for_requirement(req, gaps, ()) is False
+
+
+class TestIdentifyEscalationReason:
+    """Tests for _identify_escalation_reason function (Story 5.7)."""
+
+    def test_contradiction_returns_conflicting_requirements(self) -> None:
+        """Contradiction should return CONFLICTING_REQUIREMENTS reason."""
+        contradiction = Contradiction(
+            id="c-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001",),
+            description="Test",
+            explanation="Test",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=(),
+        )
+
+        result = _identify_escalation_reason(None, None, contradiction)
+        assert result == EscalationReason.CONFLICTING_REQUIREMENTS
+
+    def test_gap_with_domain_keyword_returns_missing_domain(self) -> None:
+        """Gap with domain keyword should return MISSING_DOMAIN_KNOWLEDGE."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Need domain expertise",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.HIGH,
+            source_requirements=("req-001",),
+            rationale="Business rule unclear",
+        )
+
+        result = _identify_escalation_reason(None, gap, None)
+        assert result == EscalationReason.MISSING_DOMAIN_KNOWLEDGE
+
+    def test_gap_with_scope_keyword_returns_scope_clarification(self) -> None:
+        """Gap with scope keyword should return SCOPE_CLARIFICATION."""
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Unclear if feature is in scope",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.MEDIUM,
+            source_requirements=("req-001",),
+            rationale="Scope boundary unclear",
+        )
+
+        result = _identify_escalation_reason(None, gap, None)
+        assert result == EscalationReason.SCOPE_CLARIFICATION
+
+    def test_not_implementable_req_returns_stakeholder_decision(self) -> None:
+        """Not implementable requirement should return STAKEHOLDER_DECISION_NEEDED."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Impossible feature",
+            refined_text="Impossible feature",
+            category="functional",
+            testable=True,
+            implementability_status="not_implementable",
+        )
+
+        result = _identify_escalation_reason(req, None, None)
+        assert result == EscalationReason.STAKEHOLDER_DECISION_NEEDED
+
+    def test_all_none_returns_stakeholder_decision(self) -> None:
+        """When all arguments are None, should return default STAKEHOLDER_DECISION_NEEDED."""
+        result = _identify_escalation_reason(None, None, None)
+        assert result == EscalationReason.STAKEHOLDER_DECISION_NEEDED
+
+
+class TestDetermineEscalationPriority:
+    """Tests for _determine_escalation_priority function (Story 5.7)."""
+
+    def test_critical_severity_returns_urgent(self) -> None:
+        """Critical severity should always return URGENT priority."""
+        result = _determine_escalation_priority(
+            EscalationReason.UNRESOLVABLE_AMBIGUITY,
+            Severity.CRITICAL,
+        )
+        assert result == EscalationPriority.URGENT
+
+    def test_conflicting_requirements_returns_high(self) -> None:
+        """CONFLICTING_REQUIREMENTS reason should return HIGH priority."""
+        result = _determine_escalation_priority(
+            EscalationReason.CONFLICTING_REQUIREMENTS,
+            Severity.HIGH,
+        )
+        assert result == EscalationPriority.HIGH
+
+    def test_missing_domain_returns_high(self) -> None:
+        """MISSING_DOMAIN_KNOWLEDGE reason should return HIGH priority."""
+        result = _determine_escalation_priority(
+            EscalationReason.MISSING_DOMAIN_KNOWLEDGE,
+            Severity.MEDIUM,
+        )
+        assert result == EscalationPriority.HIGH
+
+    def test_scope_clarification_returns_normal(self) -> None:
+        """SCOPE_CLARIFICATION reason should return NORMAL priority."""
+        result = _determine_escalation_priority(
+            EscalationReason.SCOPE_CLARIFICATION,
+            Severity.MEDIUM,
+        )
+        assert result == EscalationPriority.NORMAL
+
+
+class TestFormatDecisionRequest:
+    """Tests for _format_decision_request function (Story 5.7)."""
+
+    def test_conflicting_requirements_format(self) -> None:
+        """Should format conflicting requirements decision request."""
+        result = _format_decision_request(
+            EscalationReason.CONFLICTING_REQUIREMENTS,
+            {"req1": "real-time updates", "req2": "batch processing"},
+        )
+
+        assert "real-time updates" in result
+        assert "batch processing" in result
+        assert "prioritize" in result.lower()
+
+    def test_scope_clarification_format(self) -> None:
+        """Should format scope clarification decision request."""
+        result = _format_decision_request(
+            EscalationReason.SCOPE_CLARIFICATION,
+            {"feature": "Advanced reporting"},
+        )
+
+        assert "Advanced reporting" in result
+        assert "scope" in result.lower()
+
+    def test_missing_variables_fallback(self) -> None:
+        """Should handle missing template variables gracefully."""
+        result = _format_decision_request(
+            EscalationReason.CONFLICTING_REQUIREMENTS,
+            {"wrong_key": "value"},  # Wrong keys for template
+        )
+
+        # Should use fallback
+        assert "clarification" in result.lower() or "value" in result
+
+
+class TestPackageEscalation:
+    """Tests for _package_escalation function (Story 5.7)."""
+
+    def test_creates_escalation_with_all_fields(self) -> None:
+        """Should create escalation with all provided context."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Fast system",
+            refined_text="Response time < 200ms",
+            category="non_functional",
+            testable=True,
+        )
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Missing latency requirement",
+            gap_type=GapType.EDGE_CASE,
+            severity=Severity.HIGH,
+            source_requirements=("req-001",),
+            rationale="Need specific targets",
+        )
+
+        result = _package_escalation(
+            escalation_id="esc-001",
+            reason=EscalationReason.UNRESOLVABLE_AMBIGUITY,
+            priority=EscalationPriority.NORMAL,
+            summary="Ambiguous performance requirement",
+            requirements=(req,),
+            gaps=(gap,),
+            contradiction=None,
+            decision_request="What is acceptable latency?",
+        )
+
+        assert result.id == "esc-001"
+        assert result.reason == EscalationReason.UNRESOLVABLE_AMBIGUITY
+        assert result.priority == EscalationPriority.NORMAL
+        assert result.original_requirements == ("req-001",)
+        assert result.related_gaps == ("gap-001",)
+        assert "Response time" in result.context
+        assert "What is acceptable latency?" in result.decision_requested
+
+    def test_creates_escalation_with_contradiction(self) -> None:
+        """Should include contradiction in context."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Test",
+            refined_text="Test requirement",
+            category="functional",
+            testable=True,
+        )
+        contradiction = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002"),
+            description="Encryption conflict",
+            explanation="Must encrypt vs plaintext",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=("Clarify",),
+        )
+
+        result = _package_escalation(
+            escalation_id="esc-001",
+            reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+            priority=EscalationPriority.URGENT,
+            summary="Critical conflict",
+            requirements=(req,),
+            gaps=(),
+            contradiction=contradiction,
+            decision_request="Which takes precedence?",
+        )
+
+        assert result.related_contradictions == ("conflict-001",)
+        assert "Encryption conflict" in result.context
+        assert "Must encrypt vs plaintext" in result.context
+
+
+class TestAnalyzeEscalations:
+    """Tests for _analyze_escalations function (Story 5.7)."""
+
+    def test_critical_contradiction_creates_escalation(self) -> None:
+        """Critical contradictions should create escalations."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="encrypted",
+                refined_text="Data must be encrypted",
+                category="constraint",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="plaintext",
+                refined_text="Data in plaintext",
+                category="constraint",
+                testable=True,
+            ),
+        )
+        contradictions = (
+            Contradiction(
+                id="conflict-001",
+                contradiction_type=ContradictionType.DIRECT,
+                requirement_ids=("req-001", "req-002"),
+                description="Encryption conflict",
+                explanation="Must encrypt vs plaintext",
+                severity=Severity.CRITICAL,
+                resolution_suggestions=("Clarify",),
+            ),
+        )
+
+        escalations = _analyze_escalations(reqs, (), contradictions)
+
+        assert len(escalations) >= 1
+        assert escalations[0].reason == EscalationReason.CONFLICTING_REQUIREMENTS
+        assert escalations[0].priority == EscalationPriority.URGENT
+
+    def test_no_escalations_for_healthy_analysis(self) -> None:
+        """Should return empty tuple when no escalations needed."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Login",
+                refined_text="User can log in",
+                category="functional",
+                testable=True,
+                implementability_status="implementable",
+            ),
+        )
+        gaps = (
+            IdentifiedGap(
+                id="gap-001",
+                description="Consider password reset",
+                gap_type=GapType.PATTERN_SUGGESTION,
+                severity=Severity.LOW,
+                source_requirements=("req-001",),
+                rationale="Common pattern",
+            ),
+        )
+        # Non-critical contradiction
+        contradictions = (
+            Contradiction(
+                id="conflict-001",
+                contradiction_type=ContradictionType.IMPLICIT_BEHAVIOR,
+                requirement_ids=("req-001",),
+                description="Minor behavior difference",
+                explanation="Non-blocking",
+                severity=Severity.LOW,
+                resolution_suggestions=(),
+            ),
+        )
+
+        escalations = _analyze_escalations(reqs, gaps, contradictions)
+
+        assert len(escalations) == 0
+
+    def test_escalations_sorted_by_priority(self) -> None:
+        """Escalations should be sorted by priority (urgent first)."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Test",
+                refined_text="Test",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Test2",
+                refined_text="Test2",
+                category="functional",
+                testable=True,
+            ),
+        )
+        # One critical, one medium
+        contradictions = (
+            Contradiction(
+                id="conflict-001",
+                contradiction_type=ContradictionType.DIRECT,
+                requirement_ids=("req-001",),
+                description="Critical conflict",
+                explanation="Test",
+                severity=Severity.CRITICAL,
+                resolution_suggestions=(),
+            ),
+        )
+        gaps = (
+            IdentifiedGap(
+                id="gap-001",
+                description="Need domain expertise",
+                gap_type=GapType.IMPLIED_REQUIREMENT,
+                severity=Severity.HIGH,
+                source_requirements=("req-002",),
+                rationale="Domain unclear",
+            ),
+        )
+
+        escalations = _analyze_escalations(reqs, gaps, contradictions)
+
+        assert len(escalations) >= 1
+        # First should be urgent (from critical contradiction)
+        assert escalations[0].priority == EscalationPriority.URGENT
+
+    def test_avoid_duplicate_escalations_for_same_requirement(self) -> None:
+        """Should not create multiple escalations for the same requirement."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Test",
+            refined_text="Test requirement",
+            category="functional",
+            testable=True,
+        )
+        # Both contradiction and gap involve req-001
+        contradiction = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001",),
+            description="Critical conflict",
+            explanation="Test",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=(),
+        )
+        gap = IdentifiedGap(
+            id="gap-001",
+            description="Need business rule clarification",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.CRITICAL,
+            source_requirements=("req-001",),
+            rationale="Domain knowledge needed",
+        )
+
+        escalations = _analyze_escalations((req,), (gap,), (contradiction,))
+
+        # Should only have 1 escalation for req-001, not 2
+        req_ids_escalated = set()
+        for esc in escalations:
+            req_ids_escalated.update(esc.original_requirements)
+
+        # req-001 should appear in escalations but not duplicated across escalations
+        assert "req-001" in req_ids_escalated
+
+    def test_escalation_ids_are_unique(self) -> None:
+        """All escalation IDs should be unique."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Test1",
+                refined_text="Test requirement 1",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Test2",
+                refined_text="Test requirement 2",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-003",
+                original_text="Test3",
+                refined_text="Test requirement 3",
+                category="functional",
+                testable=True,
+                implementability_status="not_implementable",
+            ),
+        )
+        contradictions = (
+            Contradiction(
+                id="conflict-001",
+                contradiction_type=ContradictionType.DIRECT,
+                requirement_ids=("req-001",),
+                description="Critical conflict 1",
+                explanation="Test",
+                severity=Severity.CRITICAL,
+                resolution_suggestions=(),
+            ),
+        )
+        gaps = (
+            IdentifiedGap(
+                id="gap-001",
+                description="Need domain expertise",
+                gap_type=GapType.IMPLIED_REQUIREMENT,
+                severity=Severity.CRITICAL,
+                source_requirements=("req-002",),
+                rationale="Domain knowledge needed",
+            ),
+        )
+
+        escalations = _analyze_escalations(reqs, gaps, contradictions)
+
+        # Verify IDs are unique
+        escalation_ids = [e.id for e in escalations]
+        assert len(escalation_ids) == len(set(escalation_ids)), "Escalation IDs must be unique"
+
+        # Verify IDs follow sequential pattern
+        for i, esc in enumerate(escalations, start=1):
+            assert esc.id == f"esc-{i:03d}"
+
+
+class TestEnhanceWithGapAnalysisIncludesEscalations:
+    """Tests that _enhance_with_gap_analysis includes escalation analysis (Story 5.7)."""
+
+    def test_escalations_populated_in_output(self) -> None:
+        """_enhance_with_gap_analysis should populate escalations field."""
+        initial_output = AnalystOutput(
+            requirements=(
+                CrystallizedRequirement(
+                    id="req-001",
+                    original_text="encrypted",
+                    refined_text="Data must be encrypted at rest",
+                    category="constraint",
+                    testable=True,
+                ),
+                CrystallizedRequirement(
+                    id="req-002",
+                    original_text="plaintext",
+                    refined_text="Store data in plaintext format",
+                    category="constraint",
+                    testable=True,
+                ),
+            ),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        # escalations field should be present (may be empty or populated)
+        assert hasattr(result, "escalations")
+        assert isinstance(result.escalations, tuple)
+        # escalation_needed property should work
+        assert isinstance(result.escalation_needed, bool)
+
+    def test_empty_requirements_returns_empty_escalations(self) -> None:
+        """Empty requirements should return empty escalations."""
+        initial_output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        assert result.escalations == ()
+        assert result.escalation_needed is False

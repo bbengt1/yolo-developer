@@ -88,14 +88,14 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Analyst Agent (7 stories)
-  epic-5: in-progress
+  epic-5: done
   5-1-create-analyst-agent-node: done
   5-2-requirement-crystallization: done
   5-3-missing-requirement-identification: done
   5-4-requirement-categorization: done
   5-5-implementability-validation: done
   5-6-contradiction-flagging: done
-  5-7-escalation-to-pm: backlog
+  5-7-escalation-to-pm: done
   epic-5-retrospective: optional
 
   # Epic 6: PM Agent (7 stories)

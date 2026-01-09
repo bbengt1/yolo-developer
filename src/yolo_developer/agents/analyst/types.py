@@ -1,4 +1,4 @@
-"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6).
+"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7).
 
 This module provides the data types used by the Analyst agent:
 
@@ -18,6 +18,9 @@ This module provides the data types used by the Analyst agent:
 - ImplementabilityResult: Result of implementability validation (Story 5.5)
 - ContradictionType: Type of contradiction between requirements (Story 5.6)
 - Contradiction: A contradiction identified between requirements (Story 5.6)
+- EscalationReason: Reason for escalating to PM agent (Story 5.7)
+- EscalationPriority: Priority level for escalation (Story 5.7)
+- Escalation: An escalation to PM with full context (Story 5.7)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -47,7 +50,8 @@ Security Note:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -419,6 +423,160 @@ class Contradiction:
         }
 
 
+# =============================================================================
+# Story 5.7: Escalation to PM Types
+# =============================================================================
+
+
+def _utcnow() -> datetime:
+    """Return current UTC datetime with timezone info.
+
+    Using timezone-aware datetime for consistency and to avoid
+    deprecation warnings from naive datetime comparisons.
+    """
+    return datetime.now(timezone.utc)
+
+
+class EscalationReason(str, Enum):
+    """Reason for escalating an issue to the PM agent (Story 5.7).
+
+    Used to categorize why a requirement issue cannot be resolved by the
+    Analyst and needs PM decision-making.
+
+    Values:
+        UNRESOLVABLE_AMBIGUITY: Requirement is too vague to crystallize
+            even after analysis; needs stakeholder clarification.
+        CONFLICTING_REQUIREMENTS: Critical contradiction between requirements
+            that cannot be resolved without business prioritization.
+        MISSING_DOMAIN_KNOWLEDGE: Requirement references domain concepts
+            or business rules that the Analyst cannot infer.
+        STAKEHOLDER_DECISION_NEEDED: Multiple valid interpretations exist;
+            needs product decision on which direction to take.
+        SCOPE_CLARIFICATION: Unclear whether feature/behavior is in scope
+            for current iteration or project.
+
+    Example:
+        >>> EscalationReason.CONFLICTING_REQUIREMENTS.value
+        'conflicting_requirements'
+        >>> EscalationReason("missing_domain_knowledge")
+        <EscalationReason.MISSING_DOMAIN_KNOWLEDGE: 'missing_domain_knowledge'>
+    """
+
+    UNRESOLVABLE_AMBIGUITY = "unresolvable_ambiguity"
+    CONFLICTING_REQUIREMENTS = "conflicting_requirements"
+    MISSING_DOMAIN_KNOWLEDGE = "missing_domain_knowledge"
+    STAKEHOLDER_DECISION_NEEDED = "stakeholder_decision_needed"
+    SCOPE_CLARIFICATION = "scope_clarification"
+
+
+class EscalationPriority(str, Enum):
+    """Priority level for escalation to PM (Story 5.7).
+
+    Used to indicate how urgently the PM needs to address the escalation.
+
+    Values:
+        URGENT: Blocks all further progress; must be resolved immediately.
+        HIGH: Blocks significant work; should be resolved soon.
+        NORMAL: Does not block progress; can be resolved in normal workflow.
+
+    Example:
+        >>> EscalationPriority.URGENT.value
+        'urgent'
+        >>> EscalationPriority("high") == EscalationPriority.HIGH
+        True
+    """
+
+    URGENT = "urgent"
+    HIGH = "high"
+    NORMAL = "normal"
+
+
+@dataclass(frozen=True)
+class Escalation:
+    """An escalation to PM with full context for decision-making (Story 5.7).
+
+    Immutable dataclass representing an issue that the Analyst cannot resolve
+    and needs to escalate to the PM agent. Contains all context needed for
+    PM to make a decision without re-analyzing.
+
+    Attributes:
+        id: Unique identifier for this escalation (e.g., "esc-001").
+        reason: Category of why escalation is needed.
+        priority: How urgently PM needs to address this.
+        summary: Brief one-line description of the issue.
+        context: Full context for PM including analysis attempts.
+        original_requirements: Tuple of requirement IDs involved.
+        analysis_attempts: Tuple of strings describing what was tried.
+        decision_requested: Clear, actionable question for PM.
+        related_gaps: Tuple of gap IDs related to this escalation.
+        related_contradictions: Tuple of contradiction IDs related to this.
+        timestamp: When the escalation was created. Defaults to current UTC time.
+
+    Example:
+        >>> esc = Escalation(
+        ...     id="esc-001",
+        ...     reason=EscalationReason.CONFLICTING_REQUIREMENTS,
+        ...     priority=EscalationPriority.HIGH,
+        ...     summary="Real-time vs batch processing conflict",
+        ...     context="req-001 requires real-time updates, req-002 specifies batch only",
+        ...     original_requirements=("req-001", "req-002"),
+        ...     analysis_attempts=("Tried scope separation", "Checked for priority hints"),
+        ...     decision_requested="Should we prioritize real-time or batch processing?",
+        ...     related_gaps=(),
+        ...     related_contradictions=("conflict-001",),
+        ... )
+        >>> esc.priority
+        <EscalationPriority.HIGH: 'high'>
+    """
+
+    id: str
+    reason: EscalationReason
+    priority: EscalationPriority
+    summary: str
+    context: str
+    original_requirements: tuple[str, ...]
+    analysis_attempts: tuple[str, ...]
+    decision_requested: str
+    related_gaps: tuple[str, ...] = ()
+    related_contradictions: tuple[str, ...] = ()
+    timestamp: datetime = field(default_factory=_utcnow)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with all fields, enums as string values,
+            tuples as lists, timestamp as ISO format string.
+
+        Example:
+            >>> esc = Escalation(
+            ...     id="esc-001",
+            ...     reason=EscalationReason.SCOPE_CLARIFICATION,
+            ...     priority=EscalationPriority.NORMAL,
+            ...     summary="Unclear scope for feature X",
+            ...     context="Feature X mentioned but not detailed",
+            ...     original_requirements=("req-005",),
+            ...     analysis_attempts=("Searched for scope hints",),
+            ...     decision_requested="Is feature X in scope?",
+            ... )
+            >>> esc.to_dict()["reason"]
+            'scope_clarification'
+        """
+        return {
+            "id": self.id,
+            "reason": self.reason.value,
+            "priority": self.priority.value,
+            "summary": self.summary,
+            "context": self.context,
+            "original_requirements": list(self.original_requirements),
+            "analysis_attempts": list(self.analysis_attempts),
+            "decision_requested": self.decision_requested,
+            "related_gaps": list(self.related_gaps),
+            "related_contradictions": list(self.related_contradictions),
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+
 @dataclass(frozen=True)
 class CategorizationResult:
     """Result of categorizing a requirement (Story 5.4).
@@ -713,7 +871,7 @@ class AnalystOutput:
     """Complete output from Analyst agent processing.
 
     Immutable dataclass containing all results from analyzing seed content:
-    crystallized requirements, identified gaps, and contradictions.
+    crystallized requirements, identified gaps, contradictions, and escalations.
 
     Attributes:
         requirements: Tuple of CrystallizedRequirement objects.
@@ -724,6 +882,11 @@ class AnalystOutput:
         structured_contradictions: Tuple of Contradiction objects with full conflict
             details including severity and resolution suggestions (Story 5.6).
             Defaults to empty for backward compatibility.
+        escalations: Tuple of Escalation objects representing issues that need
+            PM decision-making (Story 5.7). Defaults to empty for backward compatibility.
+
+    Properties:
+        escalation_needed: True if there are any escalations pending PM review.
 
     Example:
         >>> req = CrystallizedRequirement(
@@ -747,16 +910,35 @@ class AnalystOutput:
     contradictions: tuple[str, ...]
     structured_gaps: tuple[IdentifiedGap, ...] = ()
     structured_contradictions: tuple[Contradiction, ...] = ()
+    escalations: tuple[Escalation, ...] = ()
+
+    @property
+    def escalation_needed(self) -> bool:
+        """Check if any escalations are pending PM review.
+
+        Returns:
+            True if there are any escalations, False otherwise.
+
+        Example:
+            >>> output = AnalystOutput(
+            ...     requirements=(),
+            ...     identified_gaps=(),
+            ...     contradictions=(),
+            ... )
+            >>> output.escalation_needed
+            False
+        """
+        return len(self.escalations) > 0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
-        Serializes nested CrystallizedRequirement, IdentifiedGap, and
-        Contradiction objects.
+        Serializes nested CrystallizedRequirement, IdentifiedGap,
+        Contradiction, and Escalation objects.
 
         Returns:
-            Dictionary with all output fields including structured_gaps
-            and structured_contradictions.
+            Dictionary with all output fields including structured_gaps,
+            structured_contradictions, escalations, and escalation_needed flag.
 
         Example:
             >>> output = AnalystOutput(
@@ -774,4 +956,6 @@ class AnalystOutput:
             "contradictions": list(self.contradictions),
             "structured_gaps": [g.to_dict() for g in self.structured_gaps],
             "structured_contradictions": [c.to_dict() for c in self.structured_contradictions],
+            "escalations": [e.to_dict() for e in self.escalations],
+            "escalation_needed": self.escalation_needed,
         }
