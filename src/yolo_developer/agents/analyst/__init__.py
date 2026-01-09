@@ -1,17 +1,21 @@
-"""Analyst agent module for requirement crystallization (Story 5.1).
+"""Analyst agent module for requirement crystallization (Story 5.1, 5.2, 5.3).
 
 The Analyst agent is responsible for:
 - Crystallizing raw requirements from seed content
-- Identifying gaps in requirements
+- Identifying gaps in requirements (with structured analysis)
 - Flagging contradictions between requirements
 - Categorizing requirements (functional, non-functional, constraint)
 - Assessing requirement testability
+- Detecting edge cases, implied requirements, and pattern-based suggestions
 
 Example:
     >>> from yolo_developer.agents.analyst import (
     ...     analyst_node,
     ...     AnalystOutput,
     ...     CrystallizedRequirement,
+    ...     IdentifiedGap,
+    ...     GapType,
+    ...     Severity,
     ... )
     >>>
     >>> # Create a crystallized requirement
@@ -21,6 +25,16 @@ Example:
     ...     refined_text="API response < 200ms",
     ...     category="non-functional",
     ...     testable=True,
+    ... )
+    >>>
+    >>> # Create an identified gap
+    >>> gap = IdentifiedGap(
+    ...     id="gap-001",
+    ...     description="Missing logout functionality",
+    ...     gap_type=GapType.IMPLIED_REQUIREMENT,
+    ...     severity=Severity.HIGH,
+    ...     source_requirements=("req-001",),
+    ...     rationale="Login implies logout needed",
     ... )
     >>>
     >>> # Run the analyst node
@@ -42,10 +56,19 @@ References:
 from __future__ import annotations
 
 from yolo_developer.agents.analyst.node import analyst_node
-from yolo_developer.agents.analyst.types import AnalystOutput, CrystallizedRequirement
+from yolo_developer.agents.analyst.types import (
+    AnalystOutput,
+    CrystallizedRequirement,
+    GapType,
+    IdentifiedGap,
+    Severity,
+)
 
 __all__ = [
     "AnalystOutput",
     "CrystallizedRequirement",
+    "GapType",
+    "IdentifiedGap",
+    "Severity",
     "analyst_node",
 ]

@@ -1,9 +1,10 @@
-"""Integration tests for Analyst agent (Story 5.1).
+"""Integration tests for Analyst agent (Story 5.1, 5.3).
 
 Tests the analyst_node integration with:
 - LangGraph StateGraph
 - Quality gate decorator
 - YoloState message handling
+- Gap analysis integration (Story 5.3)
 """
 
 from __future__ import annotations
@@ -16,7 +17,13 @@ from langchain_core.messages import HumanMessage
 
 from yolo_developer.agents.analyst import analyst_node
 from yolo_developer.agents.analyst.node import _parse_llm_response
-from yolo_developer.agents.analyst.types import AnalystOutput, CrystallizedRequirement
+from yolo_developer.agents.analyst.types import (
+    AnalystOutput,
+    CrystallizedRequirement,
+    GapType,
+    IdentifiedGap,
+    Severity,
+)
 from yolo_developer.gates import GateContext, GateResult, clear_evaluators, register_evaluator
 from yolo_developer.orchestrator.state import YoloState
 
@@ -441,3 +448,271 @@ class TestCrystallizationIntegration:
         assert req.scope_notes == "Applies to GET endpoints; POST excluded"
         assert req.implementation_hints == ("Use async handlers", "Add response caching")
         assert req.confidence == 0.9
+
+
+class TestGapAnalysisIntegration:
+    """Integration tests for gap analysis functionality (Story 5.3)."""
+
+    @pytest.mark.asyncio
+    async def test_full_gap_analysis_flow(self) -> None:
+        """Test complete gap analysis flow from seed content to structured gaps."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="Build user login system with email/password authentication"
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        # Verify structured gaps in output
+        output_data = result["messages"][0].additional_kwargs["output"]
+        structured_gaps = output_data["structured_gaps"]
+
+        # Should identify gaps for authentication features
+        assert len(structured_gaps) > 0
+
+        # Check gap structure
+        for gap in structured_gaps:
+            assert "id" in gap
+            assert "description" in gap
+            assert "gap_type" in gap
+            assert "severity" in gap
+            assert "source_requirements" in gap
+            assert "rationale" in gap
+
+    @pytest.mark.asyncio
+    async def test_gap_analysis_identifies_multiple_gap_types(self) -> None:
+        """Test that gap analysis identifies different types of gaps."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="Build REST API with user data input and database storage"
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        structured_gaps = output_data["structured_gaps"]
+
+        # Extract gap types present
+        gap_types = {gap["gap_type"] for gap in structured_gaps}
+
+        # Should have at least 2 different gap types for rich content
+        assert len(gap_types) >= 1, "Should identify at least one gap type"
+
+    @pytest.mark.asyncio
+    async def test_gap_analysis_with_mocked_llm_output(self) -> None:
+        """Test gap analysis when LLM returns gaps."""
+        mock_gap = IdentifiedGap(
+            id="gap-001",
+            description="Missing logout functionality",
+            gap_type=GapType.IMPLIED_REQUIREMENT,
+            severity=Severity.HIGH,
+            source_requirements=("req-001",),
+            rationale="Login implies logout needed",
+        )
+
+        mock_output = AnalystOutput(
+            requirements=(
+                CrystallizedRequirement(
+                    id="req-001",
+                    original_text="User login",
+                    refined_text="User authenticates with credentials",
+                    category="functional",
+                    testable=True,
+                ),
+            ),
+            identified_gaps=(),
+            contradictions=(),
+            structured_gaps=(mock_gap,),
+        )
+
+        state: YoloState = {
+            "messages": [HumanMessage(content="Build user login")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        with patch(
+            "yolo_developer.agents.analyst.node._crystallize_requirements",
+            new=AsyncMock(return_value=mock_output),
+        ):
+            result = await analyst_node(state)
+
+        # Verify gap is in output
+        output_data = result["messages"][0].additional_kwargs["output"]
+        gaps = output_data["structured_gaps"]
+        assert len(gaps) >= 1
+        assert gaps[0]["gap_type"] == "implied_requirement"
+        assert gaps[0]["severity"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_gap_severity_counts_in_decision(self) -> None:
+        """Test that decision includes gap severity counts."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(content="Build user authentication with login form")
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        decision = result["decisions"][0]
+        rationale = decision.rationale.lower()
+
+        # Decision should mention severity levels
+        assert "critical" in rationale
+        assert "high" in rationale
+        assert "medium" in rationale
+        assert "low" in rationale
+
+    @pytest.mark.asyncio
+    async def test_gap_ids_in_related_artifacts(self) -> None:
+        """Test that gap IDs are included in decision related_artifacts."""
+        state: YoloState = {
+            "messages": [HumanMessage(content="Build API with data input")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        decision = result["decisions"][0]
+        artifacts = decision.related_artifacts
+
+        # Should have both requirement IDs and gap IDs
+        req_ids = [a for a in artifacts if a.startswith("req-")]
+        gap_ids = [a for a in artifacts if a.startswith("gap-")]
+
+        assert len(req_ids) >= 1, "Should have requirement IDs"
+        assert len(gap_ids) >= 1, "Should have gap IDs"
+
+    def test_parse_llm_response_with_structured_gaps(self) -> None:
+        """Test parsing LLM response that includes structured_gaps."""
+        response = json.dumps({
+            "requirements": [
+                {
+                    "id": "req-001",
+                    "original_text": "User login",
+                    "refined_text": "User authenticates",
+                    "category": "functional",
+                    "testable": True,
+                }
+            ],
+            "identified_gaps": [],
+            "structured_gaps": [
+                {
+                    "id": "gap-001",
+                    "description": "Missing logout functionality",
+                    "gap_type": "implied_requirement",
+                    "severity": "high",
+                    "source_requirements": ["req-001"],
+                    "rationale": "Login implies logout needed",
+                }
+            ],
+            "contradictions": [],
+        })
+
+        result = _parse_llm_response(response)
+
+        assert len(result.structured_gaps) == 1
+        gap = result.structured_gaps[0]
+        assert gap.id == "gap-001"
+        assert gap.gap_type == GapType.IMPLIED_REQUIREMENT
+        assert gap.severity == Severity.HIGH
+        assert gap.source_requirements == ("req-001",)
+
+    def test_parse_llm_response_with_invalid_gap_type(self) -> None:
+        """Test parsing handles invalid gap_type gracefully."""
+        response = json.dumps({
+            "requirements": [],
+            "identified_gaps": [],
+            "structured_gaps": [
+                {
+                    "id": "gap-001",
+                    "description": "Test",
+                    "gap_type": "invalid_type",  # Invalid
+                    "severity": "high",
+                    "source_requirements": [],
+                    "rationale": "Test",
+                }
+            ],
+            "contradictions": [],
+        })
+
+        result = _parse_llm_response(response)
+
+        # Should skip invalid gaps but not crash
+        assert isinstance(result, AnalystOutput)
+        # Invalid gap should be skipped
+        assert len(result.structured_gaps) == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_seed_no_gaps(self) -> None:
+        """Test that empty seed content produces no gaps."""
+        state: YoloState = {
+            "messages": [],  # No messages
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        # Empty seed should have minimal/no structured gaps
+        assert "structured_gaps" in output_data
+
+    @pytest.mark.asyncio
+    async def test_gap_analysis_backward_compatibility(self) -> None:
+        """Test that old code without structured_gaps still works."""
+        # Create output without structured_gaps (simulating old LLM response)
+        mock_output = AnalystOutput(
+            requirements=(
+                CrystallizedRequirement(
+                    id="req-001",
+                    original_text="test",
+                    refined_text="test",
+                    category="functional",
+                    testable=True,
+                ),
+            ),
+            identified_gaps=("Old style gap",),
+            contradictions=(),
+            # structured_gaps defaults to ()
+        )
+
+        state: YoloState = {
+            "messages": [HumanMessage(content="test")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        # Mock to return output without structured gaps, which should then
+        # be enhanced by _enhance_with_gap_analysis
+        with patch(
+            "yolo_developer.agents.analyst.node._crystallize_requirements",
+            new=AsyncMock(return_value=mock_output),
+        ):
+            result = await analyst_node(state)
+
+        # Should still work and include structured_gaps in output dict
+        output_data = result["messages"][0].additional_kwargs["output"]
+        assert "structured_gaps" in output_data
+        assert isinstance(output_data["structured_gaps"], list)

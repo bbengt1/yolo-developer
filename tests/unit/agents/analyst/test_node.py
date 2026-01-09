@@ -1,6 +1,7 @@
-"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2).
+"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3).
 
-Tests for analyst_node function, state management, and vague term detection.
+Tests for analyst_node function, state management, vague term detection,
+and gap analysis functions.
 """
 
 from __future__ import annotations
@@ -11,8 +12,19 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from yolo_developer.agents.analyst import analyst_node
-from yolo_developer.agents.analyst.node import _detect_vague_terms
-from yolo_developer.agents.analyst.types import AnalystOutput, CrystallizedRequirement
+from yolo_developer.agents.analyst.node import (
+    _detect_vague_terms,
+    _enhance_with_gap_analysis,
+    _identify_edge_cases,
+    _identify_implied_requirements,
+    _suggest_from_patterns,
+)
+from yolo_developer.agents.analyst.types import (
+    AnalystOutput,
+    CrystallizedRequirement,
+    GapType,
+    Severity,
+)
 from yolo_developer.orchestrator.state import YoloState
 
 
@@ -492,3 +504,476 @@ class TestPromptAliases:
         # Aliases should point to the same prompts
         assert REFINEMENT_SYSTEM_PROMPT is ANALYST_SYSTEM_PROMPT
         assert REFINEMENT_USER_PROMPT_TEMPLATE is ANALYST_USER_PROMPT_TEMPLATE
+
+
+class TestEdgeCaseDetection:
+    """Tests for _identify_edge_cases function (Story 5.3)."""
+
+    def test_detects_input_validation_edge_cases(self) -> None:
+        """Should detect edge cases for input-related requirements."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User can submit form data",
+                refined_text="User submits form with required fields",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_edge_cases(reqs)
+
+        assert len(gaps) > 0
+        assert all(gap.gap_type == GapType.EDGE_CASE for gap in gaps)
+        # Should detect empty input handling
+        descriptions = [g.description.lower() for g in gaps]
+        assert any("empty" in d or "null" in d for d in descriptions)
+
+    def test_detects_api_error_edge_cases(self) -> None:
+        """Should detect edge cases for API-related requirements."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Call external API",
+                refined_text="Integrate with payment service API",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_edge_cases(reqs)
+
+        assert len(gaps) > 0
+        # Should detect network/timeout error handling
+        descriptions = [g.description.lower() for g in gaps]
+        assert any("network" in d or "timeout" in d for d in descriptions)
+
+    def test_edge_cases_have_source_requirements(self) -> None:
+        """Each edge case should link to source requirement."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User enters data",
+                refined_text="User provides input",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_edge_cases(reqs)
+
+        for gap in gaps:
+            assert len(gap.source_requirements) > 0
+            assert "req-001" in gap.source_requirements
+
+    def test_edge_cases_have_severity(self) -> None:
+        """Each edge case should have a severity assigned."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User submits request",
+                refined_text="API request handling",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_edge_cases(reqs)
+
+        for gap in gaps:
+            assert gap.severity in [
+                Severity.CRITICAL,
+                Severity.HIGH,
+                Severity.MEDIUM,
+                Severity.LOW,
+            ]
+
+    def test_empty_requirements_returns_empty(self) -> None:
+        """Empty requirements should return empty gaps."""
+        gaps = _identify_edge_cases(())
+        assert gaps == ()
+
+
+class TestImpliedRequirementDetection:
+    """Tests for _identify_implied_requirements function (Story 5.3)."""
+
+    def test_login_implies_logout(self) -> None:
+        """Login requirement should imply logout functionality."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User can login to the system",
+                refined_text="User authenticates with email/password",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_implied_requirements(reqs)
+
+        assert len(gaps) > 0
+        assert all(gap.gap_type == GapType.IMPLIED_REQUIREMENT for gap in gaps)
+        descriptions = [g.description.lower() for g in gaps]
+        assert any("logout" in d for d in descriptions)
+
+    def test_save_implies_failure_handling(self) -> None:
+        """Save operations should imply failure handling."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User can save their work",
+                refined_text="Data is persisted to storage",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_implied_requirements(reqs)
+
+        descriptions = [g.description.lower() for g in gaps]
+        assert any("failure" in d or "warning" in d for d in descriptions)
+
+    def test_delete_implies_confirmation(self) -> None:
+        """Delete operations should imply confirmation."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User can delete items",
+                refined_text="Items can be removed from the system",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_implied_requirements(reqs)
+
+        descriptions = [g.description.lower() for g in gaps]
+        assert any("confirmation" in d or "undo" in d for d in descriptions)
+
+    def test_implied_requirements_include_rationale(self) -> None:
+        """Implied requirements should have rationale."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login feature",
+                refined_text="Authentication system",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_implied_requirements(reqs)
+
+        for gap in gaps:
+            assert gap.rationale
+            assert len(gap.rationale) > 10  # Non-trivial rationale
+
+    def test_no_duplicates_across_requirements(self) -> None:
+        """Same implied requirement should not be duplicated."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login",
+                refined_text="Login functionality",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Admin login",
+                refined_text="Admin authentication",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _identify_implied_requirements(reqs)
+
+        descriptions = [g.description.lower() for g in gaps]
+        # Logout should only appear once
+        logout_count = sum(1 for d in descriptions if "logout" in d)
+        assert logout_count <= 1
+
+
+class TestPatternSuggestions:
+    """Tests for _suggest_from_patterns function (Story 5.3)."""
+
+    def test_auth_domain_suggests_patterns(self) -> None:
+        """Authentication requirements should suggest auth patterns."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User authentication",
+                refined_text="Users authenticate with credentials",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _suggest_from_patterns(reqs)
+
+        assert len(gaps) > 0
+        assert all(gap.gap_type == GapType.PATTERN_SUGGESTION for gap in gaps)
+        descriptions = [g.description.lower() for g in gaps]
+        # Should suggest common auth patterns
+        assert any(
+            pattern in " ".join(descriptions)
+            for pattern in ["registration", "mfa", "lockout", "reset"]
+        )
+
+    def test_crud_domain_suggests_patterns(self) -> None:
+        """CRUD operations should suggest CRUD patterns."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Create new records",
+                refined_text="Users can create data entries",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _suggest_from_patterns(reqs)
+
+        descriptions = [g.description.lower() for g in gaps]
+        # Should suggest CRUD patterns like pagination, filtering
+        assert any(
+            pattern in " ".join(descriptions)
+            for pattern in ["pagination", "filter", "delete", "update"]
+        )
+
+    def test_api_domain_suggests_patterns(self) -> None:
+        """API requirements should suggest API patterns."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Build REST API",
+                refined_text="Implement RESTful endpoints",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _suggest_from_patterns(reqs)
+
+        descriptions = [g.description.lower() for g in gaps]
+        # Should suggest API patterns
+        assert any(
+            pattern in " ".join(descriptions)
+            for pattern in ["rate", "version", "error", "validation"]
+        )
+
+    def test_pattern_suggestions_include_domain(self) -> None:
+        """Pattern suggestions should reference domain in rationale."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login",
+                refined_text="Authentication feature",
+                category="functional",
+                testable=True,
+            ),
+        )
+
+        gaps = _suggest_from_patterns(reqs)
+
+        for gap in gaps:
+            assert "domain" in gap.rationale.lower() or "pattern" in gap.rationale.lower()
+
+
+class TestGapAnalysisIntegration:
+    """Integration tests for gap analysis in crystallize_requirements (Story 5.3)."""
+
+    @pytest.mark.asyncio
+    async def test_placeholder_generates_structured_gaps(self) -> None:
+        """Placeholder crystallization should generate structured gaps."""
+        from yolo_developer.agents.analyst.node import _crystallize_requirements
+
+        result = await _crystallize_requirements("Build user login system")
+
+        assert len(result.structured_gaps) > 0
+        # Should have different gap types
+        gap_types = {g.gap_type for g in result.structured_gaps}
+        assert len(gap_types) >= 1
+
+    @pytest.mark.asyncio
+    async def test_gaps_are_sorted_by_severity(self) -> None:
+        """Structured gaps should be sorted by severity (critical first)."""
+        from yolo_developer.agents.analyst.node import _crystallize_requirements
+
+        result = await _crystallize_requirements(
+            "Build user authentication system with login and API endpoints"
+        )
+
+        if len(result.structured_gaps) > 1:
+            severity_order = {
+                Severity.CRITICAL: 0,
+                Severity.HIGH: 1,
+                Severity.MEDIUM: 2,
+                Severity.LOW: 3,
+            }
+            for i in range(len(result.structured_gaps) - 1):
+                current = severity_order[result.structured_gaps[i].severity]
+                next_severity = severity_order[result.structured_gaps[i + 1].severity]
+                assert current <= next_severity
+
+    @pytest.mark.asyncio
+    async def test_gaps_have_valid_ids(self) -> None:
+        """Structured gaps should have valid gap IDs."""
+        from yolo_developer.agents.analyst.node import _crystallize_requirements
+
+        result = await _crystallize_requirements("Build API with user data")
+
+        # All gaps should have IDs matching gap-XXX pattern
+        for gap in result.structured_gaps:
+            assert gap.id.startswith("gap-")
+            assert len(gap.id) == 7  # gap-001, gap-002, etc.
+
+    @pytest.mark.asyncio
+    async def test_analyst_node_includes_gap_analysis(self) -> None:
+        """analyst_node should include gap analysis in output."""
+        state: YoloState = {
+            "messages": [HumanMessage(content="Build user login feature")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        # Check message additional_kwargs contains structured gaps in output
+        # Metadata is spread directly into additional_kwargs, so "output" key exists
+        msg = result["messages"][0]
+        output_data = msg.additional_kwargs["output"]
+        assert "structured_gaps" in output_data
+        assert len(output_data["structured_gaps"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_decision_includes_gap_severity_counts(self) -> None:
+        """Decision rationale should include gap severity counts."""
+        state: YoloState = {
+            "messages": [HumanMessage(content="Build user authentication")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        decision = result["decisions"][0]
+        # Rationale should mention severity counts
+        assert "critical" in decision.rationale.lower()
+        assert "high" in decision.rationale.lower()
+
+
+class TestEnhanceWithGapAnalysis:
+    """Tests for _enhance_with_gap_analysis function (Story 5.3)."""
+
+    def test_enhances_output_with_gaps(self) -> None:
+        """_enhance_with_gap_analysis should add structured_gaps to output."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates with email/password",
+            category="functional",
+            testable=True,
+        )
+        initial_output = AnalystOutput(
+            requirements=(req,),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        assert len(result.structured_gaps) > 0
+        assert result.requirements == initial_output.requirements
+
+    def test_empty_requirements_returns_unchanged(self) -> None:
+        """Empty requirements should return output unchanged."""
+        initial_output = AnalystOutput(
+            requirements=(),
+            identified_gaps=("legacy gap",),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        assert result == initial_output
+        assert len(result.structured_gaps) == 0
+
+    def test_gaps_are_sorted_by_severity_before_numbering(self) -> None:
+        """Gap IDs should be sequential by severity (gap-001 = highest severity)."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Build API with user authentication and database",
+            refined_text="REST API with auth and data storage",
+            category="functional",
+            testable=True,
+        )
+        initial_output = AnalystOutput(
+            requirements=(req,),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        # Verify gaps are sorted by severity
+        if len(result.structured_gaps) > 1:
+            severity_order = {
+                Severity.CRITICAL: 0,
+                Severity.HIGH: 1,
+                Severity.MEDIUM: 2,
+                Severity.LOW: 3,
+            }
+            for i in range(len(result.structured_gaps) - 1):
+                current = severity_order[result.structured_gaps[i].severity]
+                next_sev = severity_order[result.structured_gaps[i + 1].severity]
+                assert current <= next_sev, (
+                    f"Gap {result.structured_gaps[i].id} ({result.structured_gaps[i].severity}) "
+                    f"should come before {result.structured_gaps[i + 1].id} ({result.structured_gaps[i + 1].severity})"
+                )
+
+    def test_gap_ids_are_sequential_after_sorting(self) -> None:
+        """Gap IDs should be gap-001, gap-002, etc. in severity order."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User login with API integration",
+            refined_text="Authentication system with external API",
+            category="functional",
+            testable=True,
+        )
+        initial_output = AnalystOutput(
+            requirements=(req,),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        # Verify IDs are sequential
+        for i, gap in enumerate(result.structured_gaps, start=1):
+            expected_id = f"gap-{i:03d}"
+            assert gap.id == expected_id, f"Expected {expected_id}, got {gap.id}"
+
+    def test_preserves_existing_fields(self) -> None:
+        """Should preserve requirements, identified_gaps, and contradictions."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="test",
+            refined_text="test",
+            category="functional",
+            testable=True,
+        )
+        initial_output = AnalystOutput(
+            requirements=(req,),
+            identified_gaps=("legacy gap 1", "legacy gap 2"),
+            contradictions=("contradiction 1",),
+        )
+
+        result = _enhance_with_gap_analysis(initial_output)
+
+        assert result.requirements == initial_output.requirements
+        assert result.identified_gaps == initial_output.identified_gaps
+        assert result.contradictions == initial_output.contradictions

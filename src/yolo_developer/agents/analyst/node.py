@@ -1,4 +1,4 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
@@ -39,7 +39,13 @@ import structlog
 from langchain_core.messages import BaseMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from yolo_developer.agents.analyst.types import AnalystOutput, CrystallizedRequirement
+from yolo_developer.agents.analyst.types import (
+    AnalystOutput,
+    CrystallizedRequirement,
+    GapType,
+    IdentifiedGap,
+    Severity,
+)
 from yolo_developer.gates import quality_gate
 from yolo_developer.orchestrator.context import Decision
 from yolo_developer.orchestrator.state import YoloState, create_agent_message
@@ -68,6 +74,57 @@ VAGUE_TERMS: frozenset[str] = frozenset([
     "good", "better", "best", "nice", "beautiful",
     "clean", "modern", "robust",
 ])
+
+# Edge case categories to check for each requirement (Story 5.3)
+EDGE_CASE_CATEGORIES: dict[str, list[str]] = {
+    "input_validation": [
+        "Empty/null input handling",
+        "Maximum length exceeded",
+        "Invalid format handling",
+        "Special characters handling",
+        "Unicode/encoding handling",
+    ],
+    "boundary_conditions": [
+        "Zero values",
+        "Negative values",
+        "Maximum integer overflow",
+        "Date boundary handling (leap years, etc.)",
+        "Time zone handling",
+    ],
+    "error_conditions": [
+        "Network failure handling",
+        "Database connection loss",
+        "External service timeout",
+        "Concurrent modification conflicts",
+        "Disk space exhaustion",
+    ],
+    "state_transitions": [
+        "Duplicate submission prevention",
+        "Invalid state transition handling",
+        "Rollback on partial failure",
+        "Recovery from interrupted operations",
+    ],
+}
+
+# Keywords that map requirement content to relevant edge case categories
+EDGE_CASE_KEYWORDS: dict[str, frozenset[str]] = {
+    "input_validation": frozenset([
+        "input", "form", "field", "submit", "enter", "data", "value",
+        "text", "string", "user", "request", "parameter", "argument",
+    ]),
+    "boundary_conditions": frozenset([
+        "number", "count", "limit", "max", "min", "date", "time",
+        "range", "quantity", "amount", "size", "length", "age",
+    ]),
+    "error_conditions": frozenset([
+        "api", "call", "fetch", "request", "network", "database", "db",
+        "connect", "external", "service", "integrate", "http", "remote",
+    ]),
+    "state_transitions": frozenset([
+        "status", "state", "workflow", "process", "step", "transition",
+        "update", "change", "modify", "submit", "save", "transaction",
+    ]),
+}
 
 
 def _detect_vague_terms(text: str) -> set[str]:
@@ -108,6 +165,499 @@ def _detect_vague_terms(text: str) -> set[str]:
                 detected.add(term)
 
     return detected
+
+
+def _identify_edge_cases(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[IdentifiedGap, ...]:
+    """Identify missing edge cases from requirements.
+
+    Analyzes requirements to detect potentially missing edge case handling
+    such as error conditions, boundary values, and input validation.
+
+    Args:
+        requirements: Tuple of crystallized requirements to analyze.
+
+    Returns:
+        Tuple of IdentifiedGap objects for edge cases, sorted by severity.
+
+    Example:
+        >>> reqs = (CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="User can submit form",
+        ...     refined_text="User submits form with validation",
+        ...     category="functional",
+        ...     testable=True,
+        ... ),)
+        >>> gaps = _identify_edge_cases(reqs)
+        >>> any("empty" in g.description.lower() for g in gaps)
+        True
+    """
+    gaps: list[IdentifiedGap] = []
+    gap_counter = 1
+
+    for req in requirements:
+        # Combine original and refined text for analysis
+        text_to_analyze = f"{req.original_text} {req.refined_text}".lower()
+
+        # Check each edge case category
+        for category, keywords in EDGE_CASE_KEYWORDS.items():
+            # Check if any keyword matches
+            matched = any(kw in text_to_analyze for kw in keywords)
+            if not matched:
+                continue
+
+            # Get edge cases for this category
+            edge_cases = EDGE_CASE_CATEGORIES.get(category, [])
+
+            for edge_case in edge_cases:
+                # Check if edge case is already mentioned in requirement
+                edge_case_lower = edge_case.lower()
+                if any(
+                    word in text_to_analyze
+                    for word in edge_case_lower.split()
+                    if len(word) > 4
+                ):
+                    continue
+
+                # Determine severity based on edge case type
+                severity = _assess_edge_case_severity(category, edge_case)
+
+                gap = IdentifiedGap(
+                    id=f"gap-{gap_counter:03d}",
+                    description=f"Missing edge case: {edge_case}",
+                    gap_type=GapType.EDGE_CASE,
+                    severity=severity,
+                    source_requirements=(req.id,),
+                    rationale=(
+                        f"Requirement '{req.id}' involves {category.replace('_', ' ')} "
+                        f"but does not address {edge_case.lower()}"
+                    ),
+                )
+                gaps.append(gap)
+                gap_counter += 1
+
+    # Sort by severity (critical first) and return
+    severity_order = {
+        Severity.CRITICAL: 0,
+        Severity.HIGH: 1,
+        Severity.MEDIUM: 2,
+        Severity.LOW: 3,
+    }
+    gaps.sort(key=lambda g: severity_order.get(g.severity, 4))
+
+    return tuple(gaps)
+
+
+def _assess_edge_case_severity(category: str, edge_case: str) -> Severity:
+    """Assess severity of an edge case based on category and type.
+
+    Args:
+        category: The edge case category (e.g., "error_conditions").
+        edge_case: The specific edge case description.
+
+    Returns:
+        Severity level for the edge case.
+    """
+    edge_case_lower = edge_case.lower()
+
+    # Critical: Security-related or data integrity issues
+    if any(
+        term in edge_case_lower
+        for term in ["overflow", "injection", "unauthorized", "data loss"]
+    ):
+        return Severity.CRITICAL
+
+    # High: Error conditions that could cause system failures
+    if category == "error_conditions":
+        return Severity.HIGH
+
+    # High: State transition issues that could corrupt data
+    if category == "state_transitions" and any(
+        term in edge_case_lower for term in ["rollback", "duplicate", "conflict"]
+    ):
+        return Severity.HIGH
+
+    # Medium: Input validation and boundary conditions
+    if category in ("input_validation", "boundary_conditions"):
+        return Severity.MEDIUM
+
+    # Low: Other edge cases
+    return Severity.LOW
+
+
+# Rules for identifying implied requirements (Story 5.3)
+# Maps trigger keywords to implied requirements with rationale
+IMPLIED_REQUIREMENT_RULES: dict[str, list[tuple[str, str]]] = {
+    # Authentication implies these features
+    "login": [
+        ("Logout functionality", "Login implies users need a way to end their session"),
+        ("Password reset/recovery", "Login implies users may forget credentials"),
+        ("Session management", "Login implies need to track active sessions"),
+    ],
+    "authentication": [
+        ("Logout functionality", "Authentication implies session termination capability"),
+        ("Password policy enforcement", "Authentication implies credential requirements"),
+        ("Failed login handling", "Authentication implies need for security controls"),
+    ],
+    "sign in": [
+        ("Sign out functionality", "Sign in implies users need to sign out"),
+        ("Password recovery", "Sign in implies credential recovery needs"),
+    ],
+    # User management implications
+    "user registration": [
+        ("Email verification", "Registration implies need to verify user identity"),
+        ("Account activation flow", "Registration implies activation process"),
+        ("Duplicate account prevention", "Registration implies uniqueness constraints"),
+    ],
+    "create user": [
+        ("Delete user capability", "User creation implies user deletion"),
+        ("User validation", "User creation implies input validation"),
+    ],
+    "user account": [
+        ("Account deactivation", "Account implies ability to disable"),
+        ("Profile management", "Account implies profile editing"),
+    ],
+    # Data operations implications
+    "save": [
+        ("Unsaved changes warning", "Save implies user should be warned of data loss"),
+        ("Save failure handling", "Save implies recovery from save errors"),
+    ],
+    "delete": [
+        ("Soft delete or undo capability", "Delete implies recovery option"),
+        ("Deletion confirmation", "Delete implies preventing accidental deletion"),
+        ("Cascade handling", "Delete implies handling related data"),
+    ],
+    "upload": [
+        ("File size limits", "Upload implies size constraints"),
+        ("File type validation", "Upload implies format restrictions"),
+        ("Upload progress indication", "Upload implies user feedback"),
+    ],
+    # Communication implications
+    "email": [
+        ("Email delivery verification", "Email implies delivery confirmation"),
+        ("Email bounce handling", "Email implies handling failed delivery"),
+    ],
+    "notification": [
+        ("Notification preferences", "Notifications imply user control over them"),
+        ("Notification history", "Notifications imply record keeping"),
+    ],
+    # Security implications
+    "password": [
+        ("Password strength requirements", "Password implies security policy"),
+        ("Password change capability", "Password implies update functionality"),
+        ("Password history tracking", "Password implies preventing reuse"),
+    ],
+    "permission": [
+        ("Permission denied handling", "Permissions imply access denial response"),
+        ("Permission auditing", "Permissions imply tracking access"),
+    ],
+}
+
+
+def _identify_implied_requirements(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[IdentifiedGap, ...]:
+    """Identify implied but unstated requirements.
+
+    Analyzes requirements to find logically implied requirements that
+    were not explicitly stated, based on common software patterns.
+
+    Args:
+        requirements: Tuple of crystallized requirements to analyze.
+
+    Returns:
+        Tuple of IdentifiedGap objects for implied requirements.
+
+    Example:
+        >>> reqs = (CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="User can login",
+        ...     refined_text="User authenticates with email and password",
+        ...     category="functional",
+        ...     testable=True,
+        ... ),)
+        >>> gaps = _identify_implied_requirements(reqs)
+        >>> any("logout" in g.description.lower() for g in gaps)
+        True
+    """
+    gaps: list[IdentifiedGap] = []
+    gap_counter = 1
+    seen_implications: set[str] = set()
+
+    # Combine all requirement text to check for already-stated requirements
+    all_req_text = " ".join(
+        f"{r.original_text} {r.refined_text}".lower() for r in requirements
+    )
+
+    for req in requirements:
+        text_to_analyze = f"{req.original_text} {req.refined_text}".lower()
+
+        # Check each trigger pattern
+        for trigger, implications in IMPLIED_REQUIREMENT_RULES.items():
+            if trigger not in text_to_analyze:
+                continue
+
+            for implied_desc, rationale in implications:
+                # Skip if already stated in requirements
+                implied_lower = implied_desc.lower()
+                key_words = [w for w in implied_lower.split() if len(w) > 4]
+                if any(word in all_req_text for word in key_words):
+                    continue
+
+                # Skip if we've already suggested this
+                if implied_lower in seen_implications:
+                    continue
+                seen_implications.add(implied_lower)
+
+                # Determine severity based on implied requirement type
+                severity = _assess_implied_severity(implied_desc)
+
+                gap = IdentifiedGap(
+                    id=f"gap-{gap_counter:03d}",
+                    description=f"Implied requirement: {implied_desc}",
+                    gap_type=GapType.IMPLIED_REQUIREMENT,
+                    severity=severity,
+                    source_requirements=(req.id,),
+                    rationale=rationale,
+                )
+                gaps.append(gap)
+                gap_counter += 1
+
+    return tuple(gaps)
+
+
+def _assess_implied_severity(implied_desc: str) -> Severity:
+    """Assess severity of an implied requirement.
+
+    Args:
+        implied_desc: Description of the implied requirement.
+
+    Returns:
+        Severity level for the implied requirement.
+    """
+    desc_lower = implied_desc.lower()
+
+    # Critical: Security-related implications
+    if any(
+        term in desc_lower
+        for term in ["password", "authentication", "security", "permission"]
+    ):
+        return Severity.HIGH
+
+    # High: Core functionality implications
+    if any(
+        term in desc_lower
+        for term in ["logout", "session", "verification", "validation"]
+    ):
+        return Severity.HIGH
+
+    # Medium: User experience implications
+    if any(
+        term in desc_lower
+        for term in ["confirmation", "warning", "preference", "progress"]
+    ):
+        return Severity.MEDIUM
+
+    # Low: Nice-to-have implications
+    return Severity.LOW
+
+
+# Pattern knowledge base for common software domains (Story 5.3)
+DOMAIN_PATTERNS: dict[str, list[tuple[str, str]]] = {
+    "authentication": [
+        ("User registration", "Standard auth requires user signup capability"),
+        ("Password reset/recovery", "Users commonly forget credentials"),
+        ("Session management", "Auth requires tracking active sessions"),
+        ("Logout functionality", "Sessions must be terminable"),
+        ("Multi-factor authentication", "Industry standard for enhanced security"),
+        ("Account lockout after failed attempts", "Prevents brute force attacks"),
+        ("Password strength validation", "Enforces credential security"),
+        ("Remember me functionality", "Common user convenience feature"),
+    ],
+    "authorization": [
+        ("Role-based access control", "Standard pattern for permission management"),
+        ("Permission checking", "Core authorization functionality"),
+        ("Access denied handling", "Must handle unauthorized access attempts"),
+        ("Admin vs user separation", "Common role distinction"),
+        ("Permission audit logging", "Compliance and security tracking"),
+    ],
+    "crud": [
+        ("Create operation", "Standard data operation"),
+        ("Read/retrieve operation", "Standard data operation"),
+        ("Update operation", "Standard data operation"),
+        ("Delete operation", "Standard data operation"),
+        ("List/pagination", "Standard for multiple records"),
+        ("Filtering and search", "Common data discovery feature"),
+        ("Soft delete capability", "Data recovery option"),
+        ("Bulk operations", "Efficiency for multiple records"),
+    ],
+    "api": [
+        ("Error response handling", "Standard API requirement"),
+        ("Input validation", "Security and data integrity"),
+        ("Rate limiting", "Prevents abuse and ensures fair usage"),
+        ("API versioning", "Backward compatibility strategy"),
+        ("Authentication/authorization headers", "API security"),
+        ("Request/response logging", "Debugging and auditing"),
+        ("CORS configuration", "Cross-origin request handling"),
+        ("Health check endpoint", "Monitoring and load balancing"),
+    ],
+    "data": [
+        ("Data validation", "Ensures data integrity"),
+        ("Backup and recovery", "Data protection requirement"),
+        ("Data migration handling", "Schema evolution support"),
+        ("Concurrent access handling", "Multi-user data integrity"),
+        ("Transaction management", "Atomic operations"),
+        ("Data archival strategy", "Long-term data management"),
+    ],
+    "user_interface": [
+        ("Loading states", "User feedback during operations"),
+        ("Error messages", "User communication"),
+        ("Form validation", "Input quality assurance"),
+        ("Responsive design", "Multi-device support"),
+        ("Accessibility features", "Inclusive design"),
+        ("Empty states", "Handling no-data scenarios"),
+    ],
+}
+
+# Keywords to detect domain context from requirements
+DOMAIN_KEYWORDS: dict[str, frozenset[str]] = {
+    "authentication": frozenset([
+        "login", "authenticate", "sign in", "signin", "credential",
+        "password", "auth", "sso", "oauth", "identity",
+    ]),
+    "authorization": frozenset([
+        "permission", "role", "access", "authorize", "privilege",
+        "admin", "rbac", "acl", "policy", "grant",
+    ]),
+    "crud": frozenset([
+        "create", "read", "update", "delete", "list", "get", "post",
+        "put", "patch", "remove", "add", "edit", "modify",
+    ]),
+    "api": frozenset([
+        "api", "endpoint", "rest", "graphql", "request", "response",
+        "http", "webhook", "integration", "service",
+    ]),
+    "data": frozenset([
+        "database", "store", "persist", "query", "record", "entity",
+        "model", "schema", "migration", "backup", "archive",
+    ]),
+    "user_interface": frozenset([
+        "ui", "interface", "form", "button", "page", "screen",
+        "dashboard", "component", "display", "view", "layout",
+    ]),
+}
+
+
+def _suggest_from_patterns(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[IdentifiedGap, ...]:
+    """Suggest missing features based on domain patterns.
+
+    Analyzes requirements to identify domain context and suggests
+    commonly expected features based on industry patterns.
+
+    Args:
+        requirements: Tuple of crystallized requirements to analyze.
+
+    Returns:
+        Tuple of IdentifiedGap objects for pattern-based suggestions.
+
+    Example:
+        >>> reqs = (CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="Build user login system",
+        ...     refined_text="Implement user authentication with email",
+        ...     category="functional",
+        ...     testable=True,
+        ... ),)
+        >>> gaps = _suggest_from_patterns(reqs)
+        >>> any("registration" in g.description.lower() for g in gaps)
+        True
+    """
+    gaps: list[IdentifiedGap] = []
+    gap_counter = 1
+    seen_suggestions: set[str] = set()
+
+    # Detect domains mentioned in requirements
+    all_req_text = " ".join(
+        f"{r.original_text} {r.refined_text}".lower() for r in requirements
+    )
+
+    detected_domains: set[str] = set()
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        if any(kw in all_req_text for kw in keywords):
+            detected_domains.add(domain)
+
+    # For each detected domain, suggest missing patterns
+    for domain in detected_domains:
+        patterns = DOMAIN_PATTERNS.get(domain, [])
+
+        for pattern_desc, explanation in patterns:
+            pattern_lower = pattern_desc.lower()
+
+            # Skip if already covered in requirements
+            key_words = [w for w in pattern_lower.split() if len(w) > 4]
+            if any(word in all_req_text for word in key_words):
+                continue
+
+            # Skip duplicates
+            if pattern_lower in seen_suggestions:
+                continue
+            seen_suggestions.add(pattern_lower)
+
+            # Find source requirement(s) for traceability
+            source_reqs: list[str] = []
+            for req in requirements:
+                req_text = f"{req.original_text} {req.refined_text}".lower()
+                if any(kw in req_text for kw in DOMAIN_KEYWORDS[domain]):
+                    source_reqs.append(req.id)
+            if not source_reqs:
+                source_reqs = [requirements[0].id] if requirements else []
+
+            gap = IdentifiedGap(
+                id=f"gap-{gap_counter:03d}",
+                description=f"Pattern suggestion: {pattern_desc}",
+                gap_type=GapType.PATTERN_SUGGESTION,
+                severity=_assess_pattern_severity(domain, pattern_desc),
+                source_requirements=tuple(source_reqs[:3]),  # Limit to 3 sources
+                rationale=f"Domain: {domain}. {explanation}",
+            )
+            gaps.append(gap)
+            gap_counter += 1
+
+    return tuple(gaps)
+
+
+def _assess_pattern_severity(domain: str, pattern_desc: str) -> Severity:
+    """Assess severity of a pattern-based suggestion.
+
+    Args:
+        domain: The domain category (e.g., "authentication").
+        pattern_desc: Description of the suggested pattern.
+
+    Returns:
+        Severity level for the pattern suggestion.
+    """
+    desc_lower = pattern_desc.lower()
+
+    # High: Security-related patterns
+    if domain in ("authentication", "authorization"):
+        if any(
+            term in desc_lower
+            for term in ["lockout", "mfa", "multi-factor", "permission"]
+        ):
+            return Severity.HIGH
+        return Severity.MEDIUM
+
+    # Medium: Core CRUD and API patterns
+    if domain in ("crud", "api"):
+        if any(term in desc_lower for term in ["validation", "error", "rate"]):
+            return Severity.MEDIUM
+        return Severity.LOW
+
+    # Low: UI and data patterns (nice-to-have)
+    return Severity.LOW
 
 
 @quality_gate("testability", blocking=True)
@@ -154,23 +704,40 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
     # Process requirements using LLM
     output = await _crystallize_requirements(seed_content)
 
-    # Create decision record
+    # Count gaps by severity for decision record
+    severity_counts: dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for gap in output.structured_gaps:
+        severity_counts[gap.severity.value] = severity_counts.get(gap.severity.value, 0) + 1
+
+    # Create decision record with gap analysis details
     decision = Decision(
         agent="analyst",
-        summary=f"Crystallized {len(output.requirements)} requirements",
+        summary=f"Crystallized {len(output.requirements)} requirements, identified {len(output.structured_gaps)} gaps",
         rationale=(
             f"Analyzed seed content and extracted structured requirements. "
-            f"Found {len(output.identified_gaps)} gaps and "
-            f"{len(output.contradictions)} contradictions."
+            f"Gap analysis found: {severity_counts['critical']} critical, "
+            f"{severity_counts['high']} high, {severity_counts['medium']} medium, "
+            f"{severity_counts['low']} low severity gaps. "
+            f"Contradictions: {len(output.contradictions)}."
         ),
-        related_artifacts=tuple(r.id for r in output.requirements),
+        related_artifacts=tuple(r.id for r in output.requirements) + tuple(
+            g.id for g in output.structured_gaps
+        ),
     )
 
     # Create output message with analyst attribution
+    gap_summary = ""
+    if output.structured_gaps:
+        gap_summary = (
+            f" Structured gaps: {len(output.structured_gaps)} "
+            f"({severity_counts['critical']} critical, {severity_counts['high']} high, "
+            f"{severity_counts['medium']} medium, {severity_counts['low']} low)."
+        )
+
     message = create_agent_message(
         content=(
-            f"Analysis complete: {len(output.requirements)} requirements crystallized. "
-            f"Gaps identified: {len(output.identified_gaps)}. "
+            f"Analysis complete: {len(output.requirements)} requirements crystallized."
+            f"{gap_summary} "
             f"Contradictions: {len(output.contradictions)}."
         ),
         agent="analyst",
@@ -181,6 +748,8 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
         "analyst_node_complete",
         requirement_count=len(output.requirements),
         gaps_count=len(output.identified_gaps),
+        structured_gaps_count=len(output.structured_gaps),
+        gap_severity_counts=severity_counts,
         contradictions_count=len(output.contradictions),
     )
 
@@ -265,8 +834,8 @@ def _parse_llm_response(response: str) -> AnalystOutput:
     """Parse LLM JSON response into AnalystOutput.
 
     Attempts to parse the LLM response as JSON and convert it to
-    an AnalystOutput. Handles both legacy format (Story 5.1) and
-    enhanced format with new fields (Story 5.2).
+    an AnalystOutput. Handles legacy format (Story 5.1), enhanced
+    format (Story 5.2), and structured gaps format (Story 5.3).
 
     Args:
         response: The raw LLM response string (expected to be JSON).
@@ -292,10 +861,34 @@ def _parse_llm_response(response: str) -> AnalystOutput:
             for i, req in enumerate(data.get("requirements", []), start=1)
         )
 
+        # Parse structured gaps from Story 5.3 (if present)
+        structured_gaps: tuple[IdentifiedGap, ...] = ()
+        if "structured_gaps" in data:
+            parsed_gaps: list[IdentifiedGap] = []
+            for i, gap_data in enumerate(data.get("structured_gaps", []), start=1):
+                try:
+                    gap = IdentifiedGap(
+                        id=gap_data.get("id", f"gap-{i:03d}"),
+                        description=gap_data.get("description", ""),
+                        gap_type=GapType(gap_data.get("gap_type", "edge_case")),
+                        severity=Severity(gap_data.get("severity", "medium")),
+                        source_requirements=tuple(
+                            gap_data.get("source_requirements", [])
+                        ),
+                        rationale=gap_data.get("rationale", ""),
+                    )
+                    parsed_gaps.append(gap)
+                except (ValueError, KeyError) as gap_err:
+                    logger.warning(
+                        "gap_parse_failed", gap_index=i, error=str(gap_err)
+                    )
+            structured_gaps = tuple(parsed_gaps)
+
         return AnalystOutput(
             requirements=requirements,
             identified_gaps=tuple(data.get("identified_gaps", [])),
             contradictions=tuple(data.get("contradictions", [])),
+            structured_gaps=structured_gaps,
         )
     except (json.JSONDecodeError, KeyError, TypeError) as e:
         logger.warning("llm_response_parse_failed", error=str(e))
@@ -312,12 +905,13 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
     When _USE_LLM is True, calls the LLM to analyze seed content
     and extract structured requirements. Otherwise, returns a
     placeholder output for testing that includes vague term detection.
+    In both cases, runs local gap analysis to enhance results.
 
     Args:
         seed_content: The raw seed document content.
 
     Returns:
-        AnalystOutput with requirements, gaps, and contradictions.
+        AnalystOutput with requirements, gaps, contradictions, and structured_gaps.
     """
     logger.debug("crystallize_requirements_start", seed_length=len(seed_content))
 
@@ -362,6 +956,10 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
                 hint_count=len(req.implementation_hints),
             )
 
+        # Enhance with local gap analysis if LLM didn't produce structured gaps
+        if not output.structured_gaps and output.requirements:
+            output = _enhance_with_gap_analysis(output)
+
         return output
 
     # Placeholder for testing (when LLM is disabled)
@@ -395,8 +993,78 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
         confidence=confidence,
     )
 
-    return AnalystOutput(
+    # Create initial output with placeholder requirement
+    initial_output = AnalystOutput(
         requirements=(placeholder_req,),
         identified_gaps=(),
         contradictions=(),
+    )
+
+    # Run gap analysis on placeholder output
+    return _enhance_with_gap_analysis(initial_output)
+
+
+def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
+    """Enhance AnalystOutput with gap analysis results.
+
+    Runs edge case detection, implied requirement detection, and
+    pattern-based suggestion on the crystallized requirements.
+
+    Args:
+        output: Initial AnalystOutput with requirements.
+
+    Returns:
+        Enhanced AnalystOutput with structured_gaps populated.
+    """
+    if not output.requirements:
+        return output
+
+    # Run all gap analysis functions
+    edge_cases = _identify_edge_cases(output.requirements)
+    implied_reqs = _identify_implied_requirements(output.requirements)
+    pattern_suggestions = _suggest_from_patterns(output.requirements)
+
+    # Combine all gaps
+    all_gaps: list[IdentifiedGap] = []
+    all_gaps.extend(edge_cases)
+    all_gaps.extend(implied_reqs)
+    all_gaps.extend(pattern_suggestions)
+
+    # Sort by severity FIRST (critical -> high -> medium -> low)
+    severity_order = {
+        Severity.CRITICAL: 0,
+        Severity.HIGH: 1,
+        Severity.MEDIUM: 2,
+        Severity.LOW: 3,
+    }
+    all_gaps.sort(key=lambda g: severity_order.get(g.severity, 4))
+
+    # Re-number gap IDs AFTER sorting so IDs are sequential by severity
+    renumbered_gaps: list[IdentifiedGap] = []
+    for i, gap in enumerate(all_gaps, start=1):
+        renumbered_gap = IdentifiedGap(
+            id=f"gap-{i:03d}",
+            description=gap.description,
+            gap_type=gap.gap_type,
+            severity=gap.severity,
+            source_requirements=gap.source_requirements,
+            rationale=gap.rationale,
+        )
+        renumbered_gaps.append(renumbered_gap)
+
+    # Log gap analysis results
+    logger.info(
+        "gap_analysis_complete",
+        edge_cases_count=len(edge_cases),
+        implied_reqs_count=len(implied_reqs),
+        pattern_suggestions_count=len(pattern_suggestions),
+        total_gaps=len(renumbered_gaps),
+    )
+
+    # Create enhanced output with structured gaps
+    return AnalystOutput(
+        requirements=output.requirements,
+        identified_gaps=output.identified_gaps,
+        contradictions=output.contradictions,
+        structured_gaps=tuple(renumbered_gaps),
     )
