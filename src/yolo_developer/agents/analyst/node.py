@@ -56,6 +56,9 @@ logger = structlog.get_logger(__name__)
 # Flag to enable/disable actual LLM calls (for testing)
 _USE_LLM: bool = False
 
+# Maximum number of keywords to show in categorization rationale
+_MAX_RATIONALE_KEYWORDS: int = 5
+
 # Vague terms to detect in requirements (Story 5.2)
 # These patterns indicate ambiguity that needs crystallization
 VAGUE_TERMS: frozenset[str] = frozenset(
@@ -834,6 +837,7 @@ def _assign_sub_category(
     text_lower = text.lower()
 
     # Select the appropriate subcategory keyword mapping
+    subcategory_keywords: dict[str, frozenset[str]]
     if category == RequirementCategory.FUNCTIONAL:
         subcategory_keywords = FUNCTIONAL_SUBCATEGORY_KEYWORDS
     elif category == RequirementCategory.NON_FUNCTIONAL:
@@ -937,17 +941,30 @@ def _categorize_requirement(
     # Build rationale
     rationale_parts = []
 
-    # List matched keywords for winning category
+    # List matched keywords for winning category using word boundary matching
+    # (consistent with _count_keyword_matches)
+    text_lower = text_to_analyze.lower()
     if winning_category == RequirementCategory.FUNCTIONAL:
-        matched_keywords = [kw for kw in FUNCTIONAL_KEYWORDS if kw in text_to_analyze.lower()]
+        keywords_to_check = FUNCTIONAL_KEYWORDS
     elif winning_category == RequirementCategory.NON_FUNCTIONAL:
-        matched_keywords = [kw for kw in NON_FUNCTIONAL_KEYWORDS if kw in text_to_analyze.lower()]
+        keywords_to_check = NON_FUNCTIONAL_KEYWORDS
     else:
-        matched_keywords = [kw for kw in CONSTRAINT_KEYWORDS if kw in text_to_analyze.lower()]
+        keywords_to_check = CONSTRAINT_KEYWORDS
+
+    matched_keywords: list[str] = []
+    for kw in keywords_to_check:
+        if " " in kw:
+            # Multi-word phrase: use substring matching
+            if kw in text_lower:
+                matched_keywords.append(kw)
+        else:
+            # Single word: use word boundary matching
+            pattern = rf"\b{re.escape(kw)}\b"
+            if re.search(pattern, text_lower):
+                matched_keywords.append(kw)
 
     if matched_keywords:
-        # Show up to 5 keywords
-        shown = matched_keywords[:5]
+        shown = matched_keywords[:_MAX_RATIONALE_KEYWORDS]
         rationale_parts.append(f"Keywords: {', '.join(repr(k) for k in shown)}")
 
     rationale_parts.append(

@@ -138,6 +138,13 @@ class CategorizationResult:
     requirement, including primary category, sub-category, confidence
     score, and rationale for audit trail.
 
+    Note:
+        This type is exported for external API consumers who may want to
+        represent categorization results separately from requirements.
+        Internally, categorization is embedded directly into
+        CrystallizedRequirement fields (sub_category, category_confidence,
+        category_rationale) for convenience.
+
     Attributes:
         category: Primary category (RequirementCategory enum).
         sub_category: Optional sub-category string (e.g., "user_management").
