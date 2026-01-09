@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4, 6.5).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4, 6.5, 6.6).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -10,6 +10,7 @@ Key Concepts:
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
 - **LLM-Powered**: Uses LLM for story extraction and AC generation (Story 6.2)
+- **Epic Breakdown**: Large stories are broken into smaller sub-stories (Story 6.6)
 - **Dependency Analysis**: Stories are analyzed for dependencies (Story 6.5)
 - **Prioritization**: Stories are prioritized by value and dependencies (Story 6.4)
 
@@ -43,6 +44,7 @@ from typing import Any
 
 import structlog
 
+from yolo_developer.agents.pm.breakdown import _process_epic_breakdowns
 from yolo_developer.agents.pm.dependencies import (
     _update_stories_with_dependencies,
     analyze_dependencies,
@@ -348,6 +350,27 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
 
     # Transform requirements to stories using LLM-powered transformation
     stories, unprocessed_reqs = await _transform_requirements_to_stories(requirements)
+    original_story_count = len(stories)
+
+    # Break down large stories (Story 6.6)
+    # This must happen BEFORE dependency analysis so sub-stories get proper dependency mapping
+    stories, breakdown_results = await _process_epic_breakdowns(stories)
+
+    # Build breakdown summary
+    breakdown_summary = ""
+    if breakdown_results:
+        broken_down_ids = [r["original_story_id"] for r in breakdown_results]
+        total_sub_stories = sum(len(r["sub_stories"]) for r in breakdown_results)
+        breakdown_summary = (
+            f"Epic breakdown: {len(breakdown_results)} stories broken into {total_sub_stories} sub-stories "
+            f"(originals: {', '.join(broken_down_ids)})"
+        )
+        logger.info(
+            "pm_epic_breakdown_complete",
+            breakdown_count=len(breakdown_results),
+            original_story_count=original_story_count,
+            final_story_count=len(stories),
+        )
 
     # Analyze dependencies (Story 6.5)
     dependency_result: DependencyAnalysisResult = await analyze_dependencies(stories)
@@ -414,13 +437,17 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         else None,
     )
 
-    # Build processing notes with validation, dependency, and prioritization summaries
+    # Build processing notes with breakdown, validation, dependency, and prioritization summaries
     processing_notes_parts = [
-        f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
+        f"Transformed {len(requirements)} requirements into {original_story_count} stories using LLM analysis",
+    ]
+    if breakdown_summary:
+        processing_notes_parts.append(breakdown_summary)
+    processing_notes_parts.extend([
         f"Dependencies: {dependency_summary}",
         validation_summary,
         f"Prioritization: {prioritization_summary}",
-    ]
+    ])
 
     # Create PM output
     output = PMOutput(
@@ -431,13 +458,18 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     )
 
     # Create decision record for audit trail with transformation details
+    breakdown_rationale = ""
+    if breakdown_results:
+        breakdown_rationale = f" {breakdown_summary}."
+
     decision = Decision(
         agent="pm",
         summary=f"Created {output.story_count} stories from {len(requirements)} requirements",
         rationale=(
             f"Requirements transformed using LLM-powered story extraction. "
             f"Constraint requirements ({len(unprocessed_reqs)}) tracked separately. "
-            f"Each story includes role, action, benefit, and acceptance criteria. "
+            f"Each story includes role, action, benefit, and acceptance criteria."
+            f"{breakdown_rationale} "
             f"Dependencies: {dependency_summary}. "
             f"{validation_summary}. "
             f"Prioritization: {prioritization_summary}"
@@ -458,10 +490,16 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     if dependency_result["has_cycles"]:
         dep_cycle_warning = f" (WARNING: {len(dependency_result['cycles'])} cycle(s))"
 
+    # Build breakdown line for message
+    breakdown_line = ""
+    if breakdown_results:
+        breakdown_line = f"- Epic breakdowns: {len(breakdown_results)} stories broken down\n"
+
     message = create_agent_message(
         content=(
             f"PM processing complete.\n"
             f"- Stories created: {output.story_count}\n"
+            f"{breakdown_line}"
             f"- Dependencies found: {dep_edge_count}{dep_cycle_warning}\n"
             f"- Critical path length: {dependency_result['critical_path_length']}\n"
             f"- Unprocessed requirements: {len(unprocessed_reqs)}\n"
@@ -485,4 +523,5 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         "pm_output": output.to_dict(),
         "dependency_analysis_result": dependency_result,
         "prioritization_result": prioritization_result,
+        "breakdown_results": breakdown_results,
     }

@@ -1,4 +1,4 @@
-"""Type definitions for PM agent (Story 6.1, 6.3, 6.4, 6.5).
+"""Type definitions for PM agent (Story 6.1, 6.3, 6.4, 6.5, 6.6).
 
 This module provides the data types used by the PM agent:
 
@@ -14,6 +14,8 @@ This module provides the data types used by the PM agent:
 - DependencyEdge: A single edge in the dependency graph (Story 6.5)
 - DependencyGraph: Graph representation of story dependencies (Story 6.5)
 - DependencyAnalysisResult: Complete dependency analysis result (Story 6.5)
+- CoverageMapping: Mapping of original AC to covering sub-stories (Story 6.6)
+- EpicBreakdownResult: Result of breaking down a large story (Story 6.6)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -543,3 +545,57 @@ class DependencyAnalysisResult(TypedDict):
     critical_path_length: int
     has_cycles: bool
     analysis_notes: str
+
+
+class CoverageMapping(TypedDict):
+    """Mapping of original requirement aspects to covering sub-stories (Story 6.6).
+
+    TypedDict tracking how sub-stories cover the original story's acceptance criteria
+    during epic breakdown. Used to ensure full requirement coverage.
+
+    Fields:
+        original_ac_id: The ID of the original acceptance criterion being tracked.
+        covering_story_ids: List of sub-story IDs that cover this AC.
+        is_covered: True if at least one sub-story addresses this AC.
+
+    Example:
+        >>> mapping: CoverageMapping = {
+        ...     "original_ac_id": "AC1",
+        ...     "covering_story_ids": ["story-001.1", "story-001.2"],
+        ...     "is_covered": True,
+        ... }
+    """
+
+    original_ac_id: str
+    covering_story_ids: list[str]
+    is_covered: bool
+
+
+class EpicBreakdownResult(TypedDict):
+    """Result of breaking down a large story into sub-stories (Story 6.6).
+
+    TypedDict containing the complete results of epic breakdown analysis,
+    including generated sub-stories, coverage validation, and rationale.
+
+    Fields:
+        original_story_id: ID of the story that was broken down.
+        sub_stories: Tuple of generated sub-Story objects.
+        coverage_mappings: List of CoverageMapping showing how ACs are covered.
+        breakdown_rationale: Human-readable explanation of why/how breakdown occurred.
+        is_valid: True if all original ACs are covered by sub-stories.
+
+    Example:
+        >>> result: EpicBreakdownResult = {
+        ...     "original_story_id": "story-001",
+        ...     "sub_stories": (sub_story_1, sub_story_2),
+        ...     "coverage_mappings": [{"original_ac_id": "AC1", ...}],
+        ...     "breakdown_rationale": "Story had 6 ACs and XL complexity",
+        ...     "is_valid": True,
+        ... }
+    """
+
+    original_story_id: str
+    sub_stories: tuple[Story, ...]
+    coverage_mappings: list[CoverageMapping]
+    breakdown_rationale: str
+    is_valid: bool
