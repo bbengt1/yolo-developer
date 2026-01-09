@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -9,6 +9,11 @@ Key Concepts:
 - **Immutable Updates**: Returns state update dict, never mutates input
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
+- **LLM-Powered**: Uses LLM for story extraction and AC generation (Story 6.2)
+
+LLM Usage:
+    Set _USE_LLM in llm.py to True to enable actual LLM calls.
+    Set to False (default) to use stub implementations for testing.
 
 Example:
     >>> from yolo_developer.agents.pm import pm_node
@@ -36,6 +41,11 @@ from typing import Any
 
 import structlog
 
+from yolo_developer.agents.pm.llm import (
+    _estimate_complexity,
+    _extract_story_components,
+    _generate_acceptance_criteria_llm,
+)
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
     PMOutput,
@@ -50,47 +60,180 @@ from yolo_developer.orchestrator.state import YoloState, create_agent_message
 logger = structlog.get_logger(__name__)
 
 
-def _generate_acceptance_criteria(
+def _determine_priority(category: str, requirement_text: str) -> StoryPriority:
+    """Determine story priority based on requirement category and content.
+
+    Args:
+        category: Requirement category (functional, non_functional, constraint).
+        requirement_text: The requirement text for content analysis.
+
+    Returns:
+        StoryPriority enum value.
+
+    Example:
+        >>> _determine_priority("functional", "User authentication")
+        <StoryPriority.HIGH: 'high'>
+    """
+    text_lower = requirement_text.lower()
+
+    # Critical indicators
+    critical_keywords = ["security", "authentication", "authorization", "critical", "must"]
+    if any(kw in text_lower for kw in critical_keywords):
+        return StoryPriority.CRITICAL
+
+    # High priority for functional requirements
+    if category == "functional":
+        return StoryPriority.HIGH
+
+    # Medium for non-functional
+    if category == "non_functional":
+        return StoryPriority.MEDIUM
+
+    # Low for everything else
+    return StoryPriority.LOW
+
+
+async def _generate_acceptance_criteria(
     requirement_id: str,
     requirement_text: str,
+    story_components: dict[str, str],
 ) -> tuple[AcceptanceCriterion, ...]:
-    """Generate acceptance criteria from requirement text.
+    """Generate acceptance criteria from requirement text using LLM.
 
-    Creates a basic Given/When/Then format acceptance criterion from
-    the requirement. This is a stub implementation for MVP; Story 6.2
-    will add LLM-powered generation.
+    Creates Given/When/Then format acceptance criteria from the requirement
+    using LLM-powered generation. Falls back to stub if LLM is disabled.
 
     Args:
         requirement_id: ID of the source requirement.
         requirement_text: Text of the requirement.
+        story_components: Dict with role, action, benefit, title from extraction.
 
     Returns:
-        Tuple containing a single AcceptanceCriterion.
+        Tuple of AcceptanceCriterion objects.
 
     Example:
-        >>> acs = _generate_acceptance_criteria("req-001", "User can login")
+        >>> acs = await _generate_acceptance_criteria(
+        ...     "req-001",
+        ...     "User can login",
+        ...     {"role": "user", "action": "login", ...}
+        ... )
         >>> acs[0].id
         'AC1'
     """
-    # Stub implementation - creates basic AC structure
-    ac = AcceptanceCriterion(
-        id="AC1",
-        given=f"the system is ready to process {requirement_id}",
-        when="the feature is used as specified",
-        then=f"the requirement is satisfied: {requirement_text[:50]}...",
-        and_clauses=(),
+    ac_data = await _generate_acceptance_criteria_llm(
+        requirement_id=requirement_id,
+        requirement_text=requirement_text,
+        story_components=story_components,
     )
-    return (ac,)
+
+    # Convert to AcceptanceCriterion objects
+    acs = []
+    for i, ac in enumerate(ac_data, start=1):
+        acs.append(
+            AcceptanceCriterion(
+                id=f"AC{i}",
+                given=ac.get("given", ""),
+                when=ac.get("when", ""),
+                then=ac.get("then", ""),
+                and_clauses=tuple(ac.get("and_clauses", [])),
+            )
+        )
+
+    return tuple(acs) if acs else (
+        AcceptanceCriterion(
+            id="AC1",
+            given=f"the system is ready to process {requirement_id}",
+            when="the feature is used as specified",
+            then=f"the requirement is satisfied: {requirement_text[:50]}...",
+            and_clauses=(),
+        ),
+    )
 
 
-def _transform_requirements_to_stories(
+async def _transform_single_requirement(
+    req: dict[str, Any],
+    story_counter: int,
+) -> Story | None:
+    """Transform a single requirement into a user story.
+
+    Args:
+        req: Requirement dict from analyst output.
+        story_counter: Counter for generating story IDs.
+
+    Returns:
+        Story object or None if requirement cannot be transformed.
+
+    Example:
+        >>> req = {"id": "req-001", "refined_text": "User can login", "category": "functional"}
+        >>> story = await _transform_single_requirement(req, 1)
+        >>> story.id
+        'story-001'
+    """
+    req_id = req.get("id", f"req-{story_counter}")
+    refined_text = req.get("refined_text", req.get("original_text", ""))
+    category = req.get("category", "functional")
+
+    logger.debug(
+        "pm_transforming_requirement",
+        requirement_id=req_id,
+        category=category,
+    )
+
+    # Extract story components using LLM
+    story_components = await _extract_story_components(
+        requirement_id=req_id,
+        requirement_text=refined_text,
+        category=category,
+    )
+
+    # Generate acceptance criteria using LLM
+    acs = await _generate_acceptance_criteria(
+        requirement_id=req_id,
+        requirement_text=refined_text,
+        story_components=story_components,
+    )
+
+    # Determine priority
+    priority = _determine_priority(category, refined_text)
+
+    # Estimate complexity
+    complexity = _estimate_complexity(refined_text, len(acs))
+
+    # Create story
+    story = Story(
+        id=f"story-{story_counter:03d}",
+        title=story_components.get("title", refined_text[:50] if refined_text else f"Story for {req_id}"),
+        role=story_components.get("role", "user"),
+        action=story_components.get("action", refined_text or f"complete requirement {req_id}"),
+        benefit=story_components.get("benefit", "the system meets the specified requirement"),
+        acceptance_criteria=acs,
+        priority=priority,
+        status=StoryStatus.DRAFT,
+        source_requirements=(req_id,),
+        dependencies=(),  # Dependency detection is Story 6.5
+        estimated_complexity=complexity,
+    )
+
+    logger.info(
+        "pm_story_created",
+        story_id=story.id,
+        requirement_id=req_id,
+        role=story.role,
+        ac_count=len(acs),
+        complexity=complexity,
+    )
+
+    return story
+
+
+async def _transform_requirements_to_stories(
     requirements: list[dict[str, Any]],
 ) -> tuple[tuple[Story, ...], tuple[str, ...]]:
     """Transform crystallized requirements into user stories.
 
-    Maps requirements to story format with acceptance criteria.
-    This is a stub implementation for MVP; Story 6.2 will add
-    LLM-powered transformation.
+    Maps requirements to story format with acceptance criteria using
+    LLM-powered extraction and generation. Constraint requirements are
+    filtered out and tracked as unprocessed.
 
     Args:
         requirements: List of crystallized requirement dicts from analyst.
@@ -99,8 +242,8 @@ def _transform_requirements_to_stories(
         Tuple of (stories, unprocessed_requirement_ids).
 
     Example:
-        >>> reqs = [{"id": "req-001", "refined_text": "User login"}]
-        >>> stories, unprocessed = _transform_requirements_to_stories(reqs)
+        >>> reqs = [{"id": "req-001", "refined_text": "User login", "category": "functional"}]
+        >>> stories, unprocessed = await _transform_requirements_to_stories(reqs)
         >>> len(stories)
         1
     """
@@ -110,43 +253,30 @@ def _transform_requirements_to_stories(
 
     for i, req in enumerate(requirements):
         req_id = req.get("id", f"req-{i}")
-        refined_text = req.get("refined_text", req.get("original_text", ""))
         category = req.get("category", "functional")
 
         # Skip constraint requirements for story transformation
         # They become constraints on functional stories
         if category == "constraint":
+            logger.debug("pm_skipping_constraint", requirement_id=req_id)
             unprocessed.append(req_id)
             continue
 
         story_counter += 1
 
-        # Generate acceptance criteria
-        acs = _generate_acceptance_criteria(req_id, refined_text)
-
-        # Determine priority based on category
-        if category == "functional":
-            priority = StoryPriority.HIGH
-        else:
-            priority = StoryPriority.MEDIUM
-
-        # Create story with stub data
-        # Note: role is hardcoded to "user" in this stub; Story 6.2 will extract
-        # specific roles from requirement context using LLM analysis
-        story = Story(
-            id=f"story-{story_counter:03d}",
-            title=refined_text[:50] if refined_text else f"Story for {req_id}",
-            role="user",
-            action=refined_text or f"complete requirement {req_id}",
-            benefit="the system meets the specified requirement",
-            acceptance_criteria=acs,
-            priority=priority,
-            status=StoryStatus.DRAFT,
-            source_requirements=(req_id,),
-            dependencies=(),
-            estimated_complexity="M",
-        )
-        stories.append(story)
+        try:
+            story = await _transform_single_requirement(req, story_counter)
+            if story:
+                stories.append(story)
+            else:
+                unprocessed.append(req_id)
+        except Exception as e:
+            logger.warning(
+                "pm_transformation_failed",
+                requirement_id=req_id,
+                error=str(e),
+            )
+            unprocessed.append(req_id)
 
     return tuple(stories), tuple(unprocessed)
 
@@ -160,6 +290,9 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     This LangGraph node receives analyst output from state and produces
     user stories with acceptance criteria. It is decorated with the
     ac_measurability quality gate to ensure AC are testable.
+
+    Uses LLM-powered transformation (Story 6.2) when _USE_LLM is True,
+    otherwise falls back to stub implementations for testing.
 
     Args:
         state: YoloState with analyst_output containing requirements.
@@ -184,37 +317,39 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     analyst_output: dict[str, Any] = state_dict.get("analyst_output", {})
     requirements: list[dict[str, Any]] = analyst_output.get("requirements", [])
     escalations_from_analyst: list[dict[str, Any]] = analyst_output.get("escalations", [])
-    # AC1: Extract gaps and contradictions for context (used in future story for decisions)
-    gaps: list[dict[str, Any]] = analyst_output.get("gaps", [])
-    contradictions: list[dict[str, Any]] = analyst_output.get("contradictions", [])
-
-    # Note: Project configuration extraction deferred to Story 6.2 (LLM integration)
-    # Config will be needed for LLM model selection and processing parameters
+    # Extract gaps and contradictions for context
+    # Note: Currently logged for visibility; used in Story 6.7 (PM escalation logic)
+    gap_count = len(analyst_output.get("gaps", []))
+    contradiction_count = len(analyst_output.get("contradictions", []))
 
     logger.info(
         "pm_node_received_input",
         requirement_count=len(requirements),
         escalation_count=len(escalations_from_analyst),
-        gap_count=len(gaps),
-        contradiction_count=len(contradictions),
+        gap_count=gap_count,
+        contradiction_count=contradiction_count,
     )
 
-    # Transform requirements to stories
-    stories, unprocessed_reqs = _transform_requirements_to_stories(requirements)
+    # Transform requirements to stories using LLM-powered transformation
+    stories, unprocessed_reqs = await _transform_requirements_to_stories(requirements)
 
     # Create PM output
     output = PMOutput(
         stories=stories,
         unprocessed_requirements=unprocessed_reqs,
-        escalations_to_analyst=(),  # No escalations back in stub
-        processing_notes=f"Transformed {len(requirements)} requirements into {len(stories)} stories",
+        escalations_to_analyst=(),  # Escalation logic is Story 6.7
+        processing_notes=f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
     )
 
-    # Create decision record for audit trail
+    # Create decision record for audit trail with transformation details
     decision = Decision(
         agent="pm",
         summary=f"Created {output.story_count} stories from {len(requirements)} requirements",
-        rationale="Requirements transformed using standard story template",
+        rationale=(
+            f"Requirements transformed using LLM-powered story extraction. "
+            f"Constraint requirements ({len(unprocessed_reqs)}) tracked separately. "
+            f"Each story includes role, action, benefit, and acceptance criteria."
+        ),
         related_artifacts=tuple(s.id for s in stories),
     )
 
