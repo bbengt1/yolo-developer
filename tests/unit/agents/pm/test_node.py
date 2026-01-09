@@ -1,4 +1,4 @@
-"""Unit tests for PM agent node (Story 6.1 Task 11, Story 6.2, Story 6.3).
+"""Unit tests for PM agent node (Story 6.1 Task 11, Story 6.2, Story 6.3, Story 6.5).
 
 Tests for pm_node function and helper functions.
 """
@@ -676,3 +676,140 @@ class TestPmNode:
 
         message = result["messages"][0]
         assert "Recommended order:" in message.content
+
+    # Story 6.5: Dependency Analysis Integration Tests
+
+    @pytest.mark.asyncio
+    async def test_dependency_analysis_result_included(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """pm_node should include dependency_analysis_result in output (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        assert "dependency_analysis_result" in result
+        dep_result = result["dependency_analysis_result"]
+        assert "graph" in dep_result
+        assert "cycles" in dep_result
+        assert "critical_paths" in dep_result
+        assert "critical_path_length" in dep_result
+        assert "has_cycles" in dep_result
+        assert "analysis_notes" in dep_result
+
+    @pytest.mark.asyncio
+    async def test_dependency_graph_has_correct_structure(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Dependency graph should have correct structure (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        graph = result["dependency_analysis_result"]["graph"]
+        assert "nodes" in graph
+        assert "edges" in graph
+        assert "adjacency_list" in graph
+        assert "reverse_adjacency_list" in graph
+
+    @pytest.mark.asyncio
+    async def test_dependency_nodes_match_stories(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Dependency graph nodes should match story IDs (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        pm_output = result["pm_output"]
+        dep_result = result["dependency_analysis_result"]
+
+        story_ids = {s["id"] for s in pm_output["stories"]}
+        graph_nodes = set(dep_result["graph"]["nodes"])
+
+        assert story_ids == graph_nodes
+
+    @pytest.mark.asyncio
+    async def test_stories_have_dependencies_field_populated(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Stories should have dependencies field after pm_node (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        pm_output = result["pm_output"]
+        for story in pm_output["stories"]:
+            assert "dependencies" in story
+            assert isinstance(story["dependencies"], list)
+
+    @pytest.mark.asyncio
+    async def test_dependency_summary_in_notes(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Processing notes should include dependency summary (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        notes = result["pm_output"]["processing_notes"]
+        assert "Dependencies:" in notes or "dependencies" in notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_dependency_summary_in_decision(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Decision rationale should mention dependencies (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        decision = result["decisions"][0]
+        assert "Dependencies:" in decision.rationale or "dependencies" in decision.rationale.lower()
+
+    @pytest.mark.asyncio
+    async def test_message_includes_dependencies_info(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Message content should mention dependency analysis (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        message = result["messages"][0]
+        assert "Dependencies found:" in message.content
+        assert "Critical path length:" in message.content
+
+    @pytest.mark.asyncio
+    async def test_empty_stories_dependency_analysis(
+        self, empty_state: dict[str, Any]
+    ) -> None:
+        """Dependency analysis should handle empty stories gracefully (Story 6.5)."""
+        empty_state["analyst_output"] = {"requirements": [], "escalations": []}
+
+        result = await pm_node(empty_state)  # type: ignore[arg-type]
+
+        dep_result = result["dependency_analysis_result"]
+        assert dep_result["graph"]["nodes"] == []
+        assert dep_result["graph"]["edges"] == []
+        assert dep_result["cycles"] == []
+        assert dep_result["critical_paths"] == []
+        assert dep_result["critical_path_length"] == 0
+        assert dep_result["has_cycles"] is False
+
+    @pytest.mark.asyncio
+    async def test_no_cycles_in_normal_stories(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Normal stories should not have dependency cycles (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        dep_result = result["dependency_analysis_result"]
+        assert dep_result["has_cycles"] is False
+        assert dep_result["cycles"] == []
+
+    @pytest.mark.asyncio
+    async def test_prioritization_receives_stories_with_dependencies(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Prioritization should run after dependency analysis (Story 6.5)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        # Both should be present and consistent
+        assert "dependency_analysis_result" in result
+        assert "prioritization_result" in result
+
+        # Story count should match between all outputs
+        pm_output = result["pm_output"]
+        dep_result = result["dependency_analysis_result"]
+        prioritization = result["prioritization_result"]
+
+        story_count = pm_output["story_count"]
+        assert len(dep_result["graph"]["nodes"]) == story_count
+        assert len(prioritization["scores"]) == story_count

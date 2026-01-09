@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4, 6.5).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -10,6 +10,7 @@ Key Concepts:
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
 - **LLM-Powered**: Uses LLM for story extraction and AC generation (Story 6.2)
+- **Dependency Analysis**: Stories are analyzed for dependencies (Story 6.5)
 - **Prioritization**: Stories are prioritized by value and dependencies (Story 6.4)
 
 LLM Usage:
@@ -42,6 +43,10 @@ from typing import Any
 
 import structlog
 
+from yolo_developer.agents.pm.dependencies import (
+    _update_stories_with_dependencies,
+    analyze_dependencies,
+)
 from yolo_developer.agents.pm.llm import (
     _estimate_complexity,
     _extract_story_components,
@@ -51,6 +56,7 @@ from yolo_developer.agents.pm.prioritization import prioritize_stories
 from yolo_developer.agents.pm.testability import validate_story_testability
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
+    DependencyAnalysisResult,
     PMOutput,
     PrioritizationResult,
     Story,
@@ -343,6 +349,28 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     # Transform requirements to stories using LLM-powered transformation
     stories, unprocessed_reqs = await _transform_requirements_to_stories(requirements)
 
+    # Analyze dependencies (Story 6.5)
+    dependency_result: DependencyAnalysisResult = await analyze_dependencies(stories)
+
+    # Update stories with their dependencies
+    stories = _update_stories_with_dependencies(stories, dependency_result)
+
+    logger.info(
+        "pm_dependency_analysis_complete",
+        story_count=len(stories),
+        dependency_count=len(dependency_result["graph"]["edges"]),
+        cycle_count=len(dependency_result["cycles"]),
+        critical_path_length=dependency_result["critical_path_length"],
+    )
+
+    # Build dependency summary for notes
+    dependency_summary = dependency_result["analysis_notes"]
+    if dependency_result["has_cycles"]:
+        cycle_stories = set()
+        for cycle in dependency_result["cycles"]:
+            cycle_stories.update(cycle)
+        dependency_summary += f" (ERROR: cycles involving {', '.join(sorted(cycle_stories))})"
+
     # Validate each story's testability (Story 6.3)
     stories_with_issues = 0
     total_vague_terms = 0
@@ -364,7 +392,7 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     else:
         validation_summary = "Testability validation: all stories passed"
 
-    # Prioritize stories (Story 6.4)
+    # Prioritize stories (Story 6.4) - now with dependency info populated
     prioritization_result: PrioritizationResult = prioritize_stories(stories)
 
     # Build prioritization summary
@@ -386,9 +414,10 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         else None,
     )
 
-    # Build processing notes with validation and prioritization summary
+    # Build processing notes with validation, dependency, and prioritization summaries
     processing_notes_parts = [
         f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
+        f"Dependencies: {dependency_summary}",
         validation_summary,
         f"Prioritization: {prioritization_summary}",
     ]
@@ -409,6 +438,7 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
             f"Requirements transformed using LLM-powered story extraction. "
             f"Constraint requirements ({len(unprocessed_reqs)}) tracked separately. "
             f"Each story includes role, action, benefit, and acceptance criteria. "
+            f"Dependencies: {dependency_summary}. "
             f"{validation_summary}. "
             f"Prioritization: {prioritization_summary}"
         ),
@@ -422,10 +452,18 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     else:
         order_summary = ", ".join(recommended_order) if recommended_order else "none"
 
+    # Prepare dependency info for message
+    dep_edge_count = len(dependency_result["graph"]["edges"])
+    dep_cycle_warning = ""
+    if dependency_result["has_cycles"]:
+        dep_cycle_warning = f" (WARNING: {len(dependency_result['cycles'])} cycle(s))"
+
     message = create_agent_message(
         content=(
             f"PM processing complete.\n"
             f"- Stories created: {output.story_count}\n"
+            f"- Dependencies found: {dep_edge_count}{dep_cycle_warning}\n"
+            f"- Critical path length: {dependency_result['critical_path_length']}\n"
             f"- Unprocessed requirements: {len(unprocessed_reqs)}\n"
             f"- Escalations to analyst: {len(output.escalations_to_analyst)}\n"
             f"- Quick wins: {len(prioritization_result['quick_wins'])}\n"
@@ -445,5 +483,6 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         "messages": [message],
         "decisions": [decision],
         "pm_output": output.to_dict(),
+        "dependency_analysis_result": dependency_result,
         "prioritization_result": prioritization_result,
     }

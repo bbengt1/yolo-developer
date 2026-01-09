@@ -1,4 +1,4 @@
-"""Type definitions for PM agent (Story 6.1, 6.3, 6.4).
+"""Type definitions for PM agent (Story 6.1, 6.3, 6.4, 6.5).
 
 This module provides the data types used by the PM agent:
 
@@ -11,6 +11,9 @@ This module provides the data types used by the PM agent:
 - DependencyInfo: Dependency analysis for a single story (Story 6.4)
 - PriorityScore: Priority score breakdown for a single story (Story 6.4)
 - PrioritizationResult: Complete prioritization analysis result (Story 6.4)
+- DependencyEdge: A single edge in the dependency graph (Story 6.5)
+- DependencyGraph: Graph representation of story dependencies (Story 6.5)
+- DependencyAnalysisResult: Complete dependency analysis result (Story 6.5)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -451,4 +454,92 @@ class PrioritizationResult(TypedDict):
     recommended_execution_order: list[str]
     quick_wins: list[str]
     dependency_cycles: list[list[str]]
+    analysis_notes: str
+
+
+class DependencyEdge(TypedDict):
+    """A single edge in the dependency graph (Story 6.5).
+
+    TypedDict representing a directed dependency relationship between two stories.
+    The edge direction is from the dependent story to the story it depends on.
+
+    Fields:
+        from_story_id: The ID of the dependent story (the one that needs another).
+        to_story_id: The ID of the dependency (the story that must be done first).
+        reason: Human-readable explanation of why this dependency exists.
+
+    Example:
+        >>> edge: DependencyEdge = {
+        ...     "from_story_id": "story-002",
+        ...     "to_story_id": "story-001",
+        ...     "reason": "Requires user authentication from story-001",
+        ... }
+    """
+
+    from_story_id: str
+    to_story_id: str
+    reason: str
+
+
+class DependencyGraph(TypedDict):
+    """Graph representation of story dependencies (Story 6.5).
+
+    TypedDict containing the complete dependency graph structure for a set of stories.
+    Supports querying "what does X depend on" via adjacency_list and "what depends on X"
+    via reverse_adjacency_list.
+
+    Fields:
+        nodes: List of all story IDs in the graph.
+        edges: List of DependencyEdge objects representing all dependencies.
+        adjacency_list: Maps story_id -> list of story IDs it depends on.
+        reverse_adjacency_list: Maps story_id -> list of story IDs that depend on it.
+
+    Example:
+        >>> graph: DependencyGraph = {
+        ...     "nodes": ["story-001", "story-002", "story-003"],
+        ...     "edges": [
+        ...         {"from_story_id": "story-002", "to_story_id": "story-001", "reason": "auth"},
+        ...         {"from_story_id": "story-003", "to_story_id": "story-001", "reason": "db"},
+        ...     ],
+        ...     "adjacency_list": {"story-002": ["story-001"], "story-003": ["story-001"]},
+        ...     "reverse_adjacency_list": {"story-001": ["story-002", "story-003"]},
+        ... }
+    """
+
+    nodes: list[str]
+    edges: list[DependencyEdge]
+    adjacency_list: dict[str, list[str]]
+    reverse_adjacency_list: dict[str, list[str]]
+
+
+class DependencyAnalysisResult(TypedDict):
+    """Complete dependency analysis result (Story 6.5).
+
+    TypedDict containing the full results of story dependency analysis,
+    including the dependency graph, detected cycles, and critical path information.
+
+    Fields:
+        graph: The complete DependencyGraph structure.
+        cycles: List of detected cycles, each as a list of story IDs forming the cycle.
+        critical_paths: List of critical paths (all equal-length longest paths per AC4).
+        critical_path_length: Length of the critical path (0 if cycles exist).
+        has_cycles: True if any dependency cycles were detected.
+        analysis_notes: Summary of the dependency analysis.
+
+    Example:
+        >>> result: DependencyAnalysisResult = {
+        ...     "graph": {"nodes": [...], "edges": [...], ...},
+        ...     "cycles": [],
+        ...     "critical_paths": [["story-001", "story-002", "story-003"]],
+        ...     "critical_path_length": 3,
+        ...     "has_cycles": False,
+        ...     "analysis_notes": "Analyzed 5 stories, found 3 dependencies, critical path length: 3",
+        ... }
+    """
+
+    graph: DependencyGraph
+    cycles: list[list[str]]
+    critical_paths: list[list[str]]
+    critical_path_length: int
+    has_cycles: bool
     analysis_notes: str

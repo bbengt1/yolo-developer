@@ -104,7 +104,7 @@ development_status:
   6-2-transform-requirements-to-stories: done
   6-3-ac-testability-validation: done
   6-4-story-prioritization: done
-  6-5-dependency-identification: backlog
+  6-5-dependency-identification: done
   6-6-epic-breakdown: backlog
   6-7-escalation-to-analyst: backlog
   epic-6-retrospective: optional

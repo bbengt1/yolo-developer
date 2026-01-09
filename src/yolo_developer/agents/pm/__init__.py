@@ -1,4 +1,4 @@
-"""PM agent module for story transformation (Story 6.1, 6.3, 6.4).
+"""PM agent module for story transformation (Story 6.1, 6.3, 6.4, 6.5).
 
 The PM agent is responsible for:
 - Transforming crystallized requirements into user stories
@@ -61,11 +61,15 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.pm.dependencies import analyze_dependencies
 from yolo_developer.agents.pm.node import pm_node
 from yolo_developer.agents.pm.prioritization import prioritize_stories
 from yolo_developer.agents.pm.testability import validate_story_testability
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
+    DependencyAnalysisResult,
+    DependencyEdge,
+    DependencyGraph,
     DependencyInfo,
     PMOutput,
     PrioritizationResult,
@@ -78,6 +82,9 @@ from yolo_developer.agents.pm.types import (
 
 __all__ = [
     "AcceptanceCriterion",
+    "DependencyAnalysisResult",
+    "DependencyEdge",
+    "DependencyGraph",
     "DependencyInfo",
     "PMOutput",
     "PrioritizationResult",
@@ -86,6 +93,7 @@ __all__ = [
     "StoryPriority",
     "StoryStatus",
     "TestabilityResult",
+    "analyze_dependencies",
     "pm_node",
     "prioritize_stories",
     "validate_story_testability",
