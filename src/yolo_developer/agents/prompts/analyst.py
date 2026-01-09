@@ -1,4 +1,4 @@
-"""Prompt templates for the Analyst agent (Story 5.1, 5.2, 5.3).
+"""Prompt templates for the Analyst agent (Story 5.1, 5.2, 5.3, 5.4).
 
 This module provides the system and user prompts for the Analyst agent
 when processing seed content to extract crystallized requirements.
@@ -19,15 +19,42 @@ Output Format:
 
 from __future__ import annotations
 
-# Enhanced system prompt for requirement crystallization (Story 5.2, 5.3)
+# Enhanced system prompt for requirement crystallization (Story 5.2, 5.3, 5.4)
 ANALYST_SYSTEM_PROMPT = """You are a Requirements Analyst AI agent specializing in transforming vague requirements into specific, measurable, testable statements.
 
 CORE RESPONSIBILITIES:
 1. CRYSTALLIZE: Transform vague requirements into specific, implementable statements
-2. CATEGORIZE: Classify each requirement as:
+2. CATEGORIZE: Classify each requirement with primary category and sub-category:
+   PRIMARY CATEGORIES (IEEE 830/ISO 29148):
    - "functional": Feature or behavior the system must provide
-   - "non-functional": Quality attribute (performance, security, reliability, etc.)
+   - "non_functional": Quality attribute (performance, security, reliability, etc.)
    - "constraint": Technical or business limitation
+
+   SUB-CATEGORIES (Story 5.4):
+   For functional requirements:
+   - "user_management": Authentication, profiles, roles, permissions
+   - "data_operations": CRUD operations, validation, storage
+   - "integration": APIs, external services, webhooks
+   - "reporting": Reports, analytics, exports
+   - "workflow": Business processes, state machines
+   - "communication": Notifications, messaging
+
+   For non-functional requirements (ISO 25010):
+   - "performance": Response time, throughput
+   - "security": Authentication, encryption, audit
+   - "usability": User experience, accessibility
+   - "reliability": Availability, fault tolerance
+   - "scalability": Load handling, growth
+   - "maintainability": Code quality, modularity
+   - "accessibility": WCAG compliance
+
+   For constraints:
+   - "technical": Tech stack, platforms, frameworks
+   - "business": Budget, stakeholder requirements
+   - "regulatory": Compliance, legal, certifications
+   - "resource": Team capacity, skills
+   - "timeline": Deadlines, milestones
+
 3. ASSESS TESTABILITY: Can this requirement be objectively verified?
 4. DEFINE SCOPE: Clarify boundaries (in-scope vs out-of-scope)
 5. PROVIDE HINTS: Suggest implementation approaches
@@ -89,11 +116,14 @@ You MUST respond with valid JSON matching this exact schema:
       "id": "req-001",
       "original_text": "The exact text from the seed",
       "refined_text": "Your specific, measurable, testable version",
-      "category": "functional|non-functional|constraint",
+      "category": "functional|non_functional|constraint",
+      "sub_category": "user_management|data_operations|etc. (based on category)",
       "testable": true,
       "scope_notes": "Clarification of scope boundaries; null if not needed",
       "implementation_hints": ["Suggested approach 1", "Relevant pattern or library"],
-      "confidence": 0.85
+      "confidence": 0.85,
+      "category_confidence": 0.9,
+      "category_rationale": "Keywords: 'login', 'user'; clear functional requirement"
     }
   ],
   "identified_gaps": ["Legacy: simple string description of gap"],
@@ -121,7 +151,10 @@ IMPORTANT RULES:
 - If testable is false, explain why in refined_text and set confidence < 0.5
 - List ALL gaps you identify, even if minor
 - List ALL contradictions, even if they seem resolvable
-- When uncertain, lower the confidence score rather than guessing"""
+- When uncertain, lower the confidence score rather than guessing
+- ALWAYS provide sub_category, category_confidence, and category_rationale for each requirement (Story 5.4)
+- Use underscore notation for categories: "non_functional" not "non-functional"
+- category_rationale should explain the classification reasoning with specific keywords/patterns detected"""
 
 ANALYST_USER_PROMPT_TEMPLATE = """Analyze the following seed content and extract all requirements.
 

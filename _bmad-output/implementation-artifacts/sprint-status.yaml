@@ -92,7 +92,7 @@ development_status:
   5-1-create-analyst-agent-node: done
   5-2-requirement-crystallization: done
   5-3-missing-requirement-identification: done
-  5-4-requirement-categorization: backlog
+  5-4-requirement-categorization: done
   5-5-implementability-validation: backlog
   5-6-contradiction-flagging: backlog
   5-7-escalation-to-pm: backlog

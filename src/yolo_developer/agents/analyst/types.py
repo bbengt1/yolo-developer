@@ -1,4 +1,4 @@
-"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3).
+"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4).
 
 This module provides the data types used by the Analyst agent:
 
@@ -7,6 +7,10 @@ This module provides the data types used by the Analyst agent:
 - GapType: Enum for types of identified gaps
 - Severity: Enum for gap severity levels
 - IdentifiedGap: A gap or missing requirement identified during analysis
+- RequirementCategory: Primary requirement category (functional, non_functional, constraint)
+- FunctionalSubCategory: Sub-categories for functional requirements
+- NonFunctionalSubCategory: Sub-categories for non-functional requirements (ISO 25010)
+- ConstraintSubCategory: Sub-categories for constraints
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -39,6 +43,148 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+
+class RequirementCategory(str, Enum):
+    """Primary requirement category per IEEE 830/ISO 29148 standards.
+
+    Used to classify requirements into fundamental categories for
+    appropriate handling by downstream agents.
+
+    Values:
+        FUNCTIONAL: What the system should DO - features, behaviors, capabilities.
+        NON_FUNCTIONAL: How well the system should DO it - quality attributes.
+        CONSTRAINT: Limitations on HOW it can be built - restrictions, mandates.
+    """
+
+    FUNCTIONAL = "functional"
+    NON_FUNCTIONAL = "non_functional"
+    CONSTRAINT = "constraint"
+
+
+class FunctionalSubCategory(str, Enum):
+    """Sub-categories for functional requirements.
+
+    Used to further classify functional requirements for routing
+    and specialized handling.
+
+    Values:
+        USER_MANAGEMENT: Authentication, profiles, roles, permissions.
+        DATA_OPERATIONS: CRUD, validation, storage, retrieval.
+        INTEGRATION: APIs, external services, webhooks.
+        REPORTING: Reports, analytics, exports, dashboards.
+        WORKFLOW: Business processes, state machines, approvals.
+        COMMUNICATION: Notifications, messaging, alerts.
+    """
+
+    USER_MANAGEMENT = "user_management"
+    DATA_OPERATIONS = "data_operations"
+    INTEGRATION = "integration"
+    REPORTING = "reporting"
+    WORKFLOW = "workflow"
+    COMMUNICATION = "communication"
+
+
+class NonFunctionalSubCategory(str, Enum):
+    """Sub-categories for non-functional requirements per ISO 25010.
+
+    Used to classify quality attributes according to ISO 25010
+    software quality model.
+
+    Values:
+        PERFORMANCE: Response time, throughput, resource efficiency.
+        SECURITY: Authentication, encryption, audit trails, access control.
+        USABILITY: User experience, learnability, accessibility.
+        RELIABILITY: Availability, fault tolerance, recoverability.
+        SCALABILITY: Load handling, growth capacity, elasticity.
+        MAINTAINABILITY: Code quality, modularity, testability.
+        ACCESSIBILITY: WCAG compliance, inclusive design, assistive tech.
+    """
+
+    PERFORMANCE = "performance"
+    SECURITY = "security"
+    USABILITY = "usability"
+    RELIABILITY = "reliability"
+    SCALABILITY = "scalability"
+    MAINTAINABILITY = "maintainability"
+    ACCESSIBILITY = "accessibility"
+
+
+class ConstraintSubCategory(str, Enum):
+    """Sub-categories for constraint requirements.
+
+    Used to classify constraints by their nature and origin.
+
+    Values:
+        TECHNICAL: Tech stack, platforms, protocols, frameworks.
+        BUSINESS: Budget, stakeholder requirements, market needs.
+        REGULATORY: Compliance, legal requirements, standards, certifications.
+        RESOURCE: Team capacity, skills, tools availability.
+        TIMELINE: Deadlines, milestones, release schedules.
+    """
+
+    TECHNICAL = "technical"
+    BUSINESS = "business"
+    REGULATORY = "regulatory"
+    RESOURCE = "resource"
+    TIMELINE = "timeline"
+
+
+@dataclass(frozen=True)
+class CategorizationResult:
+    """Result of categorizing a requirement (Story 5.4).
+
+    Immutable dataclass containing the categorization outcome for a
+    requirement, including primary category, sub-category, confidence
+    score, and rationale for audit trail.
+
+    Attributes:
+        category: Primary category (RequirementCategory enum).
+        sub_category: Optional sub-category string (e.g., "user_management").
+            None if sub-category could not be determined.
+        confidence: Confidence score 0.0-1.0 for the categorization.
+            1.0 = high confidence, 0.0 = low confidence.
+        rationale: Explanation of why this category was assigned,
+            including keywords or patterns that drove the decision.
+
+    Example:
+        >>> result = CategorizationResult(
+        ...     category=RequirementCategory.FUNCTIONAL,
+        ...     sub_category="user_management",
+        ...     confidence=0.95,
+        ...     rationale="Contains 'login', 'user' - clear functional",
+        ... )
+        >>> result.to_dict()
+        {'category': 'functional', 'sub_category': 'user_management', ...}
+    """
+
+    category: RequirementCategory
+    sub_category: str | None
+    confidence: float
+    rationale: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with all fields, category enum as string value.
+
+        Example:
+            >>> result = CategorizationResult(
+            ...     category=RequirementCategory.NON_FUNCTIONAL,
+            ...     sub_category="performance",
+            ...     confidence=0.9,
+            ...     rationale="Response time mentioned",
+            ... )
+            >>> result.to_dict()["category"]
+            'non_functional'
+        """
+        return {
+            "category": self.category.value,
+            "sub_category": self.sub_category,
+            "confidence": self.confidence,
+            "rationale": self.rationale,
+        }
 
 
 class GapType(str, Enum):
@@ -163,6 +309,15 @@ class CrystallizedRequirement:
             project patterns, libraries, or architectural conventions.
         confidence: Confidence score (0.0-1.0) for the crystallization quality.
             1.0 = high confidence the refinement is accurate, 0.0 = low confidence.
+        sub_category: Optional sub-category string (e.g., "user_management",
+            "performance"). None if sub-category could not be determined.
+            (Added in Story 5.4)
+        category_confidence: Confidence score (0.0-1.0) for the category assignment.
+            Distinct from `confidence` which is for crystallization quality.
+            (Added in Story 5.4)
+        category_rationale: Explanation of why this category/sub-category was
+            assigned, including keywords or patterns that drove the decision.
+            Used for audit trail. (Added in Story 5.4)
 
     Example:
         >>> req = CrystallizedRequirement(
@@ -187,12 +342,17 @@ class CrystallizedRequirement:
     scope_notes: str | None = None
     implementation_hints: tuple[str, ...] = ()
     confidence: float = 1.0
+    # Story 5.4 categorization fields
+    sub_category: str | None = None
+    category_confidence: float = 1.0
+    category_rationale: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
-            Dictionary with all requirement fields including enhanced fields.
+            Dictionary with all requirement fields including enhanced fields
+            and categorization fields (Story 5.4).
 
         Example:
             >>> req = CrystallizedRequirement(
@@ -214,6 +374,10 @@ class CrystallizedRequirement:
             "scope_notes": self.scope_notes,
             "implementation_hints": list(self.implementation_hints),
             "confidence": self.confidence,
+            # Story 5.4 categorization fields
+            "sub_category": self.sub_category,
+            "category_confidence": self.category_confidence,
+            "category_rationale": self.category_rationale,
         }
 
 

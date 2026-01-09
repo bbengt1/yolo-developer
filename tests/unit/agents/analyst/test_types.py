@@ -1,6 +1,6 @@
-"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3).
+"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3, Story 5.4).
 
-Tests for CrystallizedRequirement, AnalystOutput, and gap analysis types.
+Tests for CrystallizedRequirement, AnalystOutput, gap analysis types, and categorization types.
 """
 
 from __future__ import annotations
@@ -9,9 +9,14 @@ import pytest
 
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
+    CategorizationResult,
+    ConstraintSubCategory,
     CrystallizedRequirement,
+    FunctionalSubCategory,
     GapType,
     IdentifiedGap,
+    NonFunctionalSubCategory,
+    RequirementCategory,
     Severity,
 )
 
@@ -69,6 +74,10 @@ class TestCrystallizedRequirement:
             "scope_notes": None,
             "implementation_hints": [],
             "confidence": 1.0,
+            # Story 5.4 categorization fields
+            "sub_category": None,
+            "category_confidence": 1.0,
+            "category_rationale": None,
         }
 
     def test_equality(self) -> None:
@@ -634,3 +643,396 @@ class TestAnalystOutputWithStructuredGaps:
         assert len(result["structured_gaps"]) == 2
         assert result["structured_gaps"][0]["severity"] == "high"
         assert result["structured_gaps"][1]["severity"] == "medium"
+
+
+class TestRequirementCategory:
+    """Tests for RequirementCategory enum (Story 5.4)."""
+
+    def test_requirement_category_values(self) -> None:
+        """RequirementCategory should have expected string values."""
+        assert RequirementCategory.FUNCTIONAL.value == "functional"
+        assert RequirementCategory.NON_FUNCTIONAL.value == "non_functional"
+        assert RequirementCategory.CONSTRAINT.value == "constraint"
+
+    def test_requirement_category_is_str_enum(self) -> None:
+        """RequirementCategory should be a string enum."""
+        assert isinstance(RequirementCategory.FUNCTIONAL, str)
+        assert RequirementCategory.FUNCTIONAL == "functional"
+
+    def test_requirement_category_from_string(self) -> None:
+        """RequirementCategory should be creatable from string value."""
+        cat = RequirementCategory("functional")
+        assert cat == RequirementCategory.FUNCTIONAL
+
+    def test_requirement_category_invalid_value(self) -> None:
+        """RequirementCategory should raise ValueError for invalid values."""
+        with pytest.raises(ValueError):
+            RequirementCategory("invalid_category")
+
+    def test_requirement_category_all_members(self) -> None:
+        """RequirementCategory should have exactly 3 members."""
+        members = list(RequirementCategory)
+        assert len(members) == 3
+        assert RequirementCategory.FUNCTIONAL in members
+        assert RequirementCategory.NON_FUNCTIONAL in members
+        assert RequirementCategory.CONSTRAINT in members
+
+
+class TestFunctionalSubCategory:
+    """Tests for FunctionalSubCategory enum (Story 5.4)."""
+
+    def test_functional_subcategory_values(self) -> None:
+        """FunctionalSubCategory should have expected string values."""
+        assert FunctionalSubCategory.USER_MANAGEMENT.value == "user_management"
+        assert FunctionalSubCategory.DATA_OPERATIONS.value == "data_operations"
+        assert FunctionalSubCategory.INTEGRATION.value == "integration"
+        assert FunctionalSubCategory.REPORTING.value == "reporting"
+        assert FunctionalSubCategory.WORKFLOW.value == "workflow"
+        assert FunctionalSubCategory.COMMUNICATION.value == "communication"
+
+    def test_functional_subcategory_is_str_enum(self) -> None:
+        """FunctionalSubCategory should be a string enum."""
+        assert isinstance(FunctionalSubCategory.USER_MANAGEMENT, str)
+        assert FunctionalSubCategory.USER_MANAGEMENT == "user_management"
+
+    def test_functional_subcategory_from_string(self) -> None:
+        """FunctionalSubCategory should be creatable from string value."""
+        subcat = FunctionalSubCategory("user_management")
+        assert subcat == FunctionalSubCategory.USER_MANAGEMENT
+
+    def test_functional_subcategory_all_members(self) -> None:
+        """FunctionalSubCategory should have exactly 6 members."""
+        members = list(FunctionalSubCategory)
+        assert len(members) == 6
+
+
+class TestNonFunctionalSubCategory:
+    """Tests for NonFunctionalSubCategory enum (Story 5.4)."""
+
+    def test_non_functional_subcategory_values(self) -> None:
+        """NonFunctionalSubCategory should have expected string values."""
+        assert NonFunctionalSubCategory.PERFORMANCE.value == "performance"
+        assert NonFunctionalSubCategory.SECURITY.value == "security"
+        assert NonFunctionalSubCategory.USABILITY.value == "usability"
+        assert NonFunctionalSubCategory.RELIABILITY.value == "reliability"
+        assert NonFunctionalSubCategory.SCALABILITY.value == "scalability"
+        assert NonFunctionalSubCategory.MAINTAINABILITY.value == "maintainability"
+        assert NonFunctionalSubCategory.ACCESSIBILITY.value == "accessibility"
+
+    def test_non_functional_subcategory_is_str_enum(self) -> None:
+        """NonFunctionalSubCategory should be a string enum."""
+        assert isinstance(NonFunctionalSubCategory.PERFORMANCE, str)
+        assert NonFunctionalSubCategory.PERFORMANCE == "performance"
+
+    def test_non_functional_subcategory_from_string(self) -> None:
+        """NonFunctionalSubCategory should be creatable from string value."""
+        subcat = NonFunctionalSubCategory("security")
+        assert subcat == NonFunctionalSubCategory.SECURITY
+
+    def test_non_functional_subcategory_all_members(self) -> None:
+        """NonFunctionalSubCategory should have exactly 7 members."""
+        members = list(NonFunctionalSubCategory)
+        assert len(members) == 7
+
+
+class TestConstraintSubCategory:
+    """Tests for ConstraintSubCategory enum (Story 5.4)."""
+
+    def test_constraint_subcategory_values(self) -> None:
+        """ConstraintSubCategory should have expected string values."""
+        assert ConstraintSubCategory.TECHNICAL.value == "technical"
+        assert ConstraintSubCategory.BUSINESS.value == "business"
+        assert ConstraintSubCategory.REGULATORY.value == "regulatory"
+        assert ConstraintSubCategory.RESOURCE.value == "resource"
+        assert ConstraintSubCategory.TIMELINE.value == "timeline"
+
+    def test_constraint_subcategory_is_str_enum(self) -> None:
+        """ConstraintSubCategory should be a string enum."""
+        assert isinstance(ConstraintSubCategory.TECHNICAL, str)
+        assert ConstraintSubCategory.TECHNICAL == "technical"
+
+    def test_constraint_subcategory_from_string(self) -> None:
+        """ConstraintSubCategory should be creatable from string value."""
+        subcat = ConstraintSubCategory("regulatory")
+        assert subcat == ConstraintSubCategory.REGULATORY
+
+    def test_constraint_subcategory_all_members(self) -> None:
+        """ConstraintSubCategory should have exactly 5 members."""
+        members = list(ConstraintSubCategory)
+        assert len(members) == 5
+
+
+class TestCategorizationResult:
+    """Tests for CategorizationResult dataclass (Story 5.4)."""
+
+    def test_creation_with_all_fields(self) -> None:
+        """CategorizationResult should be creatable with all fields."""
+        result = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category="user_management",
+            confidence=0.95,
+            rationale="Contains 'login', 'user' - clear functional requirement",
+        )
+
+        assert result.category == RequirementCategory.FUNCTIONAL
+        assert result.sub_category == "user_management"
+        assert result.confidence == 0.95
+        assert "login" in result.rationale
+
+    def test_creation_with_none_sub_category(self) -> None:
+        """CategorizationResult should allow None sub_category."""
+        result = CategorizationResult(
+            category=RequirementCategory.CONSTRAINT,
+            sub_category=None,
+            confidence=0.6,
+            rationale="Ambiguous constraint type",
+        )
+
+        assert result.sub_category is None
+
+    def test_immutability(self) -> None:
+        """CategorizationResult should be immutable (frozen dataclass)."""
+        result = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category="data_operations",
+            confidence=0.8,
+            rationale="CRUD keywords",
+        )
+
+        with pytest.raises(AttributeError):
+            result.category = RequirementCategory.CONSTRAINT  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            result.confidence = 0.5  # type: ignore[misc]
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict should serialize all fields correctly."""
+        result = CategorizationResult(
+            category=RequirementCategory.NON_FUNCTIONAL,
+            sub_category="performance",
+            confidence=0.9,
+            rationale="Response time mentioned",
+        )
+
+        d = result.to_dict()
+
+        assert d == {
+            "category": "non_functional",
+            "sub_category": "performance",
+            "confidence": 0.9,
+            "rationale": "Response time mentioned",
+        }
+
+    def test_to_dict_with_none_sub_category(self) -> None:
+        """to_dict should handle None sub_category correctly."""
+        result = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category=None,
+            confidence=0.7,
+            rationale="No clear sub-category",
+        )
+
+        d = result.to_dict()
+
+        assert d["sub_category"] is None
+
+    def test_to_dict_converts_enum_to_string(self) -> None:
+        """to_dict should convert category enum to string value."""
+        result = CategorizationResult(
+            category=RequirementCategory.CONSTRAINT,
+            sub_category="technical",
+            confidence=0.85,
+            rationale="Tech stack mentioned",
+        )
+
+        d = result.to_dict()
+
+        assert d["category"] == "constraint"
+        assert isinstance(d["category"], str)
+
+    def test_hashability(self) -> None:
+        """CategorizationResult should be hashable (frozen)."""
+        result = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category="integration",
+            confidence=0.75,
+            rationale="API keywords",
+        )
+
+        s = {result}
+        assert result in s
+
+    def test_equality(self) -> None:
+        """CategorizationResult equality should be based on field values."""
+        result1 = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category="reporting",
+            confidence=0.8,
+            rationale="Report export",
+        )
+        result2 = CategorizationResult(
+            category=RequirementCategory.FUNCTIONAL,
+            sub_category="reporting",
+            confidence=0.8,
+            rationale="Report export",
+        )
+
+        assert result1 == result2
+
+
+class TestCrystallizedRequirementCategorization:
+    """Tests for CrystallizedRequirement categorization fields (Story 5.4 Task 3)."""
+
+    def test_new_categorization_fields_have_defaults(self) -> None:
+        """New categorization fields should have correct default values."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates with email",
+            category="functional",
+            testable=True,
+        )
+
+        assert req.sub_category is None
+        assert req.category_confidence == 1.0
+        assert req.category_rationale is None
+
+    def test_creation_with_all_categorization_fields(self) -> None:
+        """CrystallizedRequirement should accept all new categorization fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates with email",
+            category="functional",
+            testable=True,
+            sub_category="user_management",
+            category_confidence=0.95,
+            category_rationale="Contains 'login', 'user' keywords",
+        )
+
+        assert req.sub_category == "user_management"
+        assert req.category_confidence == 0.95
+        assert req.category_rationale == "Contains 'login', 'user' keywords"
+
+    def test_to_dict_includes_categorization_fields(self) -> None:
+        """to_dict should include new categorization fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="non_functional",
+            testable=True,
+            sub_category="performance",
+            category_confidence=0.85,
+            category_rationale="Response time mentioned",
+        )
+
+        d = req.to_dict()
+
+        assert "sub_category" in d
+        assert "category_confidence" in d
+        assert "category_rationale" in d
+        assert d["sub_category"] == "performance"
+        assert d["category_confidence"] == 0.85
+        assert d["category_rationale"] == "Response time mentioned"
+
+    def test_to_dict_with_none_categorization_fields(self) -> None:
+        """to_dict should handle None categorization fields correctly."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+        )
+
+        d = req.to_dict()
+
+        assert d["sub_category"] is None
+        assert d["category_confidence"] == 1.0
+        assert d["category_rationale"] is None
+
+    def test_category_confidence_boundary_values(self) -> None:
+        """category_confidence should accept 0.0 and 1.0 boundary values."""
+        req_min = CrystallizedRequirement(
+            id="req-001",
+            original_text="text",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            category_confidence=0.0,
+        )
+        req_max = CrystallizedRequirement(
+            id="req-002",
+            original_text="text",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            category_confidence=1.0,
+        )
+
+        assert req_min.category_confidence == 0.0
+        assert req_max.category_confidence == 1.0
+
+    def test_backward_compatibility_existing_to_dict(self) -> None:
+        """Existing to_dict format should still include original fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            scope_notes="scope",
+            implementation_hints=("hint1",),
+            confidence=0.9,
+        )
+
+        d = req.to_dict()
+
+        # Original fields still present
+        assert d["id"] == "req-001"
+        assert d["original_text"] == "orig"
+        assert d["refined_text"] == "ref"
+        assert d["category"] == "functional"
+        assert d["testable"] is True
+        assert d["scope_notes"] == "scope"
+        assert d["implementation_hints"] == ["hint1"]
+        assert d["confidence"] == 0.9
+
+    def test_immutability_of_categorization_fields(self) -> None:
+        """New categorization fields should also be immutable."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="text",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            sub_category="data_operations",
+            category_confidence=0.8,
+            category_rationale="CRUD keywords",
+        )
+
+        with pytest.raises(AttributeError):
+            req.sub_category = "user_management"  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            req.category_confidence = 0.5  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            req.category_rationale = "new rationale"  # type: ignore[misc]
+
+    def test_hashability_with_categorization_fields(self) -> None:
+        """CrystallizedRequirement with categorization fields should be hashable."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="text",
+            refined_text="ref",
+            category="constraint",
+            testable=True,
+            sub_category="technical",
+            category_confidence=0.7,
+            category_rationale="Tech stack specified",
+        )
+
+        s = {req}
+        assert req in s

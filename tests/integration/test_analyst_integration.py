@@ -1,10 +1,11 @@
-"""Integration tests for Analyst agent (Story 5.1, 5.3).
+"""Integration tests for Analyst agent (Story 5.1, 5.3, 5.4).
 
 Tests the analyst_node integration with:
 - LangGraph StateGraph
 - Quality gate decorator
 - YoloState message handling
 - Gap analysis integration (Story 5.3)
+- Requirement categorization (Story 5.4)
 """
 
 from __future__ import annotations
@@ -716,3 +717,208 @@ class TestGapAnalysisIntegration:
         output_data = result["messages"][0].additional_kwargs["output"]
         assert "structured_gaps" in output_data
         assert isinstance(output_data["structured_gaps"], list)
+
+
+class TestCategorizationIntegration:
+    """Integration tests for requirement categorization (Story 5.4)."""
+
+    @pytest.mark.asyncio
+    async def test_categorization_in_full_analysis_flow(self) -> None:
+        """Test that categorization runs as part of full analysis."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="""
+                    Build a user authentication system with these requirements:
+                    1. Users can register with email and password
+                    2. Login response time should be under 200ms
+                    3. Must use PostgreSQL database
+                    4. Send email notification on successful registration
+                    """
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # Should have at least one requirement
+        assert len(requirements) >= 1
+
+        # Each requirement should have categorization fields
+        for req in requirements:
+            # Story 5.4 fields should be present
+            assert "sub_category" in req
+            assert "category_confidence" in req
+            assert "category_rationale" in req
+            # Confidence should be valid
+            assert 0.0 <= req["category_confidence"] <= 1.0
+            # Rationale should exist
+            assert req["category_rationale"] is not None
+
+    @pytest.mark.asyncio
+    async def test_categorization_detects_functional_requirements(self) -> None:
+        """Test categorization correctly identifies functional requirements."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="User can login with email and password and view their profile"
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # Should detect functional requirement with user_management sub-category
+        assert len(requirements) >= 1
+        # At least one should be functional
+        categories = [req.get("category") for req in requirements]
+        assert "functional" in categories
+
+        # Check for user_management sub-category on functional reqs
+        functional_reqs = [r for r in requirements if r.get("category") == "functional"]
+        sub_categories = [r.get("sub_category") for r in functional_reqs]
+        assert "user_management" in sub_categories or any(s for s in sub_categories)
+
+    @pytest.mark.asyncio
+    async def test_categorization_detects_non_functional_requirements(self) -> None:
+        """Test categorization correctly identifies non-functional requirements."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="API response time must be under 200 milliseconds for performance"
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # Check if any requirement is non-functional with performance sub-category
+        assert len(requirements) >= 1
+
+        # Look for performance-related categorization
+        for req in requirements:
+            if req.get("category") == "non_functional":
+                assert req.get("sub_category") == "performance"
+                break
+
+    @pytest.mark.asyncio
+    async def test_categorization_rationale_includes_keywords(self) -> None:
+        """Test that categorization rationale mentions detected keywords."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(content="User can create, edit, and delete items")
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # At least one requirement should have keywords in rationale
+        for req in requirements:
+            rationale = req.get("category_rationale", "")
+            if rationale:
+                # Should mention either Keywords or Scores
+                assert "Keywords:" in rationale or "Scores:" in rationale
+
+    @pytest.mark.asyncio
+    async def test_categorization_preserves_other_fields(self) -> None:
+        """Test that categorization doesn't break other requirement fields."""
+        mock_output = AnalystOutput(
+            requirements=(
+                CrystallizedRequirement(
+                    id="req-001",
+                    original_text="User can login",
+                    refined_text="User authenticates with email/password",
+                    category="functional",
+                    testable=True,
+                    scope_notes="Web only, not mobile",
+                    implementation_hints=("Use JWT tokens",),
+                    confidence=0.9,
+                ),
+            ),
+            identified_gaps=("Legacy gap",),
+            contradictions=("Contradiction 1",),
+        )
+
+        state: YoloState = {
+            "messages": [HumanMessage(content="User can login")],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        with patch(
+            "yolo_developer.agents.analyst.node._crystallize_requirements",
+            new=AsyncMock(return_value=mock_output),
+        ):
+            result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # Original fields should still be present
+        assert len(requirements) >= 1
+        req = requirements[0]
+        assert req["id"] == "req-001"
+        assert req["original_text"] == "User can login"
+        assert req["testable"] is True
+        assert req["confidence"] == 0.9
+
+        # New categorization fields should also be present
+        assert "sub_category" in req
+        assert "category_confidence" in req
+        assert "category_rationale" in req
+
+    @pytest.mark.asyncio
+    async def test_categorization_with_mixed_requirements(self) -> None:
+        """Test categorization handles mixed requirement types."""
+        state: YoloState = {
+            "messages": [
+                HumanMessage(
+                    content="""
+                    1. Users can register accounts (functional)
+                    2. System must respond in under 200ms (non-functional performance)
+                    3. Must use PostgreSQL database (constraint technical)
+                    """
+                )
+            ],
+            "current_agent": "analyst",
+            "handoff_context": None,
+            "decisions": [],
+        }
+
+        result = await analyst_node(state)
+
+        output_data = result["messages"][0].additional_kwargs["output"]
+        requirements = output_data.get("requirements", [])
+
+        # Should have at least one requirement
+        assert len(requirements) >= 1
+
+        # All requirements should be categorized
+        for req in requirements:
+            assert req.get("category") in ("functional", "non_functional", "constraint")
+            assert req.get("category_rationale") is not None

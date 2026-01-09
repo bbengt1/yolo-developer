@@ -1,4 +1,4 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
@@ -44,6 +44,7 @@ from yolo_developer.agents.analyst.types import (
     CrystallizedRequirement,
     GapType,
     IdentifiedGap,
+    RequirementCategory,
     Severity,
 )
 from yolo_developer.gates import quality_gate
@@ -57,23 +58,54 @@ _USE_LLM: bool = False
 
 # Vague terms to detect in requirements (Story 5.2)
 # These patterns indicate ambiguity that needs crystallization
-VAGUE_TERMS: frozenset[str] = frozenset([
-    # Quantifier vagueness
-    "fast", "quick", "slow", "efficient", "performant",
-    "scalable", "responsive", "real-time",
-    # Ease vagueness
-    "easy", "simple", "straightforward", "intuitive",
-    "user-friendly", "seamless",
-    # Certainty vagueness
-    "should", "might", "could", "may", "possibly",
-    "probably", "maybe", "sometimes",
-    # Scope vagueness
-    "etc", "and so on", "and more", "various", "multiple",
-    "several", "many", "few", "some",
-    # Quality vagueness
-    "good", "better", "best", "nice", "beautiful",
-    "clean", "modern", "robust",
-])
+VAGUE_TERMS: frozenset[str] = frozenset(
+    [
+        # Quantifier vagueness
+        "fast",
+        "quick",
+        "slow",
+        "efficient",
+        "performant",
+        "scalable",
+        "responsive",
+        "real-time",
+        # Ease vagueness
+        "easy",
+        "simple",
+        "straightforward",
+        "intuitive",
+        "user-friendly",
+        "seamless",
+        # Certainty vagueness
+        "should",
+        "might",
+        "could",
+        "may",
+        "possibly",
+        "probably",
+        "maybe",
+        "sometimes",
+        # Scope vagueness
+        "etc",
+        "and so on",
+        "and more",
+        "various",
+        "multiple",
+        "several",
+        "many",
+        "few",
+        "some",
+        # Quality vagueness
+        "good",
+        "better",
+        "best",
+        "nice",
+        "beautiful",
+        "clean",
+        "modern",
+        "robust",
+    ]
+)
 
 # Edge case categories to check for each requirement (Story 5.3)
 EDGE_CASE_CATEGORIES: dict[str, list[str]] = {
@@ -108,22 +140,524 @@ EDGE_CASE_CATEGORIES: dict[str, list[str]] = {
 
 # Keywords that map requirement content to relevant edge case categories
 EDGE_CASE_KEYWORDS: dict[str, frozenset[str]] = {
-    "input_validation": frozenset([
-        "input", "form", "field", "submit", "enter", "data", "value",
-        "text", "string", "user", "request", "parameter", "argument",
-    ]),
-    "boundary_conditions": frozenset([
-        "number", "count", "limit", "max", "min", "date", "time",
-        "range", "quantity", "amount", "size", "length", "age",
-    ]),
-    "error_conditions": frozenset([
-        "api", "call", "fetch", "request", "network", "database", "db",
-        "connect", "external", "service", "integrate", "http", "remote",
-    ]),
-    "state_transitions": frozenset([
-        "status", "state", "workflow", "process", "step", "transition",
-        "update", "change", "modify", "submit", "save", "transaction",
-    ]),
+    "input_validation": frozenset(
+        [
+            "input",
+            "form",
+            "field",
+            "submit",
+            "enter",
+            "data",
+            "value",
+            "text",
+            "string",
+            "user",
+            "request",
+            "parameter",
+            "argument",
+        ]
+    ),
+    "boundary_conditions": frozenset(
+        [
+            "number",
+            "count",
+            "limit",
+            "max",
+            "min",
+            "date",
+            "time",
+            "range",
+            "quantity",
+            "amount",
+            "size",
+            "length",
+            "age",
+        ]
+    ),
+    "error_conditions": frozenset(
+        [
+            "api",
+            "call",
+            "fetch",
+            "request",
+            "network",
+            "database",
+            "db",
+            "connect",
+            "external",
+            "service",
+            "integrate",
+            "http",
+            "remote",
+        ]
+    ),
+    "state_transitions": frozenset(
+        [
+            "status",
+            "state",
+            "workflow",
+            "process",
+            "step",
+            "transition",
+            "update",
+            "change",
+            "modify",
+            "submit",
+            "save",
+            "transaction",
+        ]
+    ),
+}
+
+# =============================================================================
+# Story 5.4: Requirement Categorization Keywords
+# =============================================================================
+# Keywords for primary category classification (IEEE 830/ISO 29148 standards)
+
+# Keywords indicating FUNCTIONAL requirements (what the system should DO)
+FUNCTIONAL_KEYWORDS: frozenset[str] = frozenset(
+    [
+        # Action verbs
+        "create",
+        "read",
+        "update",
+        "delete",
+        "add",
+        "remove",
+        "edit",
+        "modify",
+        "list",
+        "search",
+        "filter",
+        "sort",
+        "view",
+        "display",
+        "show",
+        # User actions
+        "user can",
+        "user should",
+        "users will",
+        "allow",
+        "enable",
+        "permit",
+        "submit",
+        "upload",
+        "download",
+        "export",
+        "import",
+        "generate",
+        # Feature words
+        "feature",
+        "functionality",
+        "capability",
+        "ability",
+        "function",
+        # Domain specific
+        "login",
+        "logout",
+        "register",
+        "authenticate",
+        "authorize",
+        "notify",
+        "alert",
+        "send",
+        "receive",
+        "process",
+        "calculate",
+        # User story patterns
+        "as a user",
+        "i want",
+        "so that",
+        "user story",
+    ]
+)
+
+# Keywords indicating NON-FUNCTIONAL requirements (how well the system does it)
+NON_FUNCTIONAL_KEYWORDS: frozenset[str] = frozenset(
+    [
+        # Performance
+        "fast",
+        "quick",
+        "responsive",
+        "latency",
+        "throughput",
+        "performance",
+        "milliseconds",
+        "seconds",
+        "response time",
+        "load time",
+        # Security
+        "secure",
+        "security",
+        "encrypt",
+        "decrypt",
+        "audit",
+        "log",
+        "track",
+        "compliance",
+        "gdpr",
+        "pci",
+        "hipaa",
+        # Reliability
+        "available",
+        "availability",
+        "uptime",
+        "reliable",
+        "fault-tolerant",
+        "backup",
+        "recovery",
+        "disaster",
+        "redundant",
+        # Scalability
+        "scalable",
+        "scalability",
+        "concurrent",
+        "handle",
+        "capacity",
+        "growth",
+        "load",
+        "traffic",
+        # Usability
+        "easy",
+        "intuitive",
+        "user-friendly",
+        "accessible",
+        "usable",
+        "ux",
+        "experience",
+        "wcag",
+        "aria",
+        # Maintainability
+        "maintainable",
+        "modular",
+        "testable",
+        "documented",
+        "code quality",
+        # Quality metrics
+        "99.9%",
+        "sla",
+        "rto",
+        "rpo",
+    ]
+)
+
+# Keywords indicating CONSTRAINT requirements (limitations on how it can be built)
+CONSTRAINT_KEYWORDS: frozenset[str] = frozenset(
+    [
+        # Technical constraints
+        "must use",
+        "required to use",
+        "only use",
+        "limited to",
+        "compatible with",
+        "integrate with",
+        "support for",
+        "python",
+        "java",
+        "node",
+        "react",
+        "aws",
+        "azure",
+        "gcp",
+        # Business constraints
+        "budget",
+        "cost",
+        "deadline",
+        "timeline",
+        "milestone",
+        "within",
+        "by date",
+        "before",
+        "no more than",
+        # Regulatory constraints
+        "comply",
+        "compliance",
+        "regulation",
+        "standard",
+        "policy",
+        "legal",
+        "regulatory",
+        "certification",
+        # Resource constraints
+        "team",
+        "resource",
+        "staff",
+        "available",
+        "existing",
+    ]
+)
+
+# Sub-category keywords for functional requirements
+FUNCTIONAL_SUBCATEGORY_KEYWORDS: dict[str, frozenset[str]] = {
+    "user_management": frozenset(
+        [
+            "user",
+            "account",
+            "profile",
+            "login",
+            "logout",
+            "register",
+            "password",
+            "role",
+            "permission",
+            "auth",
+            "session",
+        ]
+    ),
+    "data_operations": frozenset(
+        [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "crud",
+            "store",
+            "save",
+            "database",
+            "record",
+            "entity",
+            "data",
+            "validate",
+        ]
+    ),
+    "integration": frozenset(
+        [
+            "api",
+            "endpoint",
+            "webhook",
+            "integrate",
+            "external",
+            "service",
+            "rest",
+            "graphql",
+            "soap",
+            "third-party",
+            "connect",
+        ]
+    ),
+    "reporting": frozenset(
+        [
+            "report",
+            "export",
+            "analytics",
+            "dashboard",
+            "chart",
+            "graph",
+            "statistics",
+            "metrics",
+            "kpi",
+            "insight",
+        ]
+    ),
+    "workflow": frozenset(
+        [
+            "workflow",
+            "process",
+            "step",
+            "stage",
+            "state",
+            "transition",
+            "approval",
+            "review",
+            "submit",
+            "flow",
+        ]
+    ),
+    "communication": frozenset(
+        [
+            "email",
+            "notification",
+            "alert",
+            "message",
+            "sms",
+            "push",
+            "notify",
+            "send",
+            "receive",
+            "communicate",
+        ]
+    ),
+}
+
+# Sub-category keywords for non-functional requirements (ISO 25010)
+NON_FUNCTIONAL_SUBCATEGORY_KEYWORDS: dict[str, frozenset[str]] = {
+    "performance": frozenset(
+        [
+            "fast",
+            "quick",
+            "response",
+            "latency",
+            "throughput",
+            "speed",
+            "millisecond",
+            "second",
+            "performance",
+            "efficient",
+        ]
+    ),
+    "security": frozenset(
+        [
+            "secure",
+            "security",
+            "encrypt",
+            "auth",
+            "permission",
+            "audit",
+            "vulnerability",
+            "attack",
+            "protect",
+            "sanitize",
+        ]
+    ),
+    "usability": frozenset(
+        [
+            "easy",
+            "intuitive",
+            "user-friendly",
+            "ux",
+            "experience",
+            "simple",
+            "clear",
+            "understand",
+            "learn",
+        ]
+    ),
+    "reliability": frozenset(
+        [
+            "available",
+            "reliable",
+            "uptime",
+            "fault",
+            "recover",
+            "backup",
+            "redundant",
+            "failover",
+            "resilient",
+        ]
+    ),
+    "scalability": frozenset(
+        [
+            "scale",
+            "scalable",
+            "concurrent",
+            "load",
+            "traffic",
+            "growth",
+            "capacity",
+            "elastic",
+            "horizontal",
+            "vertical",
+        ]
+    ),
+    "maintainability": frozenset(
+        [
+            "maintainable",
+            "modular",
+            "testable",
+            "document",
+            "clean",
+            "readable",
+            "refactor",
+            "extend",
+            "code quality",
+        ]
+    ),
+    "accessibility": frozenset(
+        [
+            "accessible",
+            "wcag",
+            "aria",
+            "screen reader",
+            "keyboard",
+            "contrast",
+            "alt text",
+            "inclusive",
+            "disability",
+        ]
+    ),
+}
+
+# Sub-category keywords for constraint requirements
+CONSTRAINT_SUBCATEGORY_KEYWORDS: dict[str, frozenset[str]] = {
+    "technical": frozenset(
+        [
+            "python",
+            "java",
+            "javascript",
+            "typescript",
+            "react",
+            "vue",
+            "angular",
+            "aws",
+            "azure",
+            "gcp",
+            "docker",
+            "kubernetes",
+            "database",
+            "postgresql",
+            "must use",
+            "required",
+            "compatible",
+            "platform",
+            "framework",
+        ]
+    ),
+    "business": frozenset(
+        [
+            "budget",
+            "cost",
+            "price",
+            "expense",
+            "funding",
+            "roi",
+            "stakeholder",
+            "business",
+            "revenue",
+            "profit",
+        ]
+    ),
+    "regulatory": frozenset(
+        [
+            "comply",
+            "compliance",
+            "gdpr",
+            "hipaa",
+            "pci",
+            "sox",
+            "iso",
+            "regulation",
+            "standard",
+            "certification",
+            "audit",
+            "legal",
+        ]
+    ),
+    "resource": frozenset(
+        [
+            "team",
+            "developer",
+            "staff",
+            "resource",
+            "headcount",
+            "skill",
+            "expertise",
+            "capacity",
+            "bandwidth",
+        ]
+    ),
+    "timeline": frozenset(
+        [
+            "deadline",
+            "date",
+            "milestone",
+            "sprint",
+            "release",
+            "launch",
+            "delivery",
+            "timeline",
+            "schedule",
+        ]
+    ),
 }
 
 
@@ -165,6 +699,339 @@ def _detect_vague_terms(text: str) -> set[str]:
                 detected.add(term)
 
     return detected
+
+
+# =============================================================================
+# Story 5.4: Requirement Categorization Functions
+# =============================================================================
+
+
+def _count_keyword_matches(text: str, keywords: frozenset[str]) -> int:
+    """Count how many keywords from a set appear in the text.
+
+    Performs case-insensitive matching with word boundary checks
+    for most keywords. Handles multi-word phrases (e.g., "user can").
+
+    Args:
+        text: The text to search in.
+        keywords: Set of keywords to look for.
+
+    Returns:
+        Number of keywords found in the text.
+
+    Example:
+        >>> _count_keyword_matches("User can create account", FUNCTIONAL_KEYWORDS)
+        2  # "user can", "create"
+    """
+    if not text:
+        return 0
+
+    text_lower = text.lower()
+    count = 0
+
+    for keyword in keywords:
+        # Multi-word phrases: simple contains check
+        if " " in keyword:
+            if keyword in text_lower:
+                count += 1
+        else:
+            # Single words: word boundary check
+            pattern = rf"\b{re.escape(keyword)}\b"
+            if re.search(pattern, text_lower):
+                count += 1
+
+    return count
+
+
+def _calculate_category_confidence(
+    text: str,
+    functional_count: int,
+    nonfunctional_count: int,
+    constraint_count: int,
+) -> float:
+    """Calculate confidence score for category assignment.
+
+    Confidence is based on:
+    1. Signal strength: More keyword matches = higher confidence
+    2. Category differentiation: Clear winner vs. ambiguous = higher confidence
+    3. Vague term presence: Reduces confidence
+
+    Args:
+        text: The requirement text (for vague term detection).
+        functional_count: Number of functional keyword matches.
+        nonfunctional_count: Number of non-functional keyword matches.
+        constraint_count: Number of constraint keyword matches.
+
+    Returns:
+        Confidence score between 0.0 and 1.0.
+
+    Example:
+        >>> _calculate_category_confidence("User can login", 3, 0, 0)
+        0.95  # Clear functional, high confidence
+        >>> _calculate_category_confidence("System should be fast", 1, 1, 0)
+        0.6   # Ambiguous, lower confidence
+    """
+    total = functional_count + nonfunctional_count + constraint_count
+    counts = [functional_count, nonfunctional_count, constraint_count]
+
+    # Base confidence starts at 0.5
+    confidence = 0.5
+
+    if total == 0:
+        # No keywords found - low confidence
+        return 0.3
+
+    # Find max and second max
+    max_count = max(counts)
+    counts_without_max = [c for c in counts if c != max_count]
+    second_max = max(counts_without_max) if counts_without_max else 0
+
+    # Signal strength: more matches = higher confidence (up to +0.3)
+    strength_bonus = min(max_count / 5.0, 0.3)
+    confidence += strength_bonus
+
+    # Category differentiation: clear winner = higher confidence (up to +0.2)
+    if max_count > 0:
+        differentiation = (max_count - second_max) / max_count
+        confidence += differentiation * 0.2
+
+    # Vague term penalty
+    vague_terms = _detect_vague_terms(text)
+    if vague_terms:
+        # Each vague term reduces confidence by 0.05, up to 0.15
+        penalty = min(len(vague_terms) * 0.05, 0.15)
+        confidence -= penalty
+
+    # Clamp to [0.0, 1.0]
+    return max(0.0, min(1.0, confidence))
+
+
+def _assign_sub_category(
+    text: str,
+    category: RequirementCategory,
+) -> str | None:
+    """Assign a sub-category based on the primary category.
+
+    Analyzes the text for sub-category signals specific to the
+    assigned primary category.
+
+    Args:
+        text: The requirement text to analyze.
+        category: The assigned primary category.
+
+    Returns:
+        Sub-category string if detected, None otherwise.
+
+    Example:
+        >>> _assign_sub_category("User can login", RequirementCategory.FUNCTIONAL)
+        "user_management"
+        >>> _assign_sub_category("Response < 200ms", RequirementCategory.NON_FUNCTIONAL)
+        "performance"
+    """
+    if not text:
+        return None
+
+    text_lower = text.lower()
+
+    # Select the appropriate subcategory keyword mapping
+    if category == RequirementCategory.FUNCTIONAL:
+        subcategory_keywords = FUNCTIONAL_SUBCATEGORY_KEYWORDS
+    elif category == RequirementCategory.NON_FUNCTIONAL:
+        subcategory_keywords = NON_FUNCTIONAL_SUBCATEGORY_KEYWORDS
+    elif category == RequirementCategory.CONSTRAINT:
+        subcategory_keywords = CONSTRAINT_SUBCATEGORY_KEYWORDS
+    else:
+        return None
+
+    # Count matches for each sub-category
+    best_subcat: str | None = None
+    best_count = 0
+
+    for subcat, keywords in subcategory_keywords.items():
+        count = 0
+        for keyword in keywords:
+            if " " in keyword:
+                if keyword in text_lower:
+                    count += 1
+            else:
+                pattern = rf"\b{re.escape(keyword)}\b"
+                if re.search(pattern, text_lower):
+                    count += 1
+
+        if count > best_count:
+            best_count = count
+            best_subcat = subcat
+
+    # Only return if we have at least one match
+    return best_subcat if best_count > 0 else None
+
+
+def _categorize_requirement(
+    req: CrystallizedRequirement,
+) -> CrystallizedRequirement:
+    """Categorize a single requirement by type.
+
+    Analyzes the requirement's refined text to determine primary category
+    (functional, non-functional, constraint), sub-category, confidence,
+    and generates rationale for audit trail.
+
+    Args:
+        req: The CrystallizedRequirement to categorize.
+
+    Returns:
+        New CrystallizedRequirement with categorization fields populated.
+        Original requirement is not modified (frozen dataclass).
+
+    Example:
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="User can login",
+        ...     refined_text="User authenticates with email",
+        ...     category="functional",
+        ...     testable=True,
+        ... )
+        >>> result = _categorize_requirement(req)
+        >>> result.sub_category
+        'user_management'
+        >>> result.category_confidence >= 0.7
+        True
+    """
+    # Combine original and refined text for analysis
+    # Refined text is primary, but original may have useful signals
+    text_to_analyze = f"{req.refined_text} {req.original_text}"
+
+    # Count keyword matches for each category
+    functional_count = _count_keyword_matches(text_to_analyze, FUNCTIONAL_KEYWORDS)
+    nonfunctional_count = _count_keyword_matches(text_to_analyze, NON_FUNCTIONAL_KEYWORDS)
+    constraint_count = _count_keyword_matches(text_to_analyze, CONSTRAINT_KEYWORDS)
+
+    # Determine primary category
+    counts = {
+        RequirementCategory.FUNCTIONAL: functional_count,
+        RequirementCategory.NON_FUNCTIONAL: nonfunctional_count,
+        RequirementCategory.CONSTRAINT: constraint_count,
+    }
+
+    # Find winning category
+    if max(counts.values()) == 0:
+        # No keywords found - use existing category or default to functional
+        existing_cat = req.category.lower().replace("-", "_")
+        if existing_cat in ("functional", "non_functional", "constraint"):
+            winning_category = RequirementCategory(existing_cat)
+        else:
+            winning_category = RequirementCategory.FUNCTIONAL
+    else:
+        winning_category = max(counts, key=lambda k: counts[k])
+
+    # Calculate confidence
+    confidence = _calculate_category_confidence(
+        text_to_analyze,
+        functional_count,
+        nonfunctional_count,
+        constraint_count,
+    )
+
+    # Assign sub-category
+    sub_category = _assign_sub_category(text_to_analyze, winning_category)
+
+    # Build rationale
+    rationale_parts = []
+
+    # List matched keywords for winning category
+    if winning_category == RequirementCategory.FUNCTIONAL:
+        matched_keywords = [kw for kw in FUNCTIONAL_KEYWORDS if kw in text_to_analyze.lower()]
+    elif winning_category == RequirementCategory.NON_FUNCTIONAL:
+        matched_keywords = [kw for kw in NON_FUNCTIONAL_KEYWORDS if kw in text_to_analyze.lower()]
+    else:
+        matched_keywords = [kw for kw in CONSTRAINT_KEYWORDS if kw in text_to_analyze.lower()]
+
+    if matched_keywords:
+        # Show up to 5 keywords
+        shown = matched_keywords[:5]
+        rationale_parts.append(f"Keywords: {', '.join(repr(k) for k in shown)}")
+
+    rationale_parts.append(
+        f"Scores: F={functional_count}, NF={nonfunctional_count}, C={constraint_count}"
+    )
+
+    if sub_category:
+        rationale_parts.append(f"Sub-category: {sub_category}")
+
+    rationale = "; ".join(rationale_parts)
+
+    # Create new requirement with categorization fields
+    # Use the string value for category to maintain backward compatibility
+    return CrystallizedRequirement(
+        id=req.id,
+        original_text=req.original_text,
+        refined_text=req.refined_text,
+        category=winning_category.value,
+        testable=req.testable,
+        scope_notes=req.scope_notes,
+        implementation_hints=req.implementation_hints,
+        confidence=req.confidence,
+        sub_category=sub_category,
+        category_confidence=confidence,
+        category_rationale=rationale,
+    )
+
+
+def _categorize_all_requirements(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[CrystallizedRequirement, ...]:
+    """Categorize all requirements in a batch.
+
+    Processes each requirement through the categorization pipeline,
+    collects statistics, and logs a summary for audit trail.
+
+    Args:
+        requirements: Tuple of requirements to categorize.
+
+    Returns:
+        Tuple of categorized requirements (same order as input).
+
+    Example:
+        >>> reqs = (req1, req2, req3)
+        >>> categorized = _categorize_all_requirements(reqs)
+        >>> len(categorized) == len(reqs)
+        True
+    """
+    if not requirements:
+        logger.info("categorization_skipped", reason="no_requirements")
+        return ()
+
+    categorized: list[CrystallizedRequirement] = []
+    category_counts: dict[str, int] = {
+        "functional": 0,
+        "non_functional": 0,
+        "constraint": 0,
+    }
+
+    for req in requirements:
+        cat_req = _categorize_requirement(req)
+        categorized.append(cat_req)
+
+        # Track category distribution
+        cat_key = cat_req.category
+        if cat_key in category_counts:
+            category_counts[cat_key] += 1
+
+    # Log summary for audit trail
+    total = len(categorized)
+    logger.info(
+        "requirements_categorized",
+        total=total,
+        functional=category_counts["functional"],
+        non_functional=category_counts["non_functional"],
+        constraint=category_counts["constraint"],
+        functional_pct=round(category_counts["functional"] / total * 100, 1) if total > 0 else 0,
+        non_functional_pct=round(category_counts["non_functional"] / total * 100, 1)
+        if total > 0
+        else 0,
+        constraint_pct=round(category_counts["constraint"] / total * 100, 1) if total > 0 else 0,
+    )
+
+    return tuple(categorized)
 
 
 def _identify_edge_cases(
@@ -214,9 +1081,7 @@ def _identify_edge_cases(
                 # Check if edge case is already mentioned in requirement
                 edge_case_lower = edge_case.lower()
                 if any(
-                    word in text_to_analyze
-                    for word in edge_case_lower.split()
-                    if len(word) > 4
+                    word in text_to_analyze for word in edge_case_lower.split() if len(word) > 4
                 ):
                     continue
 
@@ -263,8 +1128,7 @@ def _assess_edge_case_severity(category: str, edge_case: str) -> Severity:
 
     # Critical: Security-related or data integrity issues
     if any(
-        term in edge_case_lower
-        for term in ["overflow", "injection", "unauthorized", "data loss"]
+        term in edge_case_lower for term in ["overflow", "injection", "unauthorized", "data loss"]
     ):
         return Severity.CRITICAL
 
@@ -386,9 +1250,7 @@ def _identify_implied_requirements(
     seen_implications: set[str] = set()
 
     # Combine all requirement text to check for already-stated requirements
-    all_req_text = " ".join(
-        f"{r.original_text} {r.refined_text}".lower() for r in requirements
-    )
+    all_req_text = " ".join(f"{r.original_text} {r.refined_text}".lower() for r in requirements)
 
     for req in requirements:
         text_to_analyze = f"{req.original_text} {req.refined_text}".lower()
@@ -439,24 +1301,15 @@ def _assess_implied_severity(implied_desc: str) -> Severity:
     desc_lower = implied_desc.lower()
 
     # Critical: Security-related implications
-    if any(
-        term in desc_lower
-        for term in ["password", "authentication", "security", "permission"]
-    ):
+    if any(term in desc_lower for term in ["password", "authentication", "security", "permission"]):
         return Severity.HIGH
 
     # High: Core functionality implications
-    if any(
-        term in desc_lower
-        for term in ["logout", "session", "verification", "validation"]
-    ):
+    if any(term in desc_lower for term in ["logout", "session", "verification", "validation"]):
         return Severity.HIGH
 
     # Medium: User experience implications
-    if any(
-        term in desc_lower
-        for term in ["confirmation", "warning", "preference", "progress"]
-    ):
+    if any(term in desc_lower for term in ["confirmation", "warning", "preference", "progress"]):
         return Severity.MEDIUM
 
     # Low: Nice-to-have implications
@@ -522,30 +1375,95 @@ DOMAIN_PATTERNS: dict[str, list[tuple[str, str]]] = {
 
 # Keywords to detect domain context from requirements
 DOMAIN_KEYWORDS: dict[str, frozenset[str]] = {
-    "authentication": frozenset([
-        "login", "authenticate", "sign in", "signin", "credential",
-        "password", "auth", "sso", "oauth", "identity",
-    ]),
-    "authorization": frozenset([
-        "permission", "role", "access", "authorize", "privilege",
-        "admin", "rbac", "acl", "policy", "grant",
-    ]),
-    "crud": frozenset([
-        "create", "read", "update", "delete", "list", "get", "post",
-        "put", "patch", "remove", "add", "edit", "modify",
-    ]),
-    "api": frozenset([
-        "api", "endpoint", "rest", "graphql", "request", "response",
-        "http", "webhook", "integration", "service",
-    ]),
-    "data": frozenset([
-        "database", "store", "persist", "query", "record", "entity",
-        "model", "schema", "migration", "backup", "archive",
-    ]),
-    "user_interface": frozenset([
-        "ui", "interface", "form", "button", "page", "screen",
-        "dashboard", "component", "display", "view", "layout",
-    ]),
+    "authentication": frozenset(
+        [
+            "login",
+            "authenticate",
+            "sign in",
+            "signin",
+            "credential",
+            "password",
+            "auth",
+            "sso",
+            "oauth",
+            "identity",
+        ]
+    ),
+    "authorization": frozenset(
+        [
+            "permission",
+            "role",
+            "access",
+            "authorize",
+            "privilege",
+            "admin",
+            "rbac",
+            "acl",
+            "policy",
+            "grant",
+        ]
+    ),
+    "crud": frozenset(
+        [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "list",
+            "get",
+            "post",
+            "put",
+            "patch",
+            "remove",
+            "add",
+            "edit",
+            "modify",
+        ]
+    ),
+    "api": frozenset(
+        [
+            "api",
+            "endpoint",
+            "rest",
+            "graphql",
+            "request",
+            "response",
+            "http",
+            "webhook",
+            "integration",
+            "service",
+        ]
+    ),
+    "data": frozenset(
+        [
+            "database",
+            "store",
+            "persist",
+            "query",
+            "record",
+            "entity",
+            "model",
+            "schema",
+            "migration",
+            "backup",
+            "archive",
+        ]
+    ),
+    "user_interface": frozenset(
+        [
+            "ui",
+            "interface",
+            "form",
+            "button",
+            "page",
+            "screen",
+            "dashboard",
+            "component",
+            "display",
+            "view",
+            "layout",
+        ]
+    ),
 }
 
 
@@ -580,9 +1498,7 @@ def _suggest_from_patterns(
     seen_suggestions: set[str] = set()
 
     # Detect domains mentioned in requirements
-    all_req_text = " ".join(
-        f"{r.original_text} {r.refined_text}".lower() for r in requirements
-    )
+    all_req_text = " ".join(f"{r.original_text} {r.refined_text}".lower() for r in requirements)
 
     detected_domains: set[str] = set()
     for domain, keywords in DOMAIN_KEYWORDS.items():
@@ -643,10 +1559,7 @@ def _assess_pattern_severity(domain: str, pattern_desc: str) -> Severity:
 
     # High: Security-related patterns
     if domain in ("authentication", "authorization"):
-        if any(
-            term in desc_lower
-            for term in ["lockout", "mfa", "multi-factor", "permission"]
-        ):
+        if any(term in desc_lower for term in ["lockout", "mfa", "multi-factor", "permission"]):
             return Severity.HIGH
         return Severity.MEDIUM
 
@@ -720,9 +1633,8 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
             f"{severity_counts['low']} low severity gaps. "
             f"Contradictions: {len(output.contradictions)}."
         ),
-        related_artifacts=tuple(r.id for r in output.requirements) + tuple(
-            g.id for g in output.structured_gaps
-        ),
+        related_artifacts=tuple(r.id for r in output.requirements)
+        + tuple(g.id for g in output.structured_gaps),
     )
 
     # Create output message with analyst attribution
@@ -872,16 +1784,12 @@ def _parse_llm_response(response: str) -> AnalystOutput:
                         description=gap_data.get("description", ""),
                         gap_type=GapType(gap_data.get("gap_type", "edge_case")),
                         severity=Severity(gap_data.get("severity", "medium")),
-                        source_requirements=tuple(
-                            gap_data.get("source_requirements", [])
-                        ),
+                        source_requirements=tuple(gap_data.get("source_requirements", [])),
                         rationale=gap_data.get("rationale", ""),
                     )
                     parsed_gaps.append(gap)
                 except (ValueError, KeyError) as gap_err:
-                    logger.warning(
-                        "gap_parse_failed", gap_index=i, error=str(gap_err)
-                    )
+                    logger.warning("gap_parse_failed", gap_index=i, error=str(gap_err))
             structured_gaps = tuple(parsed_gaps)
 
         return AnalystOutput(
@@ -970,7 +1878,9 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
     # Generate scope notes if vague terms detected
     scope_notes: str | None = None
     if vague_terms:
-        scope_notes = f"Vague terms detected: {', '.join(sorted(vague_terms))}. Scope needs clarification."
+        scope_notes = (
+            f"Vague terms detected: {', '.join(sorted(vague_terms))}. Scope needs clarification."
+        )
 
     # Generate implementation hints based on content
     hints: tuple[str, ...] = ()
@@ -985,7 +1895,9 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
     placeholder_req = CrystallizedRequirement(
         id="req-001",
         original_text=seed_content[:200] if len(seed_content) > 200 else seed_content,
-        refined_text=f"Implement: {seed_content[:100]}..." if len(seed_content) > 100 else seed_content,
+        refined_text=f"Implement: {seed_content[:100]}..."
+        if len(seed_content) > 100
+        else seed_content,
         category="functional",
         testable=True,
         scope_notes=scope_notes,
@@ -1005,24 +1917,31 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
 
 
 def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
-    """Enhance AnalystOutput with gap analysis results.
+    """Enhance AnalystOutput with gap analysis and categorization results.
 
-    Runs edge case detection, implied requirement detection, and
-    pattern-based suggestion on the crystallized requirements.
+    Runs:
+    1. Requirement categorization (Story 5.4)
+    2. Edge case detection
+    3. Implied requirement detection
+    4. Pattern-based suggestion
 
     Args:
         output: Initial AnalystOutput with requirements.
 
     Returns:
-        Enhanced AnalystOutput with structured_gaps populated.
+        Enhanced AnalystOutput with categorized requirements and
+        structured_gaps populated.
     """
     if not output.requirements:
         return output
 
-    # Run all gap analysis functions
-    edge_cases = _identify_edge_cases(output.requirements)
-    implied_reqs = _identify_implied_requirements(output.requirements)
-    pattern_suggestions = _suggest_from_patterns(output.requirements)
+    # Story 5.4: Categorize all requirements
+    categorized_requirements = _categorize_all_requirements(output.requirements)
+
+    # Run all gap analysis functions on categorized requirements
+    edge_cases = _identify_edge_cases(categorized_requirements)
+    implied_reqs = _identify_implied_requirements(categorized_requirements)
+    pattern_suggestions = _suggest_from_patterns(categorized_requirements)
 
     # Combine all gaps
     all_gaps: list[IdentifiedGap] = []
@@ -1061,9 +1980,9 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         total_gaps=len(renumbered_gaps),
     )
 
-    # Create enhanced output with structured gaps
+    # Create enhanced output with categorized requirements and structured gaps
     return AnalystOutput(
-        requirements=output.requirements,
+        requirements=categorized_requirements,  # Story 5.4: Use categorized requirements
         identified_gaps=output.identified_gaps,
         contradictions=output.contradictions,
         structured_gaps=tuple(renumbered_gaps),

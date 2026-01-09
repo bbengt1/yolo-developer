@@ -1,4 +1,4 @@
-"""Analyst agent module for requirement crystallization (Story 5.1, 5.2, 5.3).
+"""Analyst agent module for requirement crystallization (Story 5.1, 5.2, 5.3, 5.4).
 
 The Analyst agent is responsible for:
 - Crystallizing raw requirements from seed content
@@ -58,17 +58,27 @@ from __future__ import annotations
 from yolo_developer.agents.analyst.node import analyst_node
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
+    CategorizationResult,
+    ConstraintSubCategory,
     CrystallizedRequirement,
+    FunctionalSubCategory,
     GapType,
     IdentifiedGap,
+    NonFunctionalSubCategory,
+    RequirementCategory,
     Severity,
 )
 
 __all__ = [
     "AnalystOutput",
+    "CategorizationResult",
+    "ConstraintSubCategory",
     "CrystallizedRequirement",
+    "FunctionalSubCategory",
     "GapType",
     "IdentifiedGap",
+    "NonFunctionalSubCategory",
+    "RequirementCategory",
     "Severity",
     "analyst_node",
 ]

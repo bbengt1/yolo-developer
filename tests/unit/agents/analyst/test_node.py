@@ -1,7 +1,7 @@
-"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3).
+"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3, 5.4).
 
 Tests for analyst_node function, state management, vague term detection,
-and gap analysis functions.
+gap analysis functions, and requirement categorization.
 """
 
 from __future__ import annotations
@@ -13,16 +13,25 @@ from langchain_core.messages import HumanMessage
 
 from yolo_developer.agents.analyst import analyst_node
 from yolo_developer.agents.analyst.node import (
+    _assign_sub_category,
+    _calculate_category_confidence,
+    _categorize_all_requirements,
+    _categorize_requirement,
+    _count_keyword_matches,
     _detect_vague_terms,
     _enhance_with_gap_analysis,
     _identify_edge_cases,
     _identify_implied_requirements,
     _suggest_from_patterns,
+    CONSTRAINT_KEYWORDS,
+    FUNCTIONAL_KEYWORDS,
+    NON_FUNCTIONAL_KEYWORDS,
 )
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
     CrystallizedRequirement,
     GapType,
+    RequirementCategory,
     Severity,
 )
 from yolo_developer.orchestrator.state import YoloState
@@ -867,10 +876,13 @@ class TestGapAnalysisIntegration:
 
 
 class TestEnhanceWithGapAnalysis:
-    """Tests for _enhance_with_gap_analysis function (Story 5.3)."""
+    """Tests for _enhance_with_gap_analysis function (Story 5.3, 5.4)."""
 
     def test_enhances_output_with_gaps(self) -> None:
-        """_enhance_with_gap_analysis should add structured_gaps to output."""
+        """_enhance_with_gap_analysis should add structured_gaps to output.
+
+        Story 5.4: Also verifies requirements are categorized.
+        """
         req = CrystallizedRequirement(
             id="req-001",
             original_text="User can login",
@@ -887,7 +899,14 @@ class TestEnhanceWithGapAnalysis:
         result = _enhance_with_gap_analysis(initial_output)
 
         assert len(result.structured_gaps) > 0
-        assert result.requirements == initial_output.requirements
+        # Story 5.4: Requirements are categorized, verify core fields match
+        assert len(result.requirements) == 1
+        enhanced_req = result.requirements[0]
+        assert enhanced_req.id == req.id
+        assert enhanced_req.original_text == req.original_text
+        # Story 5.4: Categorization fields should be populated
+        assert enhanced_req.category_rationale is not None
+        assert enhanced_req.sub_category is not None  # "user_management" for login
 
     def test_empty_requirements_returns_unchanged(self) -> None:
         """Empty requirements should return output unchanged."""
@@ -958,7 +977,11 @@ class TestEnhanceWithGapAnalysis:
             assert gap.id == expected_id, f"Expected {expected_id}, got {gap.id}"
 
     def test_preserves_existing_fields(self) -> None:
-        """Should preserve requirements, identified_gaps, and contradictions."""
+        """Should preserve core requirement fields, identified_gaps, and contradictions.
+
+        Note: Story 5.4 adds categorization fields (sub_category, category_confidence,
+        category_rationale) to requirements, so we verify core fields match.
+        """
         req = CrystallizedRequirement(
             id="req-001",
             original_text="test",
@@ -974,6 +997,362 @@ class TestEnhanceWithGapAnalysis:
 
         result = _enhance_with_gap_analysis(initial_output)
 
-        assert result.requirements == initial_output.requirements
+        # Story 5.4: Requirements are now categorized, so verify core fields match
+        assert len(result.requirements) == len(initial_output.requirements)
+        for orig, enhanced in zip(
+            initial_output.requirements, result.requirements, strict=True
+        ):
+            assert enhanced.id == orig.id
+            assert enhanced.original_text == orig.original_text
+            assert enhanced.refined_text == orig.refined_text
+            assert enhanced.category == orig.category  # May be updated by categorization
+            assert enhanced.testable == orig.testable
+            # Story 5.4: New categorization fields should be populated
+            assert enhanced.category_rationale is not None  # Should have rationale
+            assert 0.0 <= enhanced.category_confidence <= 1.0  # Valid confidence
+
+        # Legacy fields should be preserved
         assert result.identified_gaps == initial_output.identified_gaps
         assert result.contradictions == initial_output.contradictions
+
+
+# =============================================================================
+# Story 5.4: Requirement Categorization Tests
+# =============================================================================
+
+
+class TestCountKeywordMatches:
+    """Tests for _count_keyword_matches function (Story 5.4)."""
+
+    def test_empty_text_returns_zero(self) -> None:
+        """Empty text should return zero matches."""
+        assert _count_keyword_matches("", FUNCTIONAL_KEYWORDS) == 0
+
+    def test_single_keyword_match(self) -> None:
+        """Should count a single keyword match."""
+        count = _count_keyword_matches("User can create account", FUNCTIONAL_KEYWORDS)
+        assert count >= 1  # "create" is a functional keyword
+
+    def test_multiple_keyword_matches(self) -> None:
+        """Should count multiple keywords."""
+        text = "User can create, edit, and delete items"
+        count = _count_keyword_matches(text, FUNCTIONAL_KEYWORDS)
+        assert count >= 3  # "create", "edit", "delete"
+
+    def test_case_insensitive(self) -> None:
+        """Matching should be case-insensitive."""
+        count1 = _count_keyword_matches("User can LOGIN", FUNCTIONAL_KEYWORDS)
+        count2 = _count_keyword_matches("user can login", FUNCTIONAL_KEYWORDS)
+        assert count1 == count2
+
+    def test_phrase_matching(self) -> None:
+        """Should match multi-word phrases like 'user can'."""
+        count = _count_keyword_matches("User can do something", FUNCTIONAL_KEYWORDS)
+        assert count >= 1  # "user can" is a phrase keyword
+
+    def test_non_functional_keywords(self) -> None:
+        """Should detect non-functional keywords."""
+        count = _count_keyword_matches(
+            "Response time < 200ms for performance",
+            NON_FUNCTIONAL_KEYWORDS,
+        )
+        assert count >= 2  # "response time", "performance"
+
+    def test_constraint_keywords(self) -> None:
+        """Should detect constraint keywords."""
+        count = _count_keyword_matches(
+            "Must use Python and AWS",
+            CONSTRAINT_KEYWORDS,
+        )
+        assert count >= 2  # "must use", "python", "aws"
+
+
+class TestCalculateCategoryConfidence:
+    """Tests for _calculate_category_confidence function (Story 5.4)."""
+
+    def test_no_keywords_low_confidence(self) -> None:
+        """No keywords should result in low confidence."""
+        confidence = _calculate_category_confidence("random text here", 0, 0, 0)
+        assert confidence == 0.3
+
+    def test_clear_functional_high_confidence(self) -> None:
+        """Clear functional keywords should have high confidence."""
+        confidence = _calculate_category_confidence(
+            "User can create and delete",
+            5, 0, 0,  # Clear functional winner
+        )
+        assert confidence >= 0.7
+
+    def test_ambiguous_lower_confidence_than_clear_winner(self) -> None:
+        """Ambiguous (tie) categories should have lower confidence than clear winner."""
+        tie_confidence = _calculate_category_confidence(
+            "Some text",
+            2, 2, 0,  # Tie between functional and non-functional
+        )
+        clear_winner_confidence = _calculate_category_confidence(
+            "Some text",
+            5, 0, 0,  # Clear functional winner
+        )
+        # Tie should have lower confidence than clear winner (differentiation bonus)
+        assert tie_confidence <= clear_winner_confidence
+
+    def test_vague_terms_reduce_confidence(self) -> None:
+        """Vague terms should reduce confidence."""
+        # "fast" and "should" are vague terms
+        confidence = _calculate_category_confidence(
+            "System should be fast",
+            2, 1, 0,
+        )
+        # Should be reduced due to vague terms
+        assert confidence < 0.9
+
+    def test_confidence_bounded(self) -> None:
+        """Confidence should always be between 0.0 and 1.0."""
+        # Very strong signal
+        confidence = _calculate_category_confidence(
+            "Clear requirement",
+            10, 0, 0,
+        )
+        assert 0.0 <= confidence <= 1.0
+
+
+class TestAssignSubCategory:
+    """Tests for _assign_sub_category function (Story 5.4)."""
+
+    def test_empty_text_returns_none(self) -> None:
+        """Empty text should return None."""
+        result = _assign_sub_category("", RequirementCategory.FUNCTIONAL)
+        assert result is None
+
+    def test_functional_user_management(self) -> None:
+        """Login/user text should get user_management sub-category."""
+        result = _assign_sub_category(
+            "User can login with password",
+            RequirementCategory.FUNCTIONAL,
+        )
+        assert result == "user_management"
+
+    def test_functional_data_operations(self) -> None:
+        """CRUD text should get data_operations sub-category."""
+        result = _assign_sub_category(
+            "Create and store records in database",
+            RequirementCategory.FUNCTIONAL,
+        )
+        assert result == "data_operations"
+
+    def test_functional_integration(self) -> None:
+        """API text should get integration sub-category."""
+        result = _assign_sub_category(
+            "REST API endpoint for external service",
+            RequirementCategory.FUNCTIONAL,
+        )
+        assert result == "integration"
+
+    def test_non_functional_performance(self) -> None:
+        """Response time text should get performance sub-category."""
+        result = _assign_sub_category(
+            "Fast response time under load",
+            RequirementCategory.NON_FUNCTIONAL,
+        )
+        assert result == "performance"
+
+    def test_non_functional_security(self) -> None:
+        """Security text should get security sub-category."""
+        result = _assign_sub_category(
+            "Encrypt sensitive data securely",
+            RequirementCategory.NON_FUNCTIONAL,
+        )
+        assert result == "security"
+
+    def test_constraint_technical(self) -> None:
+        """Tech stack text should get technical sub-category."""
+        result = _assign_sub_category(
+            "Must use Python and PostgreSQL",
+            RequirementCategory.CONSTRAINT,
+        )
+        assert result == "technical"
+
+    def test_constraint_regulatory(self) -> None:
+        """Compliance text should get regulatory sub-category."""
+        result = _assign_sub_category(
+            "GDPR compliance required",
+            RequirementCategory.CONSTRAINT,
+        )
+        assert result == "regulatory"
+
+    def test_no_match_returns_none(self) -> None:
+        """Text with no matching keywords should return None."""
+        result = _assign_sub_category(
+            "random words here",
+            RequirementCategory.FUNCTIONAL,
+        )
+        assert result is None
+
+
+class TestCategorizeRequirement:
+    """Tests for _categorize_requirement function (Story 5.4)."""
+
+    def test_functional_requirement_detection(self) -> None:
+        """Should detect functional requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can create account",
+            refined_text="User submits registration form",
+            category="functional",
+            testable=True,
+        )
+        result = _categorize_requirement(req)
+
+        assert result.category == "functional"
+        assert result.category_confidence > 0.0
+        assert result.category_rationale is not None
+
+    def test_non_functional_requirement_detection(self) -> None:
+        """Should detect non-functional requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="System should be fast",
+            refined_text="Response time < 200ms",
+            category="non-functional",
+            testable=True,
+        )
+        result = _categorize_requirement(req)
+
+        assert result.category == "non_functional"
+        assert result.sub_category == "performance"
+
+    def test_constraint_requirement_detection(self) -> None:
+        """Should detect constraint requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Must use Python",
+            refined_text="Implementation required in Python 3.10+",
+            category="constraint",
+            testable=True,
+        )
+        result = _categorize_requirement(req)
+
+        assert result.category == "constraint"
+        assert result.sub_category == "technical"
+
+    def test_preserves_original_fields(self) -> None:
+        """Should preserve id, original_text, refined_text, etc."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Original",
+            refined_text="Refined",
+            category="functional",
+            testable=True,
+            scope_notes="Some notes",
+            implementation_hints=("hint1",),
+            confidence=0.9,
+        )
+        result = _categorize_requirement(req)
+
+        assert result.id == req.id
+        assert result.original_text == req.original_text
+        assert result.refined_text == req.refined_text
+        assert result.testable == req.testable
+        assert result.scope_notes == req.scope_notes
+        assert result.implementation_hints == req.implementation_hints
+        assert result.confidence == req.confidence
+
+    def test_rationale_includes_keywords(self) -> None:
+        """Rationale should mention detected keywords."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates",
+            category="functional",
+            testable=True,
+        )
+        result = _categorize_requirement(req)
+
+        assert "Keywords:" in result.category_rationale
+        assert "Scores:" in result.category_rationale
+
+
+class TestCategorizeAllRequirements:
+    """Tests for _categorize_all_requirements function (Story 5.4)."""
+
+    def test_empty_input_returns_empty(self) -> None:
+        """Empty input should return empty tuple."""
+        result = _categorize_all_requirements(())
+        assert result == ()
+
+    def test_processes_all_requirements(self) -> None:
+        """Should process all requirements in input."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login",
+                refined_text="User authenticates",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Fast response",
+                refined_text="< 200ms response",
+                category="non-functional",
+                testable=True,
+            ),
+        )
+        result = _categorize_all_requirements(reqs)
+
+        assert len(result) == 2
+        assert all(r.category_rationale is not None for r in result)
+
+    def test_maintains_order(self) -> None:
+        """Output order should match input order."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="First",
+                refined_text="First",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Second",
+                refined_text="Second",
+                category="functional",
+                testable=True,
+            ),
+        )
+        result = _categorize_all_requirements(reqs)
+
+        assert result[0].id == "req-001"
+        assert result[1].id == "req-002"
+
+    def test_mixed_categories(self) -> None:
+        """Should correctly categorize mixed requirement types."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User can login",
+                refined_text="Authentication required",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Must be secure",
+                refined_text="Encrypt all data",
+                category="non-functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-003",
+                original_text="Use Python",
+                refined_text="Python 3.10+ required",
+                category="constraint",
+                testable=True,
+            ),
+        )
+        result = _categorize_all_requirements(reqs)
+
+        categories = {r.category for r in result}
+        # All three category types should be present
+        assert len(categories) == 3
