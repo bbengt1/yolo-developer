@@ -1,6 +1,7 @@
-"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3, Story 5.4).
+"""Unit tests for Analyst agent types (Story 5.1 Task 3, Story 5.3, Story 5.4, Story 5.5).
 
-Tests for CrystallizedRequirement, AnalystOutput, gap analysis types, and categorization types.
+Tests for CrystallizedRequirement, AnalystOutput, gap analysis types,
+categorization types, and implementability types.
 """
 
 from __future__ import annotations
@@ -10,11 +11,16 @@ import pytest
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
     CategorizationResult,
+    ComplexityLevel,
     ConstraintSubCategory,
     CrystallizedRequirement,
+    DependencyType,
+    ExternalDependency,
     FunctionalSubCategory,
     GapType,
     IdentifiedGap,
+    ImplementabilityResult,
+    ImplementabilityStatus,
     NonFunctionalSubCategory,
     RequirementCategory,
     Severity,
@@ -78,6 +84,12 @@ class TestCrystallizedRequirement:
             "sub_category": None,
             "category_confidence": 1.0,
             "category_rationale": None,
+            # Story 5.5 implementability fields
+            "implementability_status": None,
+            "complexity": None,
+            "external_dependencies": [],
+            "implementability_issues": [],
+            "implementability_rationale": None,
         }
 
     def test_equality(self) -> None:
@@ -1036,3 +1048,459 @@ class TestCrystallizedRequirementCategorization:
 
         s = {req}
         assert req in s
+
+
+# =============================================================================
+# Story 5.5: Implementability Types Tests
+# =============================================================================
+
+
+class TestImplementabilityStatus:
+    """Tests for ImplementabilityStatus enum (Story 5.5)."""
+
+    def test_implementability_status_values(self) -> None:
+        """ImplementabilityStatus should have expected string values."""
+        assert ImplementabilityStatus.IMPLEMENTABLE.value == "implementable"
+        assert ImplementabilityStatus.NEEDS_CLARIFICATION.value == "needs_clarification"
+        assert ImplementabilityStatus.NOT_IMPLEMENTABLE.value == "not_implementable"
+
+    def test_implementability_status_is_str_enum(self) -> None:
+        """ImplementabilityStatus should be a string enum."""
+        assert isinstance(ImplementabilityStatus.IMPLEMENTABLE, str)
+        assert ImplementabilityStatus.IMPLEMENTABLE == "implementable"
+
+    def test_implementability_status_from_string(self) -> None:
+        """ImplementabilityStatus should be creatable from string value."""
+        status = ImplementabilityStatus("implementable")
+        assert status == ImplementabilityStatus.IMPLEMENTABLE
+
+    def test_implementability_status_invalid_value(self) -> None:
+        """ImplementabilityStatus should raise ValueError for invalid values."""
+        with pytest.raises(ValueError):
+            ImplementabilityStatus("invalid_status")
+
+    def test_implementability_status_all_members(self) -> None:
+        """ImplementabilityStatus should have exactly 3 members."""
+        members = list(ImplementabilityStatus)
+        assert len(members) == 3
+
+
+class TestComplexityLevel:
+    """Tests for ComplexityLevel enum (Story 5.5)."""
+
+    def test_complexity_level_values(self) -> None:
+        """ComplexityLevel should have expected string values."""
+        assert ComplexityLevel.LOW.value == "low"
+        assert ComplexityLevel.MEDIUM.value == "medium"
+        assert ComplexityLevel.HIGH.value == "high"
+        assert ComplexityLevel.VERY_HIGH.value == "very_high"
+
+    def test_complexity_level_is_str_enum(self) -> None:
+        """ComplexityLevel should be a string enum."""
+        assert isinstance(ComplexityLevel.LOW, str)
+        assert ComplexityLevel.LOW == "low"
+
+    def test_complexity_level_from_string(self) -> None:
+        """ComplexityLevel should be creatable from string value."""
+        complexity = ComplexityLevel("medium")
+        assert complexity == ComplexityLevel.MEDIUM
+
+    def test_complexity_level_invalid_value(self) -> None:
+        """ComplexityLevel should raise ValueError for invalid values."""
+        with pytest.raises(ValueError):
+            ComplexityLevel("invalid_level")
+
+    def test_complexity_level_all_members(self) -> None:
+        """ComplexityLevel should have exactly 4 members."""
+        members = list(ComplexityLevel)
+        assert len(members) == 4
+
+
+class TestDependencyType:
+    """Tests for DependencyType enum (Story 5.5)."""
+
+    def test_dependency_type_values(self) -> None:
+        """DependencyType should have expected string values."""
+        assert DependencyType.API.value == "api"
+        assert DependencyType.LIBRARY.value == "library"
+        assert DependencyType.SERVICE.value == "service"
+        assert DependencyType.INFRASTRUCTURE.value == "infrastructure"
+        assert DependencyType.DATA_SOURCE.value == "data_source"
+
+    def test_dependency_type_is_str_enum(self) -> None:
+        """DependencyType should be a string enum."""
+        assert isinstance(DependencyType.API, str)
+        assert DependencyType.API == "api"
+
+    def test_dependency_type_from_string(self) -> None:
+        """DependencyType should be creatable from string value."""
+        dep_type = DependencyType("service")
+        assert dep_type == DependencyType.SERVICE
+
+    def test_dependency_type_invalid_value(self) -> None:
+        """DependencyType should raise ValueError for invalid values."""
+        with pytest.raises(ValueError):
+            DependencyType("invalid_type")
+
+    def test_dependency_type_all_members(self) -> None:
+        """DependencyType should have exactly 5 members."""
+        members = list(DependencyType)
+        assert len(members) == 5
+
+
+class TestExternalDependency:
+    """Tests for ExternalDependency dataclass (Story 5.5)."""
+
+    def test_creation_with_all_fields(self) -> None:
+        """ExternalDependency should be creatable with all fields."""
+        dep = ExternalDependency(
+            name="PostgreSQL",
+            dependency_type=DependencyType.INFRASTRUCTURE,
+            description="Relational database for persistent storage",
+            availability_notes="Widely available, managed services exist",
+            criticality="required",
+        )
+
+        assert dep.name == "PostgreSQL"
+        assert dep.dependency_type == DependencyType.INFRASTRUCTURE
+        assert dep.description == "Relational database for persistent storage"
+        assert dep.availability_notes == "Widely available, managed services exist"
+        assert dep.criticality == "required"
+
+    def test_immutability(self) -> None:
+        """ExternalDependency should be immutable (frozen dataclass)."""
+        dep = ExternalDependency(
+            name="Redis",
+            dependency_type=DependencyType.INFRASTRUCTURE,
+            description="Cache",
+            availability_notes="Easy to provision",
+            criticality="optional",
+        )
+
+        with pytest.raises(AttributeError):
+            dep.name = "Memcached"  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            dep.criticality = "required"  # type: ignore[misc]
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict should serialize all fields correctly."""
+        dep = ExternalDependency(
+            name="Stripe",
+            dependency_type=DependencyType.API,
+            description="Payment processing API",
+            availability_notes="Requires API key",
+            criticality="required",
+        )
+
+        result = dep.to_dict()
+
+        assert result == {
+            "name": "Stripe",
+            "dependency_type": "api",
+            "description": "Payment processing API",
+            "availability_notes": "Requires API key",
+            "criticality": "required",
+        }
+
+    def test_to_dict_converts_enum_to_string(self) -> None:
+        """to_dict should convert dependency_type enum to string value."""
+        dep = ExternalDependency(
+            name="AWS",
+            dependency_type=DependencyType.SERVICE,
+            description="Cloud provider",
+            availability_notes="Account needed",
+            criticality="required",
+        )
+
+        result = dep.to_dict()
+
+        assert result["dependency_type"] == "service"
+        assert isinstance(result["dependency_type"], str)
+
+    def test_hashability(self) -> None:
+        """ExternalDependency should be hashable (frozen)."""
+        dep = ExternalDependency(
+            name="Redis",
+            dependency_type=DependencyType.INFRASTRUCTURE,
+            description="Cache",
+            availability_notes="notes",
+            criticality="optional",
+        )
+
+        s = {dep}
+        assert dep in s
+
+
+class TestImplementabilityResult:
+    """Tests for ImplementabilityResult dataclass (Story 5.5)."""
+
+    def test_creation_with_all_fields(self) -> None:
+        """ImplementabilityResult should be creatable with all fields."""
+        dep = ExternalDependency(
+            name="PostgreSQL",
+            dependency_type=DependencyType.INFRASTRUCTURE,
+            description="Database",
+            availability_notes="notes",
+            criticality="required",
+        )
+
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.IMPLEMENTABLE,
+            complexity=ComplexityLevel.MEDIUM,
+            dependencies=(dep,),
+            issues=(),
+            remediation_suggestions=(),
+            rationale="Standard CRUD requirement",
+        )
+
+        assert result.status == ImplementabilityStatus.IMPLEMENTABLE
+        assert result.complexity == ComplexityLevel.MEDIUM
+        assert len(result.dependencies) == 1
+        assert result.issues == ()
+        assert result.rationale == "Standard CRUD requirement"
+
+    def test_creation_with_issues(self) -> None:
+        """ImplementabilityResult should handle issues and remediations."""
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.NOT_IMPLEMENTABLE,
+            complexity=ComplexityLevel.HIGH,
+            dependencies=(),
+            issues=("100% uptime is impossible",),
+            remediation_suggestions=("Use 99.9% SLA instead",),
+            rationale="Absolute guarantees are infeasible",
+        )
+
+        assert result.status == ImplementabilityStatus.NOT_IMPLEMENTABLE
+        assert len(result.issues) == 1
+        assert len(result.remediation_suggestions) == 1
+
+    def test_immutability(self) -> None:
+        """ImplementabilityResult should be immutable (frozen dataclass)."""
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.IMPLEMENTABLE,
+            complexity=ComplexityLevel.LOW,
+            dependencies=(),
+            issues=(),
+            remediation_suggestions=(),
+            rationale="Simple",
+        )
+
+        with pytest.raises(AttributeError):
+            result.status = ImplementabilityStatus.NOT_IMPLEMENTABLE  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            result.complexity = ComplexityLevel.HIGH  # type: ignore[misc]
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict should serialize all fields correctly."""
+        dep = ExternalDependency(
+            name="Redis",
+            dependency_type=DependencyType.INFRASTRUCTURE,
+            description="Cache",
+            availability_notes="notes",
+            criticality="optional",
+        )
+
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.IMPLEMENTABLE,
+            complexity=ComplexityLevel.MEDIUM,
+            dependencies=(dep,),
+            issues=("minor issue",),
+            remediation_suggestions=("fix it",),
+            rationale="Needs caching",
+        )
+
+        d = result.to_dict()
+
+        assert d["status"] == "implementable"
+        assert d["complexity"] == "medium"
+        assert len(d["dependencies"]) == 1
+        assert d["dependencies"][0]["name"] == "Redis"
+        assert d["issues"] == ["minor issue"]
+        assert d["remediation_suggestions"] == ["fix it"]
+        assert d["rationale"] == "Needs caching"
+
+    def test_to_dict_converts_enums_to_strings(self) -> None:
+        """to_dict should convert all enums to string values."""
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.NEEDS_CLARIFICATION,
+            complexity=ComplexityLevel.HIGH,
+            dependencies=(),
+            issues=(),
+            remediation_suggestions=(),
+            rationale="reason",
+        )
+
+        d = result.to_dict()
+
+        assert d["status"] == "needs_clarification"
+        assert d["complexity"] == "high"
+        assert isinstance(d["status"], str)
+        assert isinstance(d["complexity"], str)
+
+    def test_hashability(self) -> None:
+        """ImplementabilityResult should be hashable (frozen)."""
+        result = ImplementabilityResult(
+            status=ImplementabilityStatus.IMPLEMENTABLE,
+            complexity=ComplexityLevel.LOW,
+            dependencies=(),
+            issues=(),
+            remediation_suggestions=(),
+            rationale="simple",
+        )
+
+        s = {result}
+        assert result in s
+
+
+class TestCrystallizedRequirementImplementability:
+    """Tests for CrystallizedRequirement implementability fields (Story 5.5)."""
+
+    def test_new_implementability_fields_have_defaults(self) -> None:
+        """New implementability fields should have correct default values."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates with email",
+            category="functional",
+            testable=True,
+        )
+
+        assert req.implementability_status is None
+        assert req.complexity is None
+        assert req.external_dependencies == ()
+        assert req.implementability_issues == ()
+        assert req.implementability_rationale is None
+
+    def test_creation_with_all_implementability_fields(self) -> None:
+        """CrystallizedRequirement should accept all implementability fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="User authenticates with email",
+            category="functional",
+            testable=True,
+            implementability_status="implementable",
+            complexity="low",
+            external_dependencies=({"name": "Auth0", "dependency_type": "service"},),
+            implementability_issues=(),
+            implementability_rationale="Standard auth pattern",
+        )
+
+        assert req.implementability_status == "implementable"
+        assert req.complexity == "low"
+        assert len(req.external_dependencies) == 1
+        assert req.implementability_issues == ()
+        assert req.implementability_rationale == "Standard auth pattern"
+
+    def test_to_dict_includes_implementability_fields(self) -> None:
+        """to_dict should include new implementability fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            implementability_status="implementable",
+            complexity="medium",
+            external_dependencies=({"name": "PostgreSQL"},),
+            implementability_issues=("minor issue",),
+            implementability_rationale="Needs database",
+        )
+
+        d = req.to_dict()
+
+        assert d["implementability_status"] == "implementable"
+        assert d["complexity"] == "medium"
+        assert d["external_dependencies"] == [{"name": "PostgreSQL"}]
+        assert d["implementability_issues"] == ["minor issue"]
+        assert d["implementability_rationale"] == "Needs database"
+
+    def test_to_dict_with_none_implementability_fields(self) -> None:
+        """to_dict should handle None implementability fields correctly."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+        )
+
+        d = req.to_dict()
+
+        assert d["implementability_status"] is None
+        assert d["complexity"] is None
+        assert d["external_dependencies"] == []
+        assert d["implementability_issues"] == []
+        assert d["implementability_rationale"] is None
+
+    def test_immutability_of_implementability_fields(self) -> None:
+        """New implementability fields should also be immutable."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="text",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            implementability_status="implementable",
+            complexity="low",
+            implementability_rationale="reason",
+        )
+
+        with pytest.raises(AttributeError):
+            req.implementability_status = "not_implementable"  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            req.complexity = "high"  # type: ignore[misc]
+
+        with pytest.raises(AttributeError):
+            req.implementability_rationale = "new reason"  # type: ignore[misc]
+
+    def test_hashability_with_implementability_fields(self) -> None:
+        """CrystallizedRequirement with implementability fields should be hashable."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="text",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            implementability_status="implementable",
+            complexity="medium",
+            implementability_rationale="reason",
+        )
+
+        s = {req}
+        assert req in s
+
+    def test_backward_compatibility_with_all_previous_fields(self) -> None:
+        """CrystallizedRequirement should work with all previous story fields."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="orig",
+            refined_text="ref",
+            category="functional",
+            testable=True,
+            # Story 5.2 fields
+            scope_notes="scope",
+            implementation_hints=("hint1",),
+            confidence=0.9,
+            # Story 5.4 fields
+            sub_category="user_management",
+            category_confidence=0.85,
+            category_rationale="login keywords",
+            # Story 5.5 fields
+            implementability_status="implementable",
+            complexity="low",
+            external_dependencies=(),
+            implementability_issues=(),
+            implementability_rationale="standard pattern",
+        )
+
+        d = req.to_dict()
+
+        # All fields should be present
+        assert d["id"] == "req-001"
+        assert d["scope_notes"] == "scope"
+        assert d["sub_category"] == "user_management"
+        assert d["implementability_status"] == "implementable"

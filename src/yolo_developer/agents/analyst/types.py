@@ -1,4 +1,4 @@
-"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4).
+"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4, 5.5).
 
 This module provides the data types used by the Analyst agent:
 
@@ -11,6 +11,11 @@ This module provides the data types used by the Analyst agent:
 - FunctionalSubCategory: Sub-categories for functional requirements
 - NonFunctionalSubCategory: Sub-categories for non-functional requirements (ISO 25010)
 - ConstraintSubCategory: Sub-categories for constraints
+- ImplementabilityStatus: Status of implementability validation (Story 5.5)
+- ComplexityLevel: Complexity level estimate for implementation (Story 5.5)
+- DependencyType: Type of external dependency (Story 5.5)
+- ExternalDependency: An external dependency required for implementation (Story 5.5)
+- ImplementabilityResult: Result of implementability validation (Story 5.5)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -128,6 +133,190 @@ class ConstraintSubCategory(str, Enum):
     REGULATORY = "regulatory"
     RESOURCE = "resource"
     TIMELINE = "timeline"
+
+
+# =============================================================================
+# Story 5.5: Implementability Validation Types
+# =============================================================================
+
+
+class ImplementabilityStatus(str, Enum):
+    """Status of implementability validation (Story 5.5).
+
+    Used to indicate whether a requirement can be implemented as stated.
+
+    Values:
+        IMPLEMENTABLE: Requirement can be implemented with available resources.
+        NEEDS_CLARIFICATION: Requirement is ambiguous or needs more details.
+        NOT_IMPLEMENTABLE: Requirement is technically impossible or infeasible.
+    """
+
+    IMPLEMENTABLE = "implementable"
+    NEEDS_CLARIFICATION = "needs_clarification"
+    NOT_IMPLEMENTABLE = "not_implementable"
+
+
+class ComplexityLevel(str, Enum):
+    """Complexity level estimate for implementation (Story 5.5).
+
+    Used to assess how difficult a requirement will be to implement.
+
+    Values:
+        LOW: Simple, well-understood patterns (CRUD, basic validation).
+        MEDIUM: Multi-component with standard integrations.
+        HIGH: Complex patterns requiring careful design (real-time, distributed).
+        VERY_HIGH: Cutting-edge or highly specialized (ML/AI, consensus).
+    """
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+
+class DependencyType(str, Enum):
+    """Type of external dependency (Story 5.5).
+
+    Used to categorize what kind of external resource a requirement needs.
+
+    Values:
+        API: External API integration (REST, GraphQL, webhooks).
+        LIBRARY: Third-party library or SDK.
+        SERVICE: Cloud service (AWS, GCP, Azure, SaaS).
+        INFRASTRUCTURE: Database, cache, queue, storage.
+        DATA_SOURCE: External data feed or data provider.
+    """
+
+    API = "api"
+    LIBRARY = "library"
+    SERVICE = "service"
+    INFRASTRUCTURE = "infrastructure"
+    DATA_SOURCE = "data_source"
+
+
+@dataclass(frozen=True)
+class ExternalDependency:
+    """An external dependency required for implementation (Story 5.5).
+
+    Immutable dataclass representing an external resource that must be
+    available to implement a requirement. Each dependency is categorized
+    by type with availability and criticality information.
+
+    Attributes:
+        name: Name of the dependency (e.g., "PostgreSQL", "Stripe API").
+        dependency_type: Category of dependency (api, library, service, etc.).
+        description: Human-readable description of what the dependency provides.
+        availability_notes: Notes about availability or accessibility.
+        criticality: How critical this dependency is ("required", "optional",
+            "recommended").
+
+    Example:
+        >>> dep = ExternalDependency(
+        ...     name="PostgreSQL",
+        ...     dependency_type=DependencyType.INFRASTRUCTURE,
+        ...     description="Relational database for persistent storage",
+        ...     availability_notes="Widely available, managed services exist",
+        ...     criticality="required",
+        ... )
+        >>> dep.to_dict()["dependency_type"]
+        'infrastructure'
+    """
+
+    name: str
+    dependency_type: DependencyType
+    description: str
+    availability_notes: str
+    criticality: str  # "required", "optional", "recommended"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with all fields, dependency_type enum as string value.
+
+        Example:
+            >>> dep = ExternalDependency(
+            ...     name="Redis",
+            ...     dependency_type=DependencyType.INFRASTRUCTURE,
+            ...     description="In-memory cache",
+            ...     availability_notes="Easy to provision",
+            ...     criticality="optional",
+            ... )
+            >>> dep.to_dict()["criticality"]
+            'optional'
+        """
+        return {
+            "name": self.name,
+            "dependency_type": self.dependency_type.value,
+            "description": self.description,
+            "availability_notes": self.availability_notes,
+            "criticality": self.criticality,
+        }
+
+
+@dataclass(frozen=True)
+class ImplementabilityResult:
+    """Result of implementability validation for a requirement (Story 5.5).
+
+    Immutable dataclass containing the complete validation outcome for a
+    requirement, including status, complexity assessment, dependencies,
+    issues found, and remediation suggestions.
+
+    Attributes:
+        status: Overall implementability status.
+        complexity: Estimated complexity level for implementation.
+        dependencies: Tuple of external dependencies identified.
+        issues: Tuple of issue descriptions found during validation.
+        remediation_suggestions: Tuple of suggested fixes for issues.
+        rationale: Explanation of the validation decision.
+
+    Example:
+        >>> result = ImplementabilityResult(
+        ...     status=ImplementabilityStatus.NOT_IMPLEMENTABLE,
+        ...     complexity=ComplexityLevel.HIGH,
+        ...     dependencies=(),
+        ...     issues=("100% uptime guarantee is impossible",),
+        ...     remediation_suggestions=("Use 99.9% SLA instead",),
+        ...     rationale="Absolute guarantees violate physics",
+        ... )
+        >>> result.to_dict()["status"]
+        'not_implementable'
+    """
+
+    status: ImplementabilityStatus
+    complexity: ComplexityLevel
+    dependencies: tuple[ExternalDependency, ...]
+    issues: tuple[str, ...]
+    remediation_suggestions: tuple[str, ...]
+    rationale: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with all fields, enums as string values,
+            dependencies as list of dicts.
+
+        Example:
+            >>> result = ImplementabilityResult(
+            ...     status=ImplementabilityStatus.IMPLEMENTABLE,
+            ...     complexity=ComplexityLevel.LOW,
+            ...     dependencies=(),
+            ...     issues=(),
+            ...     remediation_suggestions=(),
+            ...     rationale="Simple CRUD requirement",
+            ... )
+            >>> result.to_dict()["complexity"]
+            'low'
+        """
+        return {
+            "status": self.status.value,
+            "complexity": self.complexity.value,
+            "dependencies": [d.to_dict() for d in self.dependencies],
+            "issues": list(self.issues),
+            "remediation_suggestions": list(self.remediation_suggestions),
+            "rationale": self.rationale,
+        }
 
 
 @dataclass(frozen=True)
@@ -325,6 +514,24 @@ class CrystallizedRequirement:
         category_rationale: Explanation of why this category/sub-category was
             assigned, including keywords or patterns that drove the decision.
             Used for audit trail. (Added in Story 5.4)
+        implementability_status: Status of implementability validation
+            ("implementable", "needs_clarification", "not_implementable").
+            None if not yet validated. (Added in Story 5.5)
+        complexity: Estimated complexity level for implementation
+            ("low", "medium", "high", "very_high"). None if not assessed.
+            (Added in Story 5.5)
+        external_dependencies: Tuple of external dependency dicts identified
+            for this requirement. Each dict contains name, dependency_type,
+            description, availability_notes, and criticality.
+            Note: Uses dict instead of ExternalDependency objects to enable
+            direct JSON serialization and compatibility with to_dict() output.
+            For typed access, use ExternalDependency.to_dict() format.
+            (Added in Story 5.5)
+        implementability_issues: Tuple of issue descriptions found during
+            implementability validation. Empty if no issues. (Added in Story 5.5)
+        implementability_rationale: Explanation of implementability validation
+            decision, including why the requirement passed or failed.
+            (Added in Story 5.5)
 
     Example:
         >>> req = CrystallizedRequirement(
@@ -353,13 +560,20 @@ class CrystallizedRequirement:
     sub_category: str | None = None
     category_confidence: float = 1.0
     category_rationale: str | None = None
+    # Story 5.5 implementability fields
+    implementability_status: str | None = None
+    complexity: str | None = None
+    external_dependencies: tuple[dict[str, Any], ...] = ()
+    implementability_issues: tuple[str, ...] = ()
+    implementability_rationale: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
-            Dictionary with all requirement fields including enhanced fields
-            and categorization fields (Story 5.4).
+            Dictionary with all requirement fields including enhanced fields,
+            categorization fields (Story 5.4), and implementability fields
+            (Story 5.5).
 
         Example:
             >>> req = CrystallizedRequirement(
@@ -385,6 +599,12 @@ class CrystallizedRequirement:
             "sub_category": self.sub_category,
             "category_confidence": self.category_confidence,
             "category_rationale": self.category_rationale,
+            # Story 5.5 implementability fields
+            "implementability_status": self.implementability_status,
+            "complexity": self.complexity,
+            "external_dependencies": list(self.external_dependencies),
+            "implementability_issues": list(self.implementability_issues),
+            "implementability_rationale": self.implementability_rationale,
         }
 
 

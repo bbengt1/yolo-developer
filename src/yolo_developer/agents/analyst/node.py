@@ -1,8 +1,9 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4, 5.5).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
-from seed content, identifies gaps, and flags contradictions.
+from seed content, identifies gaps, flags contradictions, and validates
+implementability.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -41,9 +42,14 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
+    ComplexityLevel,
     CrystallizedRequirement,
+    DependencyType,
+    ExternalDependency,
     GapType,
     IdentifiedGap,
+    ImplementabilityResult,
+    ImplementabilityStatus,
     RequirementCategory,
     Severity,
 )
@@ -664,6 +670,263 @@ CONSTRAINT_SUBCATEGORY_KEYWORDS: dict[str, frozenset[str]] = {
 }
 
 
+# =============================================================================
+# Story 5.5: Implementability Validation Patterns and Keywords
+# =============================================================================
+
+# Impossible requirement patterns with explanations and remediation
+# Format: pattern -> (issue_type, explanation, remediation)
+# Note: Patterns are case-insensitive (re.IGNORECASE is used in _check_impossibility)
+IMPOSSIBLE_PATTERNS: dict[str, tuple[str, str, str]] = {
+    # Absolute guarantees - flexible word order and "percent" spelling
+    r"(100\s*%|100\s*percent|hundred\s*percent)\s*.{0,20}(uptime|availability|reliability|accuracy|success|guarantee)": (
+        "absolute_guarantee",
+        "100% guarantees are technically impossible in distributed systems",
+        "Consider 99.9% or 99.99% SLA with defined maintenance windows",
+    ),
+    r"(uptime|availability|reliability|accuracy)\s*.{0,20}(100\s*%|100\s*percent)": (
+        "absolute_guarantee",
+        "100% guarantees are technically impossible in distributed systems",
+        "Consider 99.9% or 99.99% SLA with defined maintenance windows",
+    ),
+    r"(zero|no)\s*(latency|downtime|errors?|failures?|bugs?|defects?)": (
+        "zero_guarantee",
+        "Zero guarantees are impossible; all systems have some failure modes",
+        "Define acceptable thresholds (e.g., <1% error rate, <100ms latency)",
+    ),
+    r"(infinite|unlimited|boundless)\s*(storage|capacity|throughput|scale|scaling|users?|requests?|data)": (
+        "unbounded_resource",
+        "Infinite resources don't exist; all systems have physical limits",
+        "Define realistic upper bounds based on expected usage",
+    ),
+    r"no\s*(limit|restriction|constraint|cap)s?\s*(on|for|to)?": (
+        "unbounded",
+        "Unbounded requirements cannot be implemented without limits",
+        "Specify maximum values for all quantities",
+    ),
+    # Physical impossibilities - more variations
+    r"(instant|instantaneous|immediate|zero-latency|zero latency)\s*(response|sync|replication|update|processing)": (
+        "physical_limit",
+        "Instant operations violate physics; network latency always exists",
+        "Define acceptable response times (e.g., <50ms, <200ms)",
+    ),
+    r"(response|sync|replication|update)\s*.{0,10}(instant|instantaneous|immediate)": (
+        "physical_limit",
+        "Instant operations violate physics; network latency always exists",
+        "Define acceptable response times (e.g., <50ms, <200ms)",
+    ),
+    r"real-?\s*time.{0,30}global.{0,30}sync": (
+        "physical_limit",
+        "True real-time global sync is impossible due to speed of light",
+        "Use eventual consistency with defined sync windows",
+    ),
+    # Logical contradictions
+    r"always.{0,30}never|never.{0,30}always": (
+        "logical_contradiction",
+        "Contradictory absolutes cannot both be satisfied",
+        "Clarify which condition takes precedence",
+    ),
+    r"both.{0,20}and.{0,20}not|simultaneously.{0,20}opposite": (
+        "logical_contradiction",
+        "Requirement contains logical contradiction",
+        "Rephrase to remove contradiction or specify conditions",
+    ),
+    # Unbounded scope
+    r"(any|every|all)\s*(size|amount|number|type|format|kind)s?": (
+        "unbounded_scope",
+        "Open-ended quantities need bounds for implementation",
+        "Specify supported sizes/amounts/types with upper limits",
+    ),
+    r"all\s*(possible|conceivable|imaginable|potential)": (
+        "unbounded_scope",
+        "Cannot enumerate or handle all possibilities",
+        "Define specific supported cases or categories",
+    ),
+}
+
+# Keywords for identifying external dependencies by type
+DEPENDENCY_KEYWORDS: dict[str, frozenset[str]] = {
+    "api": frozenset(
+        [
+            "api",
+            "endpoint",
+            "rest",
+            "graphql",
+            "webhook",
+            "oauth",
+            "openid",
+            "external api",
+            "third-party api",
+            "integrate with",
+            "connect to",
+            "call",
+            "fetch from",
+            "external service",
+        ]
+    ),
+    "library": frozenset(
+        [
+            "library",
+            "sdk",
+            "package",
+            "framework",
+            "module",
+            "npm",
+            "pip",
+            "maven",
+            "nuget",
+            "gem",
+            "open source",
+            "third-party library",
+        ]
+    ),
+    "service": frozenset(
+        [
+            "aws",
+            "azure",
+            "gcp",
+            "cloud",
+            "saas",
+            "lambda",
+            "s3",
+            "ec2",
+            "dynamodb",
+            "rds",
+            "firebase",
+            "heroku",
+            "vercel",
+            "netlify",
+            "twilio",
+            "sendgrid",
+            "stripe",
+            "paypal",
+            "auth0",
+            "okta",
+        ]
+    ),
+    "infrastructure": frozenset(
+        [
+            "database",
+            "postgresql",
+            "mysql",
+            "mongodb",
+            "redis",
+            "memcached",
+            "cache",
+            "queue",
+            "message broker",
+            "kafka",
+            "rabbitmq",
+            "elasticsearch",
+            "storage",
+            "cdn",
+            "load balancer",
+            "kubernetes",
+            "docker",
+        ]
+    ),
+    "data_source": frozenset(
+        [
+            "data feed",
+            "external data",
+            "data source",
+            "import from",
+            "sync from",
+            "pull from",
+            "data provider",
+            "data api",
+            "data stream",
+            "real-time data",
+        ]
+    ),
+}
+
+# Complexity indicators by level
+COMPLEXITY_INDICATORS: dict[str, dict[str, frozenset[str] | int | str]] = {
+    "low": {
+        "keywords": frozenset(
+            [
+                "simple",
+                "basic",
+                "single",
+                "one",
+                "standard",
+                "crud",
+                "list",
+                "view",
+                "display",
+                "show",
+                "read",
+                "get",
+            ]
+        ),
+        "max_dependencies": 1,
+        "description": "Simple, well-understood patterns",
+    },
+    "medium": {
+        "keywords": frozenset(
+            [
+                "multiple",
+                "several",
+                "integrate",
+                "validate",
+                "search",
+                "filter",
+                "workflow",
+                "state",
+                "multi-step",
+                "batch",
+            ]
+        ),
+        "max_dependencies": 3,
+        "description": "Multi-component with standard integrations",
+    },
+    "high": {
+        "keywords": frozenset(
+            [
+                "complex",
+                "distributed",
+                "concurrent",
+                "async",
+                "asynchronous",
+                "real-time",
+                "streaming",
+                "transaction",
+                "rollback",
+                "orchestration",
+                "saga",
+                "event-driven",
+                "microservice",
+            ]
+        ),
+        "max_dependencies": 5,
+        "description": "Complex patterns requiring careful design",
+    },
+    "very_high": {
+        "keywords": frozenset(
+            [
+                "machine learning",
+                "ml",
+                "ai",
+                "neural",
+                "deep learning",
+                "blockchain",
+                "consensus",
+                "cryptographic",
+                "high availability",
+                "geo-distributed",
+                "petabyte",
+                "terabyte",
+                "million",
+                "billion",
+            ]
+        ),
+        "max_dependencies": 10,
+        "description": "Cutting-edge or highly specialized",
+    },
+}
+
+
 def _detect_vague_terms(text: str) -> set[str]:
     """Detect vague terms in requirement text.
 
@@ -1049,6 +1312,519 @@ def _categorize_all_requirements(
     )
 
     return tuple(categorized)
+
+
+# =============================================================================
+# Story 5.5: Implementability Validation Functions
+# =============================================================================
+
+
+def _check_impossibility(
+    req: CrystallizedRequirement,
+) -> tuple[bool, list[str], list[str]]:
+    """Check if a requirement contains impossible elements.
+
+    Scans the requirement text against known impossible patterns such as
+    absolute guarantees, physical impossibilities, and logical contradictions.
+
+    Args:
+        req: The CrystallizedRequirement to check.
+
+    Returns:
+        Tuple of (is_impossible, issues, remediation_suggestions).
+        is_impossible is True if any impossible pattern is found.
+        issues lists the specific problems found.
+        remediation_suggestions lists suggested fixes.
+
+    Example:
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="System must have 100% uptime",
+        ...     refined_text="System guarantees 100% availability",
+        ...     category="non_functional",
+        ...     testable=True,
+        ... )
+        >>> is_impossible, issues, remediations = _check_impossibility(req)
+        >>> is_impossible
+        True
+        >>> "100%" in issues[0]
+        True
+    """
+    text_to_check = f"{req.refined_text} {req.original_text}".lower()
+    issues: list[str] = []
+    remediations: list[str] = []
+
+    for pattern, (issue_type, explanation, remediation) in IMPOSSIBLE_PATTERNS.items():
+        if re.search(pattern, text_to_check, re.IGNORECASE):
+            issues.append(f"[{issue_type}] {explanation}")
+            remediations.append(remediation)
+            logger.debug(
+                "impossibility_detected",
+                req_id=req.id,
+                issue_type=issue_type,
+                pattern=pattern,
+            )
+
+    is_impossible = len(issues) > 0
+    return is_impossible, issues, remediations
+
+
+def _identify_external_dependencies(
+    req: CrystallizedRequirement,
+) -> tuple[ExternalDependency, ...]:
+    """Identify external dependencies in a requirement.
+
+    Scans the requirement text for keywords indicating external
+    dependencies such as APIs, libraries, services, infrastructure,
+    and data sources. Deduplicates by type to avoid inflated counts.
+
+    Args:
+        req: The CrystallizedRequirement to analyze.
+
+    Returns:
+        Tuple of ExternalDependency objects identified (deduplicated by type).
+
+    Example:
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="Integrate with Stripe for payments",
+        ...     refined_text="Process payments via Stripe API",
+        ...     category="functional",
+        ...     testable=True,
+        ... )
+        >>> deps = _identify_external_dependencies(req)
+        >>> len(deps) > 0
+        True
+    """
+    text_to_check = f"{req.refined_text} {req.original_text}".lower()
+
+    # Map dependency type strings to enum values
+    type_map = {
+        "api": DependencyType.API,
+        "library": DependencyType.LIBRARY,
+        "service": DependencyType.SERVICE,
+        "infrastructure": DependencyType.INFRASTRUCTURE,
+        "data_source": DependencyType.DATA_SOURCE,
+    }
+
+    # Enhanced availability notes for specific services
+    specific_notes: dict[str, str] = {
+        "stripe": "Requires Stripe API key and webhook secret; check PCI compliance",
+        "paypal": "Requires PayPal API credentials; sandbox available for testing",
+        "twilio": "Requires Twilio Account SID and Auth Token; check SMS pricing",
+        "sendgrid": "Requires SendGrid API key; verify sender domain",
+        "auth0": "Requires Auth0 tenant configuration; check user limits",
+        "okta": "Requires Okta org setup; verify SSO integration",
+        "aws": "Requires AWS credentials and IAM configuration",
+        "azure": "Requires Azure subscription and service principal",
+        "gcp": "Requires GCP project and service account",
+        "firebase": "Requires Firebase project configuration",
+        "postgresql": "Database provisioning required; consider managed services",
+        "redis": "Redis server required; consider managed Redis service",
+        "kafka": "Kafka cluster required; significant infrastructure",
+        "elasticsearch": "Elasticsearch cluster required; resource-intensive",
+    }
+
+    # Default availability notes by type
+    default_notes = {
+        DependencyType.API: "Requires API key/credentials; check rate limits",
+        DependencyType.LIBRARY: "Available via package manager; check license",
+        DependencyType.SERVICE: "Cloud service; requires account setup",
+        DependencyType.INFRASTRUCTURE: "Infrastructure component; may require provisioning",
+        DependencyType.DATA_SOURCE: "External data; verify access and format",
+    }
+
+    # Collect all matches, then deduplicate by type
+    # Keep the most specific match per type
+    matches_by_type: dict[DependencyType, list[tuple[str, str]]] = {
+        dep_type: [] for dep_type in DependencyType
+    }
+
+    for dep_type_str, keywords in DEPENDENCY_KEYWORDS.items():
+        dep_type = type_map[dep_type_str]
+
+        for keyword in keywords:
+            matched = False
+            # Multi-word phrases
+            if " " in keyword:
+                if keyword in text_to_check:
+                    matched = True
+            else:
+                # Single word with word boundary
+                pattern = rf"\b{re.escape(keyword)}\b"
+                if re.search(pattern, text_to_check):
+                    matched = True
+
+            if matched:
+                name = keyword.upper() if len(keyword) <= 4 else keyword.title()
+                matches_by_type[dep_type].append((name, keyword))
+
+    # Build final dependencies - one per type, preferring specific services
+    dependencies: list[ExternalDependency] = []
+    seen_types: set[DependencyType] = set()
+
+    for dep_type, matches in matches_by_type.items():
+        if not matches:
+            continue
+
+        # Prefer specific named services over generic keywords
+        best_match = matches[0]
+        for name, keyword in matches:
+            if keyword.lower() in specific_notes:
+                best_match = (name, keyword)
+                break
+
+        name, keyword = best_match
+        keyword_lower = keyword.lower()
+
+        # Get availability notes - specific if available, else default
+        availability_notes = specific_notes.get(keyword_lower, default_notes[dep_type])
+
+        # Only add one dependency per type
+        if dep_type not in seen_types:
+            seen_types.add(dep_type)
+            dep = ExternalDependency(
+                name=name,
+                dependency_type=dep_type,
+                description=f"Detected '{keyword}' in requirement text",
+                availability_notes=availability_notes,
+                criticality="required",
+            )
+            dependencies.append(dep)
+
+    return tuple(dependencies)
+
+
+def _assess_complexity(
+    req: CrystallizedRequirement,
+    dependencies: tuple[ExternalDependency, ...],
+) -> tuple[ComplexityLevel, str]:
+    """Assess implementation complexity of a requirement.
+
+    Analyzes the requirement text and identified dependencies to
+    estimate implementation complexity level. Uses weighted scoring
+    across all complexity levels instead of first-match-wins.
+
+    Args:
+        req: The CrystallizedRequirement to assess.
+        dependencies: External dependencies identified for this requirement.
+
+    Returns:
+        Tuple of (complexity_level, rationale).
+
+    Example:
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="Show list of users",
+        ...     refined_text="Display simple user list",
+        ...     category="functional",
+        ...     testable=True,
+        ... )
+        >>> complexity, rationale = _assess_complexity(req, ())
+        >>> complexity in [ComplexityLevel.LOW, ComplexityLevel.MEDIUM]
+        True
+    """
+    text_to_check = f"{req.refined_text} {req.original_text}".lower()
+    dep_count = len(dependencies)
+    rationale_parts: list[str] = []
+
+    # Count matches at each level with weights
+    # Higher complexity levels have higher weights
+    level_weights = {"very_high": 4, "high": 3, "medium": 2, "low": 1}
+    level_matches: dict[str, list[str]] = {
+        "very_high": [],
+        "high": [],
+        "medium": [],
+        "low": [],
+    }
+
+    # Check for keyword matches at each level
+    for level in level_weights:
+        indicators = COMPLEXITY_INDICATORS[level]
+        keywords = indicators["keywords"]
+
+        for kw in keywords:  # type: ignore[union-attr]
+            if " " in kw:
+                if kw in text_to_check:
+                    level_matches[level].append(kw)
+            else:
+                pattern = rf"\b{re.escape(kw)}\b"
+                if re.search(pattern, text_to_check):
+                    level_matches[level].append(kw)
+
+    # Calculate weighted scores
+    scores: dict[str, float] = {}
+    for level, matches in level_matches.items():
+        weight = level_weights[level]
+        scores[level] = len(matches) * weight
+
+    # Find the level with highest score
+    max_score = max(scores.values()) if scores else 0
+    detected_level = ComplexityLevel.LOW  # Default
+
+    if max_score > 0:
+        # Get all levels with max score, prefer higher complexity in ties
+        for level in ["very_high", "high", "medium", "low"]:
+            if scores[level] == max_score and level_matches[level]:
+                detected_level = ComplexityLevel(level)
+                matched_kws = level_matches[level][:3]
+                rationale_parts.append(f"Keywords: {', '.join(matched_kws)}")
+                break
+
+    # Adjust based on dependency count
+    max_deps = COMPLEXITY_INDICATORS[detected_level.value]["max_dependencies"]
+    if dep_count > max_deps:  # type: ignore[operator]
+        # Bump up complexity if too many dependencies
+        original_level = detected_level
+        if detected_level == ComplexityLevel.LOW:
+            detected_level = ComplexityLevel.MEDIUM
+        elif detected_level == ComplexityLevel.MEDIUM:
+            detected_level = ComplexityLevel.HIGH
+        elif detected_level == ComplexityLevel.HIGH:
+            detected_level = ComplexityLevel.VERY_HIGH
+
+        if detected_level != original_level:
+            rationale_parts.append(f"Upgraded due to {dep_count} dependencies")
+
+    # Factor in requirement category (non-functional often higher complexity)
+    if req.category == "non_functional" and detected_level == ComplexityLevel.LOW:
+        detected_level = ComplexityLevel.MEDIUM
+        rationale_parts.append("Non-functional requirement typically needs more design")
+
+    # Build final rationale
+    if dep_count > 0:
+        rationale_parts.append(f"{dep_count} external dependencies")
+
+    if not rationale_parts:
+        rationale_parts.append(
+            COMPLEXITY_INDICATORS[detected_level.value]["description"]  # type: ignore[arg-type]
+        )
+
+    rationale = "; ".join(rationale_parts)
+
+    return detected_level, rationale
+
+
+def _generate_remediation(
+    issues: list[str],
+    complexity: ComplexityLevel,
+    dependencies: tuple[ExternalDependency, ...],
+) -> tuple[str, ...]:
+    """Generate remediation suggestions for implementability issues.
+
+    Provides actionable suggestions for fixing identified issues,
+    handling high complexity, and managing dependencies.
+
+    Args:
+        issues: List of issue descriptions found.
+        complexity: Assessed complexity level.
+        dependencies: External dependencies identified.
+
+    Returns:
+        Tuple of remediation suggestion strings.
+
+    Example:
+        >>> suggestions = _generate_remediation(
+        ...     ["[absolute_guarantee] 100% uptime impossible"],
+        ...     ComplexityLevel.HIGH,
+        ...     (),
+        ... )
+        >>> len(suggestions) > 0
+        True
+    """
+    suggestions: list[str] = []
+
+    # Generate suggestions based on issue types found
+    for issue in issues:
+        if "absolute_guarantee" in issue or "zero_guarantee" in issue:
+            suggestions.append("Replace absolute guarantees with realistic SLAs (e.g., 99.9%)")
+        elif "unbounded" in issue or "unbounded_scope" in issue:
+            suggestions.append("Define specific upper limits for all quantities")
+        elif "physical_limit" in issue:
+            suggestions.append("Define acceptable latency/sync thresholds instead of 'instant'")
+        elif "logical_contradiction" in issue:
+            suggestions.append("Clarify which condition takes precedence in conflicting requirements")
+
+    # Additional suggestions based on complexity
+    if complexity == ComplexityLevel.VERY_HIGH:
+        suggestions.append(
+            "Consider breaking this requirement into smaller, more manageable pieces"
+        )
+        suggestions.append("Ensure team has necessary expertise for advanced patterns")
+
+    if complexity == ComplexityLevel.HIGH:
+        suggestions.append("Plan for thorough architecture review before implementation")
+
+    # Suggestions for dependencies
+    if len(dependencies) > 3:
+        suggestions.append(
+            f"Requirement has {len(dependencies)} dependencies; verify all are available"
+        )
+
+    # Specific dependency suggestions
+    for dep in dependencies:
+        if dep.dependency_type == DependencyType.SERVICE:
+            suggestions.append(f"Verify {dep.name} service account and credentials")
+        elif dep.dependency_type == DependencyType.API:
+            suggestions.append(f"Check {dep.name} rate limits and API quotas")
+
+    return tuple(suggestions)
+
+
+def _validate_implementability(
+    req: CrystallizedRequirement,
+) -> ImplementabilityResult:
+    """Validate implementability of a single requirement.
+
+    Runs all implementability checks and returns a comprehensive result
+    including status, complexity, dependencies, issues, and remediation.
+
+    Args:
+        req: The CrystallizedRequirement to validate.
+
+    Returns:
+        ImplementabilityResult with full validation details.
+
+    Example:
+        >>> req = CrystallizedRequirement(
+        ...     id="req-001",
+        ...     original_text="Users can register",
+        ...     refined_text="Users register with email and password",
+        ...     category="functional",
+        ...     testable=True,
+        ... )
+        >>> result = _validate_implementability(req)
+        >>> result.status == ImplementabilityStatus.IMPLEMENTABLE
+        True
+    """
+    # Check for impossible elements
+    is_impossible, issues, pattern_remediations = _check_impossibility(req)
+
+    # Identify external dependencies
+    dependencies = _identify_external_dependencies(req)
+
+    # Assess complexity
+    complexity, complexity_rationale = _assess_complexity(req, dependencies)
+
+    # Generate remediation suggestions
+    extra_remediations = _generate_remediation(issues, complexity, dependencies)
+
+    # Combine all remediation suggestions
+    all_remediations = tuple(pattern_remediations) + extra_remediations
+
+    # Determine status
+    if is_impossible:
+        status = ImplementabilityStatus.NOT_IMPLEMENTABLE
+        rationale = f"Impossible elements found: {'; '.join(issues[:2])}"
+    elif len(issues) > 0:
+        status = ImplementabilityStatus.NEEDS_CLARIFICATION
+        rationale = f"Issues found that may affect implementation: {issues[0]}"
+    else:
+        status = ImplementabilityStatus.IMPLEMENTABLE
+        rationale = (
+            f"Requirement is implementable. Complexity: {complexity.value}. {complexity_rationale}"
+        )
+
+    logger.debug(
+        "implementability_validated",
+        req_id=req.id,
+        status=status.value,
+        complexity=complexity.value,
+        dependency_count=len(dependencies),
+        issue_count=len(issues),
+    )
+
+    return ImplementabilityResult(
+        status=status,
+        complexity=complexity,
+        dependencies=dependencies,
+        issues=tuple(issues),
+        remediation_suggestions=all_remediations,
+        rationale=rationale,
+    )
+
+
+def _validate_all_requirements(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[tuple[CrystallizedRequirement, ...], float]:
+    """Validate implementability of all requirements.
+
+    Processes each requirement through the validation pipeline,
+    updates requirements with implementability fields, and calculates
+    an overall implementability score.
+
+    Args:
+        requirements: Tuple of requirements to validate.
+
+    Returns:
+        Tuple of (validated_requirements, overall_score).
+        validated_requirements have implementability fields populated.
+        overall_score is 0.0-1.0 representing percentage implementable.
+
+    Example:
+        >>> reqs = (CrystallizedRequirement(...),)
+        >>> validated, score = _validate_all_requirements(reqs)
+        >>> 0.0 <= score <= 1.0
+        True
+    """
+    if not requirements:
+        logger.info("implementability_validation_skipped", reason="no_requirements")
+        return (), 1.0
+
+    validated: list[CrystallizedRequirement] = []
+    implementable_count = 0
+    status_counts: dict[str, int] = {
+        "implementable": 0,
+        "needs_clarification": 0,
+        "not_implementable": 0,
+    }
+
+    for req in requirements:
+        result = _validate_implementability(req)
+
+        # Create new requirement with implementability fields
+        validated_req = CrystallizedRequirement(
+            id=req.id,
+            original_text=req.original_text,
+            refined_text=req.refined_text,
+            category=req.category,
+            testable=req.testable,
+            scope_notes=req.scope_notes,
+            implementation_hints=req.implementation_hints,
+            confidence=req.confidence,
+            # Story 5.4 fields
+            sub_category=req.sub_category,
+            category_confidence=req.category_confidence,
+            category_rationale=req.category_rationale,
+            # Story 5.5 fields
+            implementability_status=result.status.value,
+            complexity=result.complexity.value,
+            external_dependencies=tuple(d.to_dict() for d in result.dependencies),
+            implementability_issues=result.issues,
+            implementability_rationale=result.rationale,
+        )
+        validated.append(validated_req)
+
+        # Track statistics
+        status_counts[result.status.value] += 1
+        if result.status == ImplementabilityStatus.IMPLEMENTABLE:
+            implementable_count += 1
+
+    # Calculate overall score
+    total = len(requirements)
+    overall_score = implementable_count / total if total > 0 else 1.0
+
+    # Log summary for audit trail
+    logger.info(
+        "implementability_validation_complete",
+        total=total,
+        implementable=status_counts["implementable"],
+        needs_clarification=status_counts["needs_clarification"],
+        not_implementable=status_counts["not_implementable"],
+        overall_score=round(overall_score, 3),
+    )
+
+    return tuple(validated), overall_score
 
 
 def _identify_edge_cases(
@@ -1934,19 +2710,20 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
 
 
 def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
-    """Enhance AnalystOutput with gap analysis and categorization results.
+    """Enhance AnalystOutput with gap analysis, categorization, and validation.
 
     Runs:
     1. Requirement categorization (Story 5.4)
-    2. Edge case detection
-    3. Implied requirement detection
-    4. Pattern-based suggestion
+    2. Implementability validation (Story 5.5)
+    3. Edge case detection
+    4. Implied requirement detection
+    5. Pattern-based suggestion
 
     Args:
         output: Initial AnalystOutput with requirements.
 
     Returns:
-        Enhanced AnalystOutput with categorized requirements and
+        Enhanced AnalystOutput with categorized, validated requirements and
         structured_gaps populated.
     """
     if not output.requirements:
@@ -1955,10 +2732,15 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
     # Story 5.4: Categorize all requirements
     categorized_requirements = _categorize_all_requirements(output.requirements)
 
-    # Run all gap analysis functions on categorized requirements
-    edge_cases = _identify_edge_cases(categorized_requirements)
-    implied_reqs = _identify_implied_requirements(categorized_requirements)
-    pattern_suggestions = _suggest_from_patterns(categorized_requirements)
+    # Story 5.5: Validate implementability of all requirements
+    validated_requirements, implementability_score = _validate_all_requirements(
+        categorized_requirements
+    )
+
+    # Run all gap analysis functions on validated requirements
+    edge_cases = _identify_edge_cases(validated_requirements)
+    implied_reqs = _identify_implied_requirements(validated_requirements)
+    pattern_suggestions = _suggest_from_patterns(validated_requirements)
 
     # Combine all gaps
     all_gaps: list[IdentifiedGap] = []
@@ -1995,11 +2777,12 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         implied_reqs_count=len(implied_reqs),
         pattern_suggestions_count=len(pattern_suggestions),
         total_gaps=len(renumbered_gaps),
+        implementability_score=round(implementability_score, 3),
     )
 
-    # Create enhanced output with categorized requirements and structured gaps
+    # Create enhanced output with validated requirements and structured gaps
     return AnalystOutput(
-        requirements=categorized_requirements,  # Story 5.4: Use categorized requirements
+        requirements=validated_requirements,  # Story 5.5: Use validated requirements
         identified_gaps=output.identified_gaps,
         contradictions=output.contradictions,
         structured_gaps=tuple(renumbered_gaps),

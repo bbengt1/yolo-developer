@@ -1,7 +1,7 @@
-"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3, 5.4).
+"""Unit tests for Analyst agent node (Story 5.1 Task 2, Story 5.2, Story 5.3, 5.4, 5.5).
 
 Tests for analyst_node function, state management, vague term detection,
-gap analysis functions, and requirement categorization.
+gap analysis functions, requirement categorization, and implementability validation.
 """
 
 from __future__ import annotations
@@ -13,24 +13,33 @@ from langchain_core.messages import HumanMessage
 
 from yolo_developer.agents.analyst import analyst_node
 from yolo_developer.agents.analyst.node import (
+    CONSTRAINT_KEYWORDS,
+    FUNCTIONAL_KEYWORDS,
+    NON_FUNCTIONAL_KEYWORDS,
+    _assess_complexity,
     _assign_sub_category,
     _calculate_category_confidence,
     _categorize_all_requirements,
     _categorize_requirement,
+    _check_impossibility,
     _count_keyword_matches,
     _detect_vague_terms,
     _enhance_with_gap_analysis,
+    _generate_remediation,
     _identify_edge_cases,
+    _identify_external_dependencies,
     _identify_implied_requirements,
     _suggest_from_patterns,
-    CONSTRAINT_KEYWORDS,
-    FUNCTIONAL_KEYWORDS,
-    NON_FUNCTIONAL_KEYWORDS,
+    _validate_all_requirements,
+    _validate_implementability,
 )
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
+    ComplexityLevel,
     CrystallizedRequirement,
+    DependencyType,
     GapType,
+    ImplementabilityStatus,
     RequirementCategory,
     Severity,
 )
@@ -1356,3 +1365,573 @@ class TestCategorizeAllRequirements:
         categories = {r.category for r in result}
         # All three category types should be present
         assert len(categories) == 3
+
+
+# =============================================================================
+# Story 5.5: Implementability Validation Tests
+# =============================================================================
+
+
+class TestCheckImpossibility:
+    """Tests for _check_impossibility function."""
+
+    def test_detects_100_percent_uptime(self) -> None:
+        """Should detect 100% uptime guarantees as impossible."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="System must have 100% uptime",
+            refined_text="The system shall guarantee 100% uptime",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert len(issues) >= 1
+        assert any("absolute_guarantee" in issue for issue in issues)
+
+    def test_detects_hundred_percent_spelled_out(self) -> None:
+        """Should detect 'hundred percent' spelled out."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="We need hundred percent reliability",
+            refined_text="The system requires hundred percent reliability",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert any("absolute_guarantee" in issue for issue in issues)
+
+    def test_detects_zero_latency(self) -> None:
+        """Should detect zero latency requirements as impossible."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Response must have zero latency",
+            refined_text="API responses shall have zero latency",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert any("zero_guarantee" in issue for issue in issues)
+
+    def test_detects_unlimited_resources(self) -> None:
+        """Should detect unlimited resource requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Support unlimited users",
+            refined_text="The system must support unlimited concurrent users",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert any("unbounded" in issue for issue in issues)
+
+    def test_detects_infinite_storage(self) -> None:
+        """Should detect infinite storage requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Provide infinite storage",
+            refined_text="Users shall have infinite storage capacity",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert any("unbounded" in issue for issue in issues)
+
+    def test_no_issues_for_reasonable_requirements(self) -> None:
+        """Should not flag reasonable requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="99.9% uptime SLA",
+            refined_text="System shall maintain 99.9% uptime",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is False
+        assert len(issues) == 0
+
+    def test_case_insensitive_matching(self) -> None:
+        """Should detect patterns regardless of case."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="ZERO DOWNTIME required",
+            refined_text="System must have ZERO DOWNTIME",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert len(issues) >= 1
+
+    def test_multiple_issues_detected(self) -> None:
+        """Should detect multiple impossible requirements."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="100% uptime and zero latency with unlimited users",
+            refined_text="Guarantee 100% uptime, zero latency, unlimited concurrent users",
+            category="non-functional",
+            testable=True,
+        )
+        has_issues, issues, _ = _check_impossibility(req)
+
+        assert has_issues is True
+        assert len(issues) >= 2
+
+
+class TestIdentifyExternalDependencies:
+    """Tests for _identify_external_dependencies function."""
+
+    def test_detects_api_dependencies(self) -> None:
+        """Should detect API-related dependencies."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Integrate with REST API",
+            refined_text="System shall integrate with external REST API for data",
+            category="functional",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        assert len(deps) >= 1
+        assert any(d.dependency_type == DependencyType.API for d in deps)
+
+    def test_detects_database_dependencies(self) -> None:
+        """Should detect database dependencies (infrastructure type)."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Store data in PostgreSQL",
+            refined_text="Use PostgreSQL database for persistence",
+            category="constraint",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        assert len(deps) >= 1
+        # PostgreSQL maps to INFRASTRUCTURE in DEPENDENCY_KEYWORDS
+        assert any(d.dependency_type == DependencyType.INFRASTRUCTURE for d in deps)
+
+    def test_detects_cloud_service_dependencies(self) -> None:
+        """Should detect cloud service dependencies (service type)."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Deploy to AWS",
+            refined_text="Application shall be deployed on AWS infrastructure",
+            category="constraint",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        assert len(deps) >= 1
+        # AWS maps to SERVICE in DEPENDENCY_KEYWORDS
+        assert any(d.dependency_type == DependencyType.SERVICE for d in deps)
+
+    def test_detects_payment_service_dependencies(self) -> None:
+        """Should detect payment integration dependencies."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Process payments with Stripe",
+            refined_text="Integrate Stripe for payment processing",
+            category="functional",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        assert len(deps) >= 1
+        assert any("stripe" in d.name.lower() for d in deps)
+
+    def test_deduplicates_by_type(self) -> None:
+        """Should deduplicate dependencies of the same type."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Use REST API and GraphQL API",
+            refined_text="System shall use REST API and GraphQL API",
+            category="functional",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        # Should only have one API dependency (deduped by type)
+        api_deps = [d for d in deps if d.dependency_type == DependencyType.API]
+        assert len(api_deps) <= 1
+
+    def test_no_dependencies_for_simple_requirement(self) -> None:
+        """Should return empty tuple for requirements without dependencies."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Button should be blue",
+            refined_text="Login button shall be blue colored",
+            category="ui",
+            testable=True,
+        )
+        deps = _identify_external_dependencies(req)
+
+        assert len(deps) == 0
+
+
+class TestAssessComplexity:
+    """Tests for _assess_complexity function."""
+
+    def test_low_complexity_for_simple_requirements(self) -> None:
+        """Simple requirements should have LOW complexity."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Add a button",
+            refined_text="Add a submit button to the form",
+            category="ui",
+            testable=True,
+        )
+        complexity, rationale = _assess_complexity(req, ())
+
+        assert complexity == ComplexityLevel.LOW
+        assert rationale is not None
+
+    def test_medium_complexity_with_validation(self) -> None:
+        """Requirements with validation should have at least MEDIUM complexity."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Validate user input",
+            refined_text="Validate email format and required fields",
+            category="functional",
+            testable=True,
+        )
+        complexity, _ = _assess_complexity(req, ())
+
+        assert complexity in (ComplexityLevel.MEDIUM, ComplexityLevel.HIGH)
+
+    def test_high_complexity_with_distributed_keywords(self) -> None:
+        """Requirements with distributed keywords should have HIGH complexity."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Build distributed concurrent system",
+            refined_text="Implement distributed async processing with concurrent workers",
+            category="functional",
+            testable=True,
+        )
+        complexity, _ = _assess_complexity(req, ())
+
+        # "distributed", "concurrent", "async" are HIGH complexity keywords
+        assert complexity in (ComplexityLevel.HIGH, ComplexityLevel.VERY_HIGH)
+
+    def test_very_high_complexity_with_many_dependencies(self) -> None:
+        """Many dependencies should contribute to HIGH or VERY_HIGH complexity."""
+        from yolo_developer.agents.analyst.types import ExternalDependency
+
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Complex distributed system",
+            refined_text="Build distributed real-time system with ML",
+            category="functional",
+            testable=True,
+        )
+        deps = (
+            ExternalDependency(
+                name="API 1",
+                dependency_type=DependencyType.API,
+                description="External API",
+                availability_notes="Available",
+                criticality="required",
+            ),
+            ExternalDependency(
+                name="API 2",
+                dependency_type=DependencyType.API,
+                description="Another API",
+                availability_notes="Available",
+                criticality="required",
+            ),
+            ExternalDependency(
+                name="Database",
+                dependency_type=DependencyType.DATA_SOURCE,
+                description="Database",
+                availability_notes="Available",
+                criticality="required",
+            ),
+        )
+        complexity, rationale = _assess_complexity(req, deps)
+
+        # With "distributed", "real-time", "ML" and 3 dependencies, should be HIGH or VERY_HIGH
+        assert complexity in (ComplexityLevel.HIGH, ComplexityLevel.VERY_HIGH)
+        assert "dependencies" in rationale.lower() or "distributed" in rationale.lower()
+
+    def test_weighted_scoring_considers_all_indicators(self) -> None:
+        """Complexity should use weighted scoring across all levels."""
+        # Requirement with indicators from multiple levels
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Simple CRUD with basic validation",
+            refined_text="Create basic CRUD operations with validation",
+            category="functional",
+            testable=True,
+        )
+        complexity, rationale = _assess_complexity(req, ())
+
+        # Should consider both CRUD (lower) and validation (medium)
+        assert complexity in (
+            ComplexityLevel.LOW,
+            ComplexityLevel.MEDIUM,
+        )
+        assert rationale is not None
+
+
+class TestGenerateRemediation:
+    """Tests for _generate_remediation function."""
+
+    def test_generates_suggestions_for_absolute_guarantee(self) -> None:
+        """Should generate specific suggestions for absolute guarantee issues."""
+        issues = ["[absolute_guarantee] 100% guarantees are impossible"]
+        suggestions = _generate_remediation(issues, ComplexityLevel.HIGH, ())
+
+        assert len(suggestions) >= 1
+        # Should suggest SLA or percentage-based alternative
+        assert any("SLA" in s or "99" in s or "threshold" in s.lower() for s in suggestions)
+
+    def test_generates_suggestions_for_zero_guarantee(self) -> None:
+        """Should generate suggestions for zero guarantee issues."""
+        issues = ["[zero_guarantee] Zero latency is impossible"]
+        suggestions = _generate_remediation(issues, ComplexityLevel.MEDIUM, ())
+
+        assert len(suggestions) >= 1
+        # Should suggest SLA or realistic alternatives
+        assert any("SLA" in s or "realistic" in s.lower() or "99" in s for s in suggestions)
+
+    def test_generates_suggestions_for_unbounded(self) -> None:
+        """Should generate suggestions for unbounded resource issues."""
+        issues = ["[unbounded_resource] Unlimited resources not possible"]
+        suggestions = _generate_remediation(issues, ComplexityLevel.HIGH, ())
+
+        assert len(suggestions) >= 1
+        # Should suggest defining limits
+        assert any("limit" in s.lower() or "bound" in s.lower() or "cap" in s.lower() for s in suggestions)
+
+    def test_generates_suggestions_for_high_complexity(self) -> None:
+        """Should suggest breaking down high complexity requirements."""
+        issues: list[str] = []
+        suggestions = _generate_remediation(issues, ComplexityLevel.VERY_HIGH, ())
+
+        assert len(suggestions) >= 1
+        # Should suggest breaking down or phased approach
+        assert any("break" in s.lower() or "phase" in s.lower() or "piece" in s.lower() for s in suggestions)
+
+    def test_generates_suggestions_for_dependencies(self) -> None:
+        """Should suggest contingency plans for many dependencies."""
+        from yolo_developer.agents.analyst.types import ExternalDependency
+
+        deps = (
+            ExternalDependency(
+                name="API",
+                dependency_type=DependencyType.API,
+                description="External API",
+                availability_notes="Requires account",
+                criticality="required",
+            ),
+            ExternalDependency(
+                name="Database",
+                dependency_type=DependencyType.DATA_SOURCE,
+                description="Database",
+                availability_notes="Cloud hosted",
+                criticality="required",
+            ),
+            ExternalDependency(
+                name="Service",
+                dependency_type=DependencyType.SERVICE,
+                description="External service",
+                availability_notes="Third party",
+                criticality="required",
+            ),
+        )
+        suggestions = _generate_remediation([], ComplexityLevel.HIGH, deps)
+
+        assert len(suggestions) >= 1
+
+
+class TestValidateImplementability:
+    """Tests for _validate_implementability function."""
+
+    def test_returns_implementable_for_valid_requirement(self) -> None:
+        """Valid requirements should be marked IMPLEMENTABLE."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="User can login",
+            refined_text="Users can authenticate with email and password",
+            category="functional",
+            testable=True,
+        )
+        result = _validate_implementability(req)
+
+        assert result.status == ImplementabilityStatus.IMPLEMENTABLE
+        assert len(result.issues) == 0
+        assert result.rationale is not None
+
+    def test_returns_not_implementable_for_impossible_requirement(self) -> None:
+        """Impossible requirements should be marked NOT_IMPLEMENTABLE."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="100% uptime guaranteed",
+            refined_text="System must guarantee 100% uptime always",
+            category="non-functional",
+            testable=True,
+        )
+        result = _validate_implementability(req)
+
+        assert result.status == ImplementabilityStatus.NOT_IMPLEMENTABLE
+        assert len(result.issues) >= 1
+        assert len(result.remediation_suggestions) >= 1
+
+    def test_high_complexity_marked_correctly(self) -> None:
+        """High complexity requirements should have appropriate status and remediation."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Build AI system",
+            refined_text="Implement machine learning with deep learning neural network",
+            category="functional",
+            testable=True,
+        )
+        result = _validate_implementability(req)
+
+        # High complexity requirements are still implementable but should have
+        # remediation suggestions to help break them down
+        assert result.complexity == ComplexityLevel.VERY_HIGH
+        assert len(result.remediation_suggestions) >= 1
+
+    def test_includes_complexity_assessment(self) -> None:
+        """Result should include complexity level."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Add button",
+            refined_text="Add a submit button",
+            category="ui",
+            testable=True,
+        )
+        result = _validate_implementability(req)
+
+        assert result.complexity in (
+            ComplexityLevel.LOW,
+            ComplexityLevel.MEDIUM,
+            ComplexityLevel.HIGH,
+            ComplexityLevel.VERY_HIGH,
+        )
+
+    def test_includes_dependencies(self) -> None:
+        """Result should include identified dependencies."""
+        req = CrystallizedRequirement(
+            id="req-001",
+            original_text="Integrate with Stripe API",
+            refined_text="Process payments via Stripe API integration",
+            category="functional",
+            testable=True,
+        )
+        result = _validate_implementability(req)
+
+        assert isinstance(result.dependencies, tuple)
+
+
+class TestValidateAllRequirements:
+    """Tests for _validate_all_requirements function."""
+
+    def test_validates_multiple_requirements(self) -> None:
+        """Should validate all requirements in the tuple."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login",
+                refined_text="User can login with email",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Fast response",
+                refined_text="API responds in < 200ms",
+                category="non-functional",
+                testable=True,
+            ),
+        )
+        result, score = _validate_all_requirements(reqs)
+
+        assert len(result) == 2
+        assert 0.0 <= score <= 1.0
+
+    def test_updates_requirement_fields(self) -> None:
+        """Should update requirement fields with validation results."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="User login",
+                refined_text="User can login with email",
+                category="functional",
+                testable=True,
+            ),
+        )
+        result, _ = _validate_all_requirements(reqs)
+
+        assert result[0].implementability_status is not None
+        assert result[0].complexity is not None
+        assert result[0].implementability_rationale is not None
+
+    def test_score_reflects_implementability(self) -> None:
+        """Score should reflect overall implementability."""
+        # All implementable
+        good_reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="Add button",
+                refined_text="Add submit button",
+                category="ui",
+                testable=True,
+            ),
+        )
+        _, good_score = _validate_all_requirements(good_reqs)
+
+        # Has impossible requirement
+        bad_reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="100% uptime",
+                refined_text="Guarantee 100% uptime",
+                category="non-functional",
+                testable=True,
+            ),
+        )
+        _, bad_score = _validate_all_requirements(bad_reqs)
+
+        assert good_score > bad_score
+
+    def test_empty_tuple_returns_perfect_score(self) -> None:
+        """Empty requirements should return 1.0 score."""
+        result, score = _validate_all_requirements(())
+
+        assert len(result) == 0
+        assert score == 1.0
+
+    def test_maintains_order(self) -> None:
+        """Output order should match input order."""
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="First",
+                refined_text="First req",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="Second",
+                refined_text="Second req",
+                category="functional",
+                testable=True,
+            ),
+        )
+        result, _ = _validate_all_requirements(reqs)
+
+        assert result[0].id == "req-001"
+        assert result[1].id == "req-002"

@@ -93,7 +93,7 @@ development_status:
   5-2-requirement-crystallization: done
   5-3-missing-requirement-identification: done
   5-4-requirement-categorization: done
-  5-5-implementability-validation: backlog
+  5-5-implementability-validation: done
   5-6-contradiction-flagging: backlog
   5-7-escalation-to-pm: backlog
   epic-5-retrospective: optional
