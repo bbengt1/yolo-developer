@@ -99,8 +99,8 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: PM Agent (7 stories)
-  epic-6: backlog
-  6-1-create-pm-agent-node: backlog
+  epic-6: in-progress
+  6-1-create-pm-agent-node: done
   6-2-transform-requirements-to-stories: backlog
   6-3-ac-testability-validation: backlog
   6-4-story-prioritization: backlog

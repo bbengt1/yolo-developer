@@ -1,4 +1,4 @@
-"""Agents package for YOLO Developer (Story 5.1+).
+"""Agents package for YOLO Developer (Story 5.1+, 6.1+).
 
 This package contains the agent implementations for the multi-agent
 orchestration system. Each agent is implemented as a LangGraph node
@@ -9,14 +9,16 @@ that follows the pattern of:
 
 Available Agents:
     analyst_node: Requirement crystallization and analysis
-    (More agents will be added in future stories)
+    pm_node: Story transformation and acceptance criteria generation
 
 Types:
     CrystallizedRequirement: A refined requirement with category and testability
     AnalystOutput: Complete output from analyst processing
+    Story: A user story with acceptance criteria
+    PMOutput: Complete output from PM processing
 
 Example:
-    >>> from yolo_developer.agents import analyst_node
+    >>> from yolo_developer.agents import analyst_node, pm_node
     >>> from yolo_developer.orchestrator.state import YoloState
     >>>
     >>> state: YoloState = {
@@ -40,9 +42,23 @@ from yolo_developer.agents.analyst import (
     CrystallizedRequirement,
     analyst_node,
 )
+from yolo_developer.agents.pm import (
+    AcceptanceCriterion,
+    PMOutput,
+    Story,
+    StoryPriority,
+    StoryStatus,
+    pm_node,
+)
 
 __all__ = [
+    "AcceptanceCriterion",
     "AnalystOutput",
     "CrystallizedRequirement",
+    "PMOutput",
+    "Story",
+    "StoryPriority",
+    "StoryStatus",
     "analyst_node",
+    "pm_node",
 ]
