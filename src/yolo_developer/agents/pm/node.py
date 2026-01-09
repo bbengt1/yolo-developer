@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1, 6.2).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -46,6 +46,7 @@ from yolo_developer.agents.pm.llm import (
     _extract_story_components,
     _generate_acceptance_criteria_llm,
 )
+from yolo_developer.agents.pm.testability import validate_story_testability
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
     PMOutput,
@@ -333,12 +334,39 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     # Transform requirements to stories using LLM-powered transformation
     stories, unprocessed_reqs = await _transform_requirements_to_stories(requirements)
 
+    # Validate each story's testability (Story 6.3)
+    stories_with_issues = 0
+    total_vague_terms = 0
+    total_missing_edge_cases = 0
+
+    for story in stories:
+        result = validate_story_testability(story)
+        if not result["is_valid"]:
+            stories_with_issues += 1
+            total_vague_terms += len(result["vague_terms_found"])
+        total_missing_edge_cases += len(result["missing_edge_cases"])
+
+    # Build validation summary for processing notes and decision rationale
+    if stories_with_issues > 0:
+        validation_summary = (
+            f"Testability validation: {stories_with_issues}/{len(stories)} stories have issues "
+            f"({total_vague_terms} vague terms, {total_missing_edge_cases} missing edge cases)"
+        )
+    else:
+        validation_summary = "Testability validation: all stories passed"
+
+    # Build processing notes with validation summary
+    processing_notes_parts = [
+        f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
+        validation_summary,
+    ]
+
     # Create PM output
     output = PMOutput(
         stories=stories,
         unprocessed_requirements=unprocessed_reqs,
         escalations_to_analyst=(),  # Escalation logic is Story 6.7
-        processing_notes=f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
+        processing_notes="; ".join(processing_notes_parts),
     )
 
     # Create decision record for audit trail with transformation details
@@ -348,7 +376,8 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         rationale=(
             f"Requirements transformed using LLM-powered story extraction. "
             f"Constraint requirements ({len(unprocessed_reqs)}) tracked separately. "
-            f"Each story includes role, action, benefit, and acceptance criteria."
+            f"Each story includes role, action, benefit, and acceptance criteria. "
+            f"{validation_summary}"
         ),
         related_artifacts=tuple(s.id for s in stories),
     )

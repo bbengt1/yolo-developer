@@ -102,7 +102,7 @@ development_status:
   epic-6: in-progress
   6-1-create-pm-agent-node: done
   6-2-transform-requirements-to-stories: done
-  6-3-ac-testability-validation: backlog
+  6-3-ac-testability-validation: done
   6-4-story-prioritization: backlog
   6-5-dependency-identification: backlog
   6-6-epic-breakdown: backlog

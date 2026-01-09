@@ -1,4 +1,4 @@
-"""Unit tests for PM agent node (Story 6.1 Task 11, Story 6.2).
+"""Unit tests for PM agent node (Story 6.1 Task 11, Story 6.2, Story 6.3).
 
 Tests for pm_node function and helper functions.
 """
@@ -532,3 +532,50 @@ class TestPmNode:
 
         decision = result["decisions"][0]
         assert "LLM" in decision.rationale or "story extraction" in decision.rationale
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_validation(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Processing notes should include testability validation summary (Story 6.3)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        notes = result["pm_output"]["processing_notes"]
+        # Should mention testability validation
+        assert "Testability validation" in notes or "testability" in notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_validation_does_not_block_story_creation(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Validation should warn but not block story creation (Story 6.3)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        # Stories should still be created even if they have validation issues
+        pm_output = result["pm_output"]
+        assert pm_output["story_count"] > 0
+        # Processing notes should exist
+        assert pm_output["processing_notes"] != ""
+
+    @pytest.mark.asyncio
+    async def test_validation_results_appear_in_notes(
+        self, empty_state: dict[str, Any]
+    ) -> None:
+        """Validation results should appear in processing notes (Story 6.3)."""
+        # Create requirements that will produce stories with potential issues
+        empty_state["analyst_output"] = {
+            "requirements": [
+                {
+                    "id": "req-001",
+                    "refined_text": "System must be fast and efficient",  # Contains vague terms
+                    "category": "functional",
+                },
+            ],
+            "escalations": [],
+        }
+
+        result = await pm_node(empty_state)  # type: ignore[arg-type]
+
+        notes = result["pm_output"]["processing_notes"]
+        # Should have testability validation info
+        assert "Testability validation" in notes or "validation" in notes.lower()

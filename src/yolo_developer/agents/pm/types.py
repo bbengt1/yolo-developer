@@ -1,4 +1,4 @@
-"""Type definitions for PM agent (Story 6.1).
+"""Type definitions for PM agent (Story 6.1, 6.3).
 
 This module provides the data types used by the PM agent:
 
@@ -7,6 +7,7 @@ This module provides the data types used by the PM agent:
 - AcceptanceCriterion: A single acceptance criterion in Given/When/Then format
 - Story: A user story with acceptance criteria and metadata
 - PMOutput: Complete output from PM processing
+- TestabilityResult: Result of AC testability validation (Story 6.3)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -46,7 +47,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, TypedDict
 
 
 class StoryStatus(str, Enum):
@@ -324,3 +325,34 @@ class PMOutput:
             "story_count": self.story_count,
             "has_escalations": self.has_escalations,
         }
+
+
+class TestabilityResult(TypedDict):
+    """Result of AC testability validation (Story 6.3).
+
+    TypedDict containing the complete results from validating a story's
+    acceptance criteria for testability issues.
+
+    Fields:
+        is_valid: True if all critical checks pass (no vague terms, no structural issues).
+        vague_terms_found: List of (ac_id, term) tuples for each vague term found.
+        missing_edge_cases: List of missing edge case category names
+            (e.g., "error_handling", "empty_input", "boundary").
+        ac_count_warning: Warning message if AC count is unusual, or None.
+        validation_notes: List of detailed validation findings.
+
+    Example:
+        >>> result: TestabilityResult = {
+        ...     "is_valid": False,
+        ...     "vague_terms_found": [("AC1", "fast"), ("AC2", "easy")],
+        ...     "missing_edge_cases": ["boundary"],
+        ...     "ac_count_warning": None,
+        ...     "validation_notes": ["Found vague terms in 2 ACs"],
+        ... }
+    """
+
+    is_valid: bool
+    vague_terms_found: list[tuple[str, str]]
+    missing_edge_cases: list[str]
+    ac_count_warning: str | None
+    validation_notes: list[str]
