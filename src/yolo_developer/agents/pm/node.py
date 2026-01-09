@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -10,6 +10,7 @@ Key Concepts:
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
 - **LLM-Powered**: Uses LLM for story extraction and AC generation (Story 6.2)
+- **Prioritization**: Stories are prioritized by value and dependencies (Story 6.4)
 
 LLM Usage:
     Set _USE_LLM in llm.py to True to enable actual LLM calls.
@@ -46,10 +47,12 @@ from yolo_developer.agents.pm.llm import (
     _extract_story_components,
     _generate_acceptance_criteria_llm,
 )
+from yolo_developer.agents.pm.prioritization import prioritize_stories
 from yolo_developer.agents.pm.testability import validate_story_testability
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
     PMOutput,
+    PrioritizationResult,
     Story,
     StoryPriority,
     StoryStatus,
@@ -140,14 +143,18 @@ async def _generate_acceptance_criteria(
             )
         )
 
-    return tuple(acs) if acs else (
-        AcceptanceCriterion(
-            id="AC1",
-            given=f"the system is ready to process {requirement_id}",
-            when="the feature is used as specified",
-            then=f"the requirement is satisfied: {requirement_text[:50]}...",
-            and_clauses=(),
-        ),
+    return (
+        tuple(acs)
+        if acs
+        else (
+            AcceptanceCriterion(
+                id="AC1",
+                given=f"the system is ready to process {requirement_id}",
+                when="the feature is used as specified",
+                then=f"the requirement is satisfied: {requirement_text[:50]}...",
+                and_clauses=(),
+            ),
+        )
     )
 
 
@@ -203,7 +210,9 @@ async def _transform_single_requirement(
     # Create story
     story = Story(
         id=f"story-{story_counter:03d}",
-        title=story_components.get("title", refined_text[:50] if refined_text else f"Story for {req_id}"),
+        title=story_components.get(
+            "title", refined_text[:50] if refined_text else f"Story for {req_id}"
+        ),
         role=story_components.get("role", "user"),
         action=story_components.get("action", refined_text or f"complete requirement {req_id}"),
         benefit=story_components.get("benefit", "the system meets the specified requirement"),
@@ -355,10 +364,33 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     else:
         validation_summary = "Testability validation: all stories passed"
 
-    # Build processing notes with validation summary
+    # Prioritize stories (Story 6.4)
+    prioritization_result: PrioritizationResult = prioritize_stories(stories)
+
+    # Build prioritization summary
+    prioritization_summary = prioritization_result["analysis_notes"]
+    if prioritization_result["quick_wins"]:
+        prioritization_summary += f" (quick wins: {', '.join(prioritization_result['quick_wins'])})"
+    if prioritization_result["dependency_cycles"]:
+        prioritization_summary += (
+            f" (warning: {len(prioritization_result['dependency_cycles'])} dependency cycles)"
+        )
+
+    logger.info(
+        "pm_prioritization_complete",
+        story_count=len(stories),
+        quick_win_count=len(prioritization_result["quick_wins"]),
+        cycle_count=len(prioritization_result["dependency_cycles"]),
+        top_priority=prioritization_result["recommended_execution_order"][0]
+        if prioritization_result["recommended_execution_order"]
+        else None,
+    )
+
+    # Build processing notes with validation and prioritization summary
     processing_notes_parts = [
         f"Transformed {len(requirements)} requirements into {len(stories)} stories using LLM analysis",
         validation_summary,
+        f"Prioritization: {prioritization_summary}",
     ]
 
     # Create PM output
@@ -377,18 +409,27 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
             f"Requirements transformed using LLM-powered story extraction. "
             f"Constraint requirements ({len(unprocessed_reqs)}) tracked separately. "
             f"Each story includes role, action, benefit, and acceptance criteria. "
-            f"{validation_summary}"
+            f"{validation_summary}. "
+            f"Prioritization: {prioritization_summary}"
         ),
         related_artifacts=tuple(s.id for s in stories),
     )
 
     # Create summary message
+    recommended_order = prioritization_result["recommended_execution_order"]
+    if len(recommended_order) > 3:
+        order_summary = f"{', '.join(recommended_order[:3])}..."
+    else:
+        order_summary = ", ".join(recommended_order) if recommended_order else "none"
+
     message = create_agent_message(
         content=(
             f"PM processing complete.\n"
             f"- Stories created: {output.story_count}\n"
             f"- Unprocessed requirements: {len(unprocessed_reqs)}\n"
-            f"- Escalations to analyst: {len(output.escalations_to_analyst)}"
+            f"- Escalations to analyst: {len(output.escalations_to_analyst)}\n"
+            f"- Quick wins: {len(prioritization_result['quick_wins'])}\n"
+            f"- Recommended order: {order_summary}"
         ),
         agent="pm",
     )
@@ -397,10 +438,12 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         "pm_node_completed",
         story_count=output.story_count,
         unprocessed_count=len(unprocessed_reqs),
+        quick_win_count=len(prioritization_result["quick_wins"]),
     )
 
     return {
         "messages": [message],
         "decisions": [decision],
         "pm_output": output.to_dict(),
+        "prioritization_result": prioritization_result,
     }

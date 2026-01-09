@@ -1,4 +1,4 @@
-"""Type definitions for PM agent (Story 6.1, 6.3).
+"""Type definitions for PM agent (Story 6.1, 6.3, 6.4).
 
 This module provides the data types used by the PM agent:
 
@@ -8,6 +8,9 @@ This module provides the data types used by the PM agent:
 - Story: A user story with acceptance criteria and metadata
 - PMOutput: Complete output from PM processing
 - TestabilityResult: Result of AC testability validation (Story 6.3)
+- DependencyInfo: Dependency analysis for a single story (Story 6.4)
+- PriorityScore: Priority score breakdown for a single story (Story 6.4)
+- PrioritizationResult: Complete prioritization analysis result (Story 6.4)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -356,3 +359,96 @@ class TestabilityResult(TypedDict):
     missing_edge_cases: list[str]
     ac_count_warning: str | None
     validation_notes: list[str]
+
+
+class DependencyInfo(TypedDict):
+    """Dependency analysis for a single story (Story 6.4).
+
+    TypedDict containing dependency graph information for a story,
+    used in prioritization to adjust scores based on dependencies.
+
+    Fields:
+        blocking_count: Number of stories that depend on this one.
+        blocked_by_count: Number of unfinished dependencies this story has.
+        blocking_story_ids: IDs of stories that depend on this story.
+        blocked_by_story_ids: IDs of stories this story depends on.
+        in_cycle: True if story is part of a dependency cycle.
+
+    Example:
+        >>> info: DependencyInfo = {
+        ...     "blocking_count": 2,
+        ...     "blocked_by_count": 1,
+        ...     "blocking_story_ids": ["story-002", "story-003"],
+        ...     "blocked_by_story_ids": ["story-000"],
+        ...     "in_cycle": False,
+        ... }
+    """
+
+    blocking_count: int
+    blocked_by_count: int
+    blocking_story_ids: list[str]
+    blocked_by_story_ids: list[str]
+    in_cycle: bool
+
+
+class PriorityScore(TypedDict):
+    """Priority score breakdown for a single story (Story 6.4).
+
+    TypedDict containing the complete priority score breakdown for a story,
+    including raw value score, dependency adjustments, and quick win status.
+
+    Fields:
+        story_id: The story's unique identifier.
+        raw_score: Base priority score (0-100) based on value factors.
+        dependency_adjustment: Score adjustment (-20 to +20) based on dependencies.
+        final_score: Clamped sum of raw_score + dependency_adjustment (0-100).
+        is_quick_win: True if story qualifies as a quick win.
+        scoring_rationale: Human-readable explanation of score factors.
+
+    Example:
+        >>> score: PriorityScore = {
+        ...     "story_id": "story-001",
+        ...     "raw_score": 85,
+        ...     "dependency_adjustment": 10,
+        ...     "final_score": 95,
+        ...     "is_quick_win": True,
+        ...     "scoring_rationale": "HIGH priority (+75), S complexity (+10), unblocks 2 stories (+10)",
+        ... }
+    """
+
+    story_id: str
+    raw_score: int
+    dependency_adjustment: int
+    final_score: int
+    is_quick_win: bool
+    scoring_rationale: str
+
+
+class PrioritizationResult(TypedDict):
+    """Complete prioritization analysis result (Story 6.4).
+
+    TypedDict containing the full results of story prioritization,
+    including all scores, recommended order, and dependency analysis.
+
+    Fields:
+        scores: List of PriorityScore for each story.
+        recommended_execution_order: Story IDs sorted by final_score descending.
+        quick_wins: Story IDs flagged as quick wins.
+        dependency_cycles: Detected cycles as lists of story ID chains.
+        analysis_notes: Summary of prioritization analysis.
+
+    Example:
+        >>> result: PrioritizationResult = {
+        ...     "scores": [{"story_id": "story-001", ...}],
+        ...     "recommended_execution_order": ["story-001", "story-002"],
+        ...     "quick_wins": ["story-001"],
+        ...     "dependency_cycles": [],
+        ...     "analysis_notes": "Prioritized 2 stories, 1 quick win identified",
+        ... }
+    """
+
+    scores: list[PriorityScore]
+    recommended_execution_order: list[str]
+    quick_wins: list[str]
+    dependency_cycles: list[list[str]]
+    analysis_notes: str

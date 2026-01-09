@@ -579,3 +579,100 @@ class TestPmNode:
         notes = result["pm_output"]["processing_notes"]
         # Should have testability validation info
         assert "Testability validation" in notes or "validation" in notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_prioritization_result_included(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """pm_node should include prioritization_result in output (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        assert "prioritization_result" in result
+        prioritization = result["prioritization_result"]
+        assert "scores" in prioritization
+        assert "recommended_execution_order" in prioritization
+        assert "quick_wins" in prioritization
+        assert "dependency_cycles" in prioritization
+        assert "analysis_notes" in prioritization
+
+    @pytest.mark.asyncio
+    async def test_prioritization_scores_match_story_count(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Prioritization should have scores for each story (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        pm_output = result["pm_output"]
+        prioritization = result["prioritization_result"]
+
+        assert len(prioritization["scores"]) == pm_output["story_count"]
+
+    @pytest.mark.asyncio
+    async def test_prioritization_order_matches_stories(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Recommended order should contain same story IDs (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        pm_output = result["pm_output"]
+        prioritization = result["prioritization_result"]
+
+        story_ids = {s["id"] for s in pm_output["stories"]}
+        order_ids = set(prioritization["recommended_execution_order"])
+
+        assert story_ids == order_ids
+
+    @pytest.mark.asyncio
+    async def test_prioritization_summary_in_notes(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Processing notes should include prioritization summary (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        notes = result["pm_output"]["processing_notes"]
+        assert "Prioritization:" in notes or "prioritized" in notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_prioritization_in_decision_rationale(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Decision rationale should mention prioritization (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        decision = result["decisions"][0]
+        assert "Prioritization" in decision.rationale or "prioritized" in decision.rationale.lower()
+
+    @pytest.mark.asyncio
+    async def test_empty_stories_prioritization(
+        self, empty_state: dict[str, Any]
+    ) -> None:
+        """Prioritization should handle empty stories gracefully (Story 6.4)."""
+        empty_state["analyst_output"] = {"requirements": [], "escalations": []}
+
+        result = await pm_node(empty_state)  # type: ignore[arg-type]
+
+        prioritization = result["prioritization_result"]
+        assert prioritization["scores"] == []
+        assert prioritization["recommended_execution_order"] == []
+        assert prioritization["quick_wins"] == []
+        assert prioritization["dependency_cycles"] == []
+
+    @pytest.mark.asyncio
+    async def test_message_includes_quick_wins(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Message content should mention quick wins (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        message = result["messages"][0]
+        assert "Quick wins:" in message.content
+
+    @pytest.mark.asyncio
+    async def test_message_includes_recommended_order(
+        self, mock_state: dict[str, Any]
+    ) -> None:
+        """Message content should mention recommended order (Story 6.4)."""
+        result = await pm_node(mock_state)  # type: ignore[arg-type]
+
+        message = result["messages"][0]
+        assert "Recommended order:" in message.content
