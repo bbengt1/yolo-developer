@@ -1,9 +1,9 @@
-"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4, 5.5).
+"""Analyst agent node for LangGraph orchestration (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6).
 
 This module provides the analyst_node function that integrates with the
 LangGraph orchestration workflow. The Analyst agent crystallizes requirements
-from seed content, identifies gaps, flags contradictions, and validates
-implementability.
+from seed content, identifies gaps, flags contradictions with structured
+analysis, and validates implementability.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -43,6 +43,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from yolo_developer.agents.analyst.types import (
     AnalystOutput,
     ComplexityLevel,
+    Contradiction,
+    ContradictionType,
     CrystallizedRequirement,
     DependencyType,
     ExternalDependency,
@@ -924,6 +926,199 @@ COMPLEXITY_INDICATORS: dict[str, dict[str, frozenset[str] | int | str]] = {
         "max_dependencies": 10,
         "description": "Cutting-edge or highly specialized",
     },
+}
+
+
+# =============================================================================
+# Story 5.6: Contradiction Flagging Patterns and Rules
+# =============================================================================
+
+# Direct conflict pairs: (keywords_set_1, keywords_set_2, description, contradiction_type)
+# When requirement A contains keywords from set_1 and requirement B contains
+# keywords from set_2 (or vice versa), a conflict of the specified type is detected.
+# Types: "direct" for explicit opposites, "semantic" for logically incompatible meanings
+DIRECT_CONFLICT_PAIRS: tuple[tuple[frozenset[str], frozenset[str], str, str], ...] = (
+    # Consistency model conflicts - SEMANTIC (logically incompatible design choices)
+    (
+        frozenset(["real-time", "real time", "instant", "immediate", "synchronous"]),
+        frozenset(
+            [
+                "eventual consistency",
+                "eventually consistent",
+                "async",
+                "asynchronous",
+                "delayed",
+            ]
+        ),
+        "Consistency model conflict: real-time vs eventual consistency",
+        "semantic",
+    ),
+    # Requirement strength conflicts (must vs must not) - DIRECT
+    (
+        frozenset(["must encrypt", "must be encrypted", "require encryption", "encrypted"]),
+        frozenset(["must not encrypt", "unencrypted", "plain text", "plaintext", "no encryption"]),
+        "Security conflict: encrypted vs unencrypted data",
+        "direct",
+    ),
+    # Access control conflicts - DIRECT
+    (
+        frozenset(["public", "open access", "unrestricted", "anonymous"]),
+        frozenset(["private", "restricted", "authenticated", "authorized only"]),
+        "Access conflict: public vs private/restricted",
+        "direct",
+    ),
+    # Cardinality conflicts - SEMANTIC (design choice incompatibility)
+    (
+        frozenset(["single", "one", "unique", "only one", "singleton"]),
+        frozenset(["multiple", "many", "several", "unlimited", "any number"]),
+        "Cardinality conflict: single vs multiple",
+        "semantic",
+    ),
+    # Online/offline conflicts - SEMANTIC (architectural incompatibility)
+    (
+        frozenset(["online only", "requires connection", "cloud-based", "always connected"]),
+        frozenset(["offline", "disconnected", "local-only", "offline-first"]),
+        "Connectivity conflict: online-only vs offline support",
+        "semantic",
+    ),
+    # State management conflicts - SEMANTIC (design pattern incompatibility)
+    (
+        frozenset(["stateless", "no state", "stateless design"]),
+        frozenset(["stateful", "session", "maintain state", "remember", "persistent state"]),
+        "State management conflict: stateless vs stateful",
+        "semantic",
+    ),
+    # Temporal conflicts (always vs never) - DIRECT
+    (
+        frozenset(["always", "constantly", "continuously", "at all times"]),
+        frozenset(["never", "not ever", "at no time", "prohibited"]),
+        "Temporal conflict: always vs never",
+        "direct",
+    ),
+    # Data retention conflicts - DIRECT
+    (
+        frozenset(["delete immediately", "no storage", "ephemeral", "transient"]),
+        frozenset(["permanent", "forever", "indefinitely", "never delete", "retain"]),
+        "Data retention conflict: ephemeral vs permanent storage",
+        "direct",
+    ),
+)
+
+# Implicit conflict patterns: resource or behavior-based conflicts that aren't
+# explicitly contradictory but indicate competing requirements
+IMPLICIT_CONFLICT_PATTERNS: dict[str, dict[str, frozenset[str] | str]] = {
+    "resource_memory": {
+        "high": frozenset(
+            ["in-memory", "cache all", "preload", "memory-intensive", "large dataset", "keep in ram"]
+        ),
+        "low": frozenset(
+            ["low memory", "minimal footprint", "embedded", "resource-constrained", "memory limit"]
+        ),
+        "description": "Memory resource conflict: high-memory requirements vs low-memory constraints",
+    },
+    "resource_compute": {
+        "high": frozenset(
+            [
+                "real-time processing",
+                "complex calculations",
+                "ml inference",
+                "encryption",
+                "heavy computation",
+            ]
+        ),
+        "low": frozenset(
+            ["low latency", "fast response", "lightweight", "minimal processing", "quick"]
+        ),
+        "description": "Compute resource conflict: intensive processing vs fast response needs",
+    },
+    "throughput_latency": {
+        "high": frozenset(
+            ["high volume", "thousands per second", "bulk operations", "batch", "high throughput"]
+        ),
+        "low": frozenset(
+            ["low latency", "instant response", "real-time", "sub-millisecond", "immediate"]
+        ),
+        "description": "Performance tradeoff: high throughput vs low latency",
+    },
+    "consistency_availability": {
+        "high": frozenset(["acid", "transactional", "consistent reads", "linearizable", "strong consistency"]),
+        "low": frozenset(
+            ["always available", "no downtime", "partition tolerant", "eventual", "high availability"]
+        ),
+        "description": "CAP theorem conflict: strong consistency vs high availability",
+    },
+    "optimization_read_write": {
+        "high": frozenset(["read-heavy", "query performance", "fast reads", "denormalized", "read optimized"]),
+        "low": frozenset(
+            ["write-heavy", "fast writes", "insert performance", "normalized", "write optimized"]
+        ),
+        "description": "Optimization conflict: read-optimized vs write-optimized design",
+    },
+}
+
+# Severity assessment rules based on conflict category and requirement types
+# Key format: conflict_category -> { requirement_type -> severity }
+CONTRADICTION_SEVERITY_RULES: dict[str, dict[str, Severity]] = {
+    "security": {
+        "any": Severity.CRITICAL,  # Security conflicts are always critical
+    },
+    "data_integrity": {
+        "any": Severity.CRITICAL,  # Data integrity is critical
+    },
+    "consistency": {
+        "functional": Severity.HIGH,
+        "non_functional": Severity.HIGH,
+        "constraint": Severity.CRITICAL,
+    },
+    "architecture": {
+        "functional": Severity.HIGH,
+        "non_functional": Severity.HIGH,
+        "constraint": Severity.CRITICAL,
+    },
+    "performance": {
+        "functional": Severity.MEDIUM,
+        "non_functional": Severity.HIGH,
+        "constraint": Severity.HIGH,
+    },
+    "state": {
+        "functional": Severity.MEDIUM,
+        "non_functional": Severity.MEDIUM,
+        "constraint": Severity.HIGH,
+    },
+    "access": {
+        "functional": Severity.MEDIUM,
+        "non_functional": Severity.MEDIUM,
+        "constraint": Severity.HIGH,
+    },
+    "default": {
+        "functional": Severity.MEDIUM,
+        "non_functional": Severity.MEDIUM,
+        "constraint": Severity.MEDIUM,
+    },
+}
+
+# Resolution suggestion templates by contradiction type
+RESOLUTION_TEMPLATES: dict[str, tuple[str, ...]] = {
+    "direct": (
+        "Clarify which requirement takes precedence in the specific context",
+        "Define different scopes where each requirement applies",
+        "Discuss with stakeholders to determine intended behavior",
+    ),
+    "implicit_resource": (
+        "Add resource constraints to define acceptable tradeoffs",
+        "Split into separate deployment tiers (high-resource vs low-resource)",
+        "Implement feature flags to enable/disable resource-intensive features",
+    ),
+    "implicit_behavior": (
+        "Define clear boundaries for each behavior mode",
+        "Implement switchable modes based on configuration",
+        "Clarify which use cases require which behavior",
+    ),
+    "semantic": (
+        "Reconcile the semantic difference by clarifying terminology",
+        "Add context-specific definitions for conflicting terms",
+        "Split requirements to separate features with distinct semantics",
+    ),
 }
 
 
@@ -1827,6 +2022,474 @@ def _validate_all_requirements(
     return tuple(validated), overall_score
 
 
+# =============================================================================
+# Story 5.6: Contradiction Flagging Functions
+# =============================================================================
+
+
+def _has_keyword_in_text(text: str, keywords: frozenset[str]) -> bool:
+    """Check if any keyword from the set appears in the text.
+
+    Performs case-insensitive matching. For multi-word phrases, uses
+    substring matching. For single words, uses word boundary matching.
+
+    Args:
+        text: The text to search in (should already be lowercased).
+        keywords: Set of keywords to look for.
+
+    Returns:
+        True if any keyword is found, False otherwise.
+    """
+    for keyword in keywords:
+        if " " in keyword:
+            # Multi-word phrase: substring match
+            if keyword in text:
+                return True
+        else:
+            # Single word: word boundary match
+            pattern = rf"\b{re.escape(keyword)}\b"
+            if re.search(pattern, text):
+                return True
+    return False
+
+
+def _find_direct_conflicts(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> list[tuple[str, str, str, str]]:
+    """Find directly conflicting requirement pairs.
+
+    Scans all requirement pairs against DIRECT_CONFLICT_PAIRS patterns.
+    A conflict is detected when one requirement contains keywords from
+    set_1 and another contains keywords from set_2 of the same pattern.
+
+    Args:
+        requirements: Tuple of requirements to analyze.
+
+    Returns:
+        List of (req_id_1, req_id_2, conflict_description, conflict_type) tuples.
+        conflict_type is "direct" or "semantic".
+
+    Example:
+        >>> req1 = CrystallizedRequirement(
+        ...     id="req-001", original_text="must encrypt",
+        ...     refined_text="Data must be encrypted", category="functional", testable=True
+        ... )
+        >>> req2 = CrystallizedRequirement(
+        ...     id="req-002", original_text="plain text",
+        ...     refined_text="Store in plain text", category="functional", testable=True
+        ... )
+        >>> conflicts = _find_direct_conflicts((req1, req2))
+        >>> len(conflicts) > 0
+        True
+    """
+    conflicts: list[tuple[str, str, str, str]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    for i, req1 in enumerate(requirements):
+        text1 = f"{req1.refined_text} {req1.original_text}".lower()
+
+        for req2 in requirements[i + 1 :]:
+            text2 = f"{req2.refined_text} {req2.original_text}".lower()
+
+            # Skip if we've already checked this pair
+            pair_key = (min(req1.id, req2.id), max(req1.id, req2.id))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            # Check against all conflict patterns
+            for keywords1, keywords2, description, conflict_type in DIRECT_CONFLICT_PAIRS:
+                # Check if req1 has keywords1 and req2 has keywords2
+                if _has_keyword_in_text(text1, keywords1) and _has_keyword_in_text(
+                    text2, keywords2
+                ):
+                    conflicts.append((req1.id, req2.id, description, conflict_type))
+                    logger.debug(
+                        "direct_conflict_detected",
+                        req1_id=req1.id,
+                        req2_id=req2.id,
+                        description=description,
+                        conflict_type=conflict_type,
+                    )
+                    break  # Only report first match for this pair
+
+                # Check opposite direction: req1 has keywords2 and req2 has keywords1
+                if _has_keyword_in_text(text1, keywords2) and _has_keyword_in_text(
+                    text2, keywords1
+                ):
+                    conflicts.append((req1.id, req2.id, description, conflict_type))
+                    logger.debug(
+                        "direct_conflict_detected",
+                        req1_id=req1.id,
+                        req2_id=req2.id,
+                        description=description,
+                        conflict_type=conflict_type,
+                    )
+                    break
+
+    return conflicts
+
+
+def _find_implicit_conflicts(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> list[tuple[str, str, str, str]]:
+    """Find implicit conflicts based on resource or behavior patterns.
+
+    Detects conflicts where requirements don't explicitly contradict
+    but imply competing resource needs or incompatible behaviors.
+
+    Args:
+        requirements: Tuple of requirements to analyze.
+
+    Returns:
+        List of (req_id_1, req_id_2, conflict_type, explanation) tuples.
+
+    Example:
+        >>> req1 = CrystallizedRequirement(
+        ...     id="req-001", original_text="cache all",
+        ...     refined_text="Cache all data in memory", category="non_functional", testable=True
+        ... )
+        >>> req2 = CrystallizedRequirement(
+        ...     id="req-002", original_text="low memory",
+        ...     refined_text="Run on low memory devices", category="constraint", testable=True
+        ... )
+        >>> conflicts = _find_implicit_conflicts((req1, req2))
+        >>> len(conflicts) > 0
+        True
+    """
+    conflicts: list[tuple[str, str, str, str]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    for i, req1 in enumerate(requirements):
+        text1 = f"{req1.refined_text} {req1.original_text}".lower()
+
+        for req2 in requirements[i + 1 :]:
+            text2 = f"{req2.refined_text} {req2.original_text}".lower()
+
+            # Skip if already checked
+            pair_key = (min(req1.id, req2.id), max(req1.id, req2.id))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            # Check each implicit conflict pattern
+            for pattern_name, pattern_config in IMPLICIT_CONFLICT_PATTERNS.items():
+                high_keywords = pattern_config["high"]
+                low_keywords = pattern_config["low"]
+                description = pattern_config["description"]
+
+                # Check if one req has "high" keywords and other has "low" keywords
+                req1_high = _has_keyword_in_text(text1, high_keywords)  # type: ignore[arg-type]
+                req1_low = _has_keyword_in_text(text1, low_keywords)  # type: ignore[arg-type]
+                req2_high = _has_keyword_in_text(text2, high_keywords)  # type: ignore[arg-type]
+                req2_low = _has_keyword_in_text(text2, low_keywords)  # type: ignore[arg-type]
+
+                if (req1_high and req2_low) or (req1_low and req2_high):
+                    conflict_type = (
+                        "implicit_resource"
+                        if "resource" in pattern_name
+                        else "implicit_behavior"
+                    )
+                    conflicts.append(
+                        (req1.id, req2.id, conflict_type, str(description))
+                    )
+                    logger.debug(
+                        "implicit_conflict_detected",
+                        req1_id=req1.id,
+                        req2_id=req2.id,
+                        pattern=pattern_name,
+                        conflict_type=conflict_type,
+                    )
+                    break  # Only report first match for this pair
+
+    return conflicts
+
+
+def _classify_conflict_category(description: str) -> str:
+    """Classify a conflict description into a severity rule category.
+
+    Args:
+        description: The conflict description string.
+
+    Returns:
+        Category string matching keys in CONTRADICTION_SEVERITY_RULES.
+    """
+    desc_lower = description.lower()
+
+    if any(term in desc_lower for term in ["encrypt", "security", "auth", "private"]):
+        return "security"
+    if any(term in desc_lower for term in ["data", "integrity", "corrupt"]):
+        return "data_integrity"
+    if any(term in desc_lower for term in ["consistency", "eventual", "real-time"]):
+        return "consistency"
+    if any(term in desc_lower for term in ["state", "stateless", "stateful", "session"]):
+        return "state"
+    if any(term in desc_lower for term in ["performance", "latency", "throughput"]):
+        return "performance"
+    if any(term in desc_lower for term in ["access", "public", "private", "restricted"]):
+        return "access"
+    if any(
+        term in desc_lower
+        for term in ["architecture", "design", "pattern", "cardinality"]
+    ):
+        return "architecture"
+
+    return "default"
+
+
+def _assess_contradiction_severity(
+    conflict_type: ContradictionType,
+    req1: CrystallizedRequirement,
+    req2: CrystallizedRequirement,
+    description: str,
+) -> Severity:
+    """Assess severity of a contradiction based on conflict type and requirements.
+
+    Uses CONTRADICTION_SEVERITY_RULES to determine severity based on:
+    1. Conflict category (security, performance, etc.)
+    2. Requirement categories involved (functional, non_functional, constraint)
+
+    Args:
+        conflict_type: Type of contradiction (direct, implicit_resource, etc.).
+        req1: First requirement in conflict.
+        req2: Second requirement in conflict.
+        description: Description of the conflict.
+
+    Returns:
+        Severity level (CRITICAL, HIGH, MEDIUM, or LOW).
+
+    Example:
+        >>> req1 = CrystallizedRequirement(
+        ...     id="req-001", original_text="encrypt",
+        ...     refined_text="Must encrypt", category="non_functional", testable=True
+        ... )
+        >>> req2 = CrystallizedRequirement(
+        ...     id="req-002", original_text="plain",
+        ...     refined_text="Store plaintext", category="constraint", testable=True
+        ... )
+        >>> severity = _assess_contradiction_severity(
+        ...     ContradictionType.DIRECT, req1, req2, "Security conflict"
+        ... )
+        >>> severity == Severity.CRITICAL
+        True
+    """
+    # Classify the conflict
+    category = _classify_conflict_category(description)
+
+    # Get severity rules for this category
+    rules = CONTRADICTION_SEVERITY_RULES.get(category, CONTRADICTION_SEVERITY_RULES["default"])
+
+    # Check if "any" rule applies (e.g., security always critical)
+    if "any" in rules:
+        return rules["any"]
+
+    # Otherwise, use the higher-priority requirement category
+    # Constraints are highest priority, then non_functional, then functional
+    cat1 = req1.category.lower().replace("-", "_")
+    cat2 = req2.category.lower().replace("-", "_")
+
+    # Determine priority category (unknown categories treated as lowest priority)
+    # Using dict.get() to avoid ValueError for categories not in the priority list
+    priority_ranks = {"constraint": 0, "non_functional": 1, "functional": 2}
+    rank1 = priority_ranks.get(cat1, 3)  # Unknown categories get lowest priority (3)
+    rank2 = priority_ranks.get(cat2, 3)
+    priority_cat = cat1 if rank1 < rank2 else cat2
+
+    # Get severity from rules, defaulting to MEDIUM
+    return rules.get(priority_cat, Severity.MEDIUM)
+
+
+def _generate_resolution_suggestions(
+    conflict_type: ContradictionType,
+    req1: CrystallizedRequirement,
+    req2: CrystallizedRequirement,
+) -> tuple[str, ...]:
+    """Generate actionable resolution suggestions for a contradiction.
+
+    Uses RESOLUTION_TEMPLATES based on conflict type and adds
+    context-specific suggestions when applicable.
+
+    Args:
+        conflict_type: Type of contradiction.
+        req1: First requirement in conflict.
+        req2: Second requirement in conflict.
+
+    Returns:
+        Tuple of suggestion strings.
+
+    Example:
+        >>> req1 = CrystallizedRequirement(
+        ...     id="req-001", original_text="real-time",
+        ...     refined_text="Real-time updates", category="functional", testable=True
+        ... )
+        >>> req2 = CrystallizedRequirement(
+        ...     id="req-002", original_text="eventual",
+        ...     refined_text="Eventual consistency", category="non_functional", testable=True
+        ... )
+        >>> suggestions = _generate_resolution_suggestions(ContradictionType.SEMANTIC, req1, req2)
+        >>> len(suggestions) > 0
+        True
+    """
+    # Start with base templates for this conflict type
+    base_suggestions: list[str] = list(
+        RESOLUTION_TEMPLATES.get(conflict_type.value, RESOLUTION_TEMPLATES["direct"])
+    )
+
+    # Add context-specific suggestions based on requirement content
+    text1 = f"{req1.refined_text} {req1.original_text}".lower()
+    text2 = f"{req2.refined_text} {req2.original_text}".lower()
+    combined = text1 + " " + text2
+
+    # Security-specific suggestions
+    if any(term in combined for term in ["encrypt", "security", "auth"]):
+        base_suggestions.append(
+            f"Consult security team to determine encryption requirements for {req1.id} vs {req2.id}"
+        )
+
+    # Performance-specific suggestions
+    if any(term in combined for term in ["performance", "latency", "throughput", "memory"]):
+        base_suggestions.append(
+            "Consider implementing tiered service levels with different guarantees"
+        )
+
+    # State-specific suggestions
+    if any(term in combined for term in ["state", "session", "stateless"]):
+        base_suggestions.append(
+            "Consider hybrid approach with stateless core and optional session layer"
+        )
+
+    return tuple(base_suggestions[:5])  # Limit to 5 suggestions
+
+
+def _analyze_contradictions(
+    requirements: tuple[CrystallizedRequirement, ...],
+) -> tuple[Contradiction, ...]:
+    """Analyze requirements for contradictions.
+
+    Runs all contradiction detection passes (direct and implicit),
+    assesses severity, and generates resolution suggestions.
+
+    Args:
+        requirements: Tuple of requirements to analyze.
+
+    Returns:
+        Tuple of Contradiction objects, sorted by severity (critical first).
+
+    Example:
+        >>> req1 = CrystallizedRequirement(
+        ...     id="req-001", original_text="encrypt all",
+        ...     refined_text="All data must be encrypted", category="non_functional", testable=True
+        ... )
+        >>> req2 = CrystallizedRequirement(
+        ...     id="req-002", original_text="plain text",
+        ...     refined_text="Store in plain text for debugging", category="constraint", testable=True
+        ... )
+        >>> contradictions = _analyze_contradictions((req1, req2))
+        >>> len(contradictions) > 0
+        True
+    """
+    if not requirements or len(requirements) < 2:
+        return ()
+
+    # Build requirement lookup for quick access
+    req_lookup: dict[str, CrystallizedRequirement] = {r.id: r for r in requirements}
+
+    contradictions: list[Contradiction] = []
+    conflict_counter = 1
+
+    # Find direct/semantic conflicts from pattern matching
+    direct_conflicts = _find_direct_conflicts(requirements)
+    for req1_id, req2_id, description, conflict_type_str in direct_conflicts:
+        req1 = req_lookup[req1_id]
+        req2 = req_lookup[req2_id]
+
+        # Map string to ContradictionType enum
+        ct = ContradictionType.SEMANTIC if conflict_type_str == "semantic" else ContradictionType.DIRECT
+
+        severity = _assess_contradiction_severity(ct, req1, req2, description)
+        suggestions = _generate_resolution_suggestions(ct, req1, req2)
+
+        # Customize explanation based on type
+        if ct == ContradictionType.SEMANTIC:
+            explanation = f"Semantic conflict: '{req1_id}' and '{req2_id}' have logically incompatible requirements"
+        else:
+            explanation = f"Direct conflict: '{req1_id}' and '{req2_id}' contain explicitly opposing statements"
+
+        contradiction = Contradiction(
+            id=f"conflict-{conflict_counter:03d}",
+            contradiction_type=ct,
+            requirement_ids=(req1_id, req2_id),
+            description=description,
+            explanation=explanation,
+            severity=severity,
+            resolution_suggestions=suggestions,
+        )
+        contradictions.append(contradiction)
+        conflict_counter += 1
+
+    # Find implicit conflicts
+    implicit_conflicts = _find_implicit_conflicts(requirements)
+    for req1_id, req2_id, conflict_type_str, explanation in implicit_conflicts:
+        req1 = req_lookup[req1_id]
+        req2 = req_lookup[req2_id]
+
+        # Map string to enum
+        if conflict_type_str == "implicit_resource":
+            ct = ContradictionType.IMPLICIT_RESOURCE
+        else:
+            ct = ContradictionType.IMPLICIT_BEHAVIOR
+
+        severity = _assess_contradiction_severity(ct, req1, req2, explanation)
+        suggestions = _generate_resolution_suggestions(ct, req1, req2)
+
+        contradiction = Contradiction(
+            id=f"conflict-{conflict_counter:03d}",
+            contradiction_type=ct,
+            requirement_ids=(req1_id, req2_id),
+            description=explanation,
+            explanation=f"Implicit conflict: {explanation}",
+            severity=severity,
+            resolution_suggestions=suggestions,
+        )
+        contradictions.append(contradiction)
+        conflict_counter += 1
+
+    # Sort by severity (critical first)
+    severity_order = {
+        Severity.CRITICAL: 0,
+        Severity.HIGH: 1,
+        Severity.MEDIUM: 2,
+        Severity.LOW: 3,
+    }
+    contradictions.sort(key=lambda c: severity_order.get(c.severity, 4))
+
+    # Re-number IDs after sorting
+    renumbered: list[Contradiction] = []
+    for i, c in enumerate(contradictions, start=1):
+        renumbered.append(
+            Contradiction(
+                id=f"conflict-{i:03d}",
+                contradiction_type=c.contradiction_type,
+                requirement_ids=c.requirement_ids,
+                description=c.description,
+                explanation=c.explanation,
+                severity=c.severity,
+                resolution_suggestions=c.resolution_suggestions,
+            )
+        )
+
+    logger.info(
+        "contradiction_analysis_complete",
+        total=len(renumbered),
+        direct_count=len(direct_conflicts),
+        implicit_count=len(implicit_conflicts),
+        critical_count=sum(1 for c in renumbered if c.severity == Severity.CRITICAL),
+        high_count=sum(1 for c in renumbered if c.severity == Severity.HIGH),
+    )
+
+    return tuple(renumbered)
+
+
 def _identify_edge_cases(
     requirements: tuple[CrystallizedRequirement, ...],
 ) -> tuple[IdentifiedGap, ...]:
@@ -2710,21 +3373,22 @@ async def _crystallize_requirements(seed_content: str) -> AnalystOutput:
 
 
 def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
-    """Enhance AnalystOutput with gap analysis, categorization, and validation.
+    """Enhance AnalystOutput with gap analysis, categorization, validation, and contradiction analysis.
 
     Runs:
     1. Requirement categorization (Story 5.4)
     2. Implementability validation (Story 5.5)
-    3. Edge case detection
-    4. Implied requirement detection
-    5. Pattern-based suggestion
+    3. Contradiction analysis (Story 5.6)
+    4. Edge case detection
+    5. Implied requirement detection
+    6. Pattern-based suggestion
 
     Args:
         output: Initial AnalystOutput with requirements.
 
     Returns:
-        Enhanced AnalystOutput with categorized, validated requirements and
-        structured_gaps populated.
+        Enhanced AnalystOutput with categorized, validated requirements,
+        structured_gaps, and structured_contradictions populated.
     """
     if not output.requirements:
         return output
@@ -2736,6 +3400,9 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
     validated_requirements, implementability_score = _validate_all_requirements(
         categorized_requirements
     )
+
+    # Story 5.6: Analyze contradictions between requirements
+    structured_contradictions = _analyze_contradictions(validated_requirements)
 
     # Run all gap analysis functions on validated requirements
     edge_cases = _identify_edge_cases(validated_requirements)
@@ -2770,7 +3437,7 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         )
         renumbered_gaps.append(renumbered_gap)
 
-    # Log gap analysis results
+    # Log gap analysis results (including contradiction info)
     logger.info(
         "gap_analysis_complete",
         edge_cases_count=len(edge_cases),
@@ -2778,12 +3445,14 @@ def _enhance_with_gap_analysis(output: AnalystOutput) -> AnalystOutput:
         pattern_suggestions_count=len(pattern_suggestions),
         total_gaps=len(renumbered_gaps),
         implementability_score=round(implementability_score, 3),
+        structured_contradictions_count=len(structured_contradictions),
     )
 
-    # Create enhanced output with validated requirements and structured gaps
+    # Create enhanced output with validated requirements, structured gaps, and contradictions
     return AnalystOutput(
         requirements=validated_requirements,  # Story 5.5: Use validated requirements
         identified_gaps=output.identified_gaps,
         contradictions=output.contradictions,
         structured_gaps=tuple(renumbered_gaps),
+        structured_contradictions=structured_contradictions,  # Story 5.6
     )

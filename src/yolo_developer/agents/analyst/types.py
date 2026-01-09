@@ -1,4 +1,4 @@
-"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4, 5.5).
+"""Type definitions for Analyst agent (Story 5.1, 5.2, 5.3, 5.4, 5.5, 5.6).
 
 This module provides the data types used by the Analyst agent:
 
@@ -16,6 +16,8 @@ This module provides the data types used by the Analyst agent:
 - DependencyType: Type of external dependency (Story 5.5)
 - ExternalDependency: An external dependency required for implementation (Story 5.5)
 - ImplementabilityResult: Result of implementability validation (Story 5.5)
+- ContradictionType: Type of contradiction between requirements (Story 5.6)
+- Contradiction: A contradiction identified between requirements (Story 5.6)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -319,6 +321,104 @@ class ImplementabilityResult:
         }
 
 
+# =============================================================================
+# Story 5.6: Contradiction Flagging Types
+# =============================================================================
+
+
+class ContradictionType(str, Enum):
+    """Type of contradiction between requirements (Story 5.6).
+
+    Used to categorize how requirements conflict with each other.
+
+    Values:
+        DIRECT: Explicit opposing statements (must vs must not, encrypted vs plaintext).
+        IMPLICIT_RESOURCE: Competing resource needs (memory-intensive vs low-memory).
+        IMPLICIT_BEHAVIOR: Contradictory behaviors (stateless vs session-required).
+        SEMANTIC: Logically incompatible meanings (real-time vs eventual consistency).
+
+    Example:
+        >>> ContradictionType.DIRECT.value
+        'direct'
+        >>> ContradictionType("semantic") == ContradictionType.SEMANTIC
+        True
+    """
+
+    DIRECT = "direct"
+    IMPLICIT_RESOURCE = "implicit_resource"
+    IMPLICIT_BEHAVIOR = "implicit_behavior"
+    SEMANTIC = "semantic"
+
+
+@dataclass(frozen=True)
+class Contradiction:
+    """A contradiction identified between requirements (Story 5.6).
+
+    Immutable dataclass representing a conflict between two or more
+    requirements that needs resolution before implementation.
+
+    Attributes:
+        id: Unique identifier for this contradiction (e.g., "conflict-001").
+        contradiction_type: Category of conflict (direct, implicit_resource, etc.).
+        requirement_ids: Tuple of requirement IDs involved in the conflict.
+        description: Human-readable description of the contradiction.
+        explanation: Detailed explanation of why these requirements conflict.
+        severity: Impact severity (critical, high, medium, low).
+        resolution_suggestions: Tuple of suggested ways to resolve the conflict.
+
+    Example:
+        >>> conflict = Contradiction(
+        ...     id="conflict-001",
+        ...     contradiction_type=ContradictionType.SEMANTIC,
+        ...     requirement_ids=("req-001", "req-002"),
+        ...     description="Real-time vs eventual consistency conflict",
+        ...     explanation="req-001 requires real-time updates, req-002 specifies eventual consistency",
+        ...     severity=Severity.HIGH,
+        ...     resolution_suggestions=("Clarify which operations need real-time", "Split into two features"),
+        ... )
+        >>> conflict.severity
+        <Severity.HIGH: 'high'>
+    """
+
+    id: str
+    contradiction_type: ContradictionType
+    requirement_ids: tuple[str, ...]
+    description: str
+    explanation: str
+    severity: Severity
+    resolution_suggestions: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary with all fields, enums as string values,
+            requirement_ids and resolution_suggestions as lists.
+
+        Example:
+            >>> conflict = Contradiction(
+            ...     id="conflict-001",
+            ...     contradiction_type=ContradictionType.DIRECT,
+            ...     requirement_ids=("req-001", "req-002"),
+            ...     description="Encryption conflict",
+            ...     explanation="One requires encryption, other forbids it",
+            ...     severity=Severity.CRITICAL,
+            ...     resolution_suggestions=("Clarify security requirements",),
+            ... )
+            >>> conflict.to_dict()["severity"]
+            'critical'
+        """
+        return {
+            "id": self.id,
+            "contradiction_type": self.contradiction_type.value,
+            "requirement_ids": list(self.requirement_ids),
+            "description": self.description,
+            "explanation": self.explanation,
+            "severity": self.severity.value,
+            "resolution_suggestions": list(self.resolution_suggestions),
+        }
+
+
 @dataclass(frozen=True)
 class CategorizationResult:
     """Result of categorizing a requirement (Story 5.4).
@@ -618,9 +718,12 @@ class AnalystOutput:
     Attributes:
         requirements: Tuple of CrystallizedRequirement objects.
         identified_gaps: Tuple of strings describing missing information (legacy).
-        contradictions: Tuple of strings describing conflicting requirements.
+        contradictions: Tuple of strings describing conflicting requirements (legacy).
         structured_gaps: Tuple of IdentifiedGap objects with full gap details
             (Story 5.3). Defaults to empty for backward compatibility.
+        structured_contradictions: Tuple of Contradiction objects with full conflict
+            details including severity and resolution suggestions (Story 5.6).
+            Defaults to empty for backward compatibility.
 
     Example:
         >>> req = CrystallizedRequirement(
@@ -643,14 +746,17 @@ class AnalystOutput:
     identified_gaps: tuple[str, ...]
     contradictions: tuple[str, ...]
     structured_gaps: tuple[IdentifiedGap, ...] = ()
+    structured_contradictions: tuple[Contradiction, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
-        Serializes nested CrystallizedRequirement and IdentifiedGap objects.
+        Serializes nested CrystallizedRequirement, IdentifiedGap, and
+        Contradiction objects.
 
         Returns:
-            Dictionary with all output fields including structured_gaps.
+            Dictionary with all output fields including structured_gaps
+            and structured_contradictions.
 
         Example:
             >>> output = AnalystOutput(
@@ -667,4 +773,5 @@ class AnalystOutput:
             "identified_gaps": list(self.identified_gaps),
             "contradictions": list(self.contradictions),
             "structured_gaps": [g.to_dict() for g in self.structured_gaps],
+            "structured_contradictions": [c.to_dict() for c in self.structured_contradictions],
         }

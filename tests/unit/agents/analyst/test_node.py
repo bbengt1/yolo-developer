@@ -1935,3 +1935,650 @@ class TestValidateAllRequirements:
 
         assert result[0].id == "req-001"
         assert result[1].id == "req-002"
+
+
+# =============================================================================
+# Story 5.6: Contradiction Flagging Tests
+# =============================================================================
+
+
+class TestHasKeywordInText:
+    """Tests for _has_keyword_in_text helper function (Story 5.6)."""
+
+    def test_single_word_match_with_word_boundary(self) -> None:
+        """Single word keyword should match with word boundaries."""
+        from yolo_developer.agents.analyst.node import _has_keyword_in_text
+
+        keywords = frozenset(["public", "private"])
+
+        assert _has_keyword_in_text("this is public", keywords)
+        assert _has_keyword_in_text("private access", keywords)
+        assert not _has_keyword_in_text("publication", keywords)  # Not word boundary
+
+    def test_multi_word_phrase_substring_match(self) -> None:
+        """Multi-word phrases should use substring matching."""
+        from yolo_developer.agents.analyst.node import _has_keyword_in_text
+
+        keywords = frozenset(["real-time", "eventual consistency"])
+
+        assert _has_keyword_in_text("requires real-time updates", keywords)
+        assert _has_keyword_in_text("uses eventual consistency", keywords)
+        assert not _has_keyword_in_text("realtime", keywords)  # Different format
+
+    def test_no_match_returns_false(self) -> None:
+        """Should return False when no keywords match."""
+        from yolo_developer.agents.analyst.node import _has_keyword_in_text
+
+        keywords = frozenset(["encrypt", "decrypt"])
+
+        assert not _has_keyword_in_text("store data in plain text", keywords)
+
+
+class TestFindDirectConflicts:
+    """Tests for _find_direct_conflicts function (Story 5.6)."""
+
+    def test_detects_encryption_conflict(self) -> None:
+        """Should detect encryption vs plaintext conflict."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt data",
+            refined_text="All data must be encrypted at rest",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="plaintext",
+            refined_text="Store data in plain text for debugging",
+            category="constraint",
+            testable=True,
+        )
+        conflicts = _find_direct_conflicts((req1, req2))
+
+        assert len(conflicts) == 1
+        assert conflicts[0][0] == "req-001"
+        assert conflicts[0][1] == "req-002"
+        assert "encrypt" in conflicts[0][2].lower() or "security" in conflicts[0][2].lower()
+        assert conflicts[0][3] == "direct"  # Security conflict is direct type
+
+    def test_detects_public_vs_private_conflict(self) -> None:
+        """Should detect public vs private access conflict."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="public api",
+            refined_text="API endpoints are public",
+            category="functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="authenticated",
+            refined_text="All endpoints require authenticated access",
+            category="non_functional",
+            testable=True,
+        )
+        conflicts = _find_direct_conflicts((req1, req2))
+
+        assert len(conflicts) == 1
+        assert "access" in conflicts[0][2].lower()
+        assert conflicts[0][3] == "direct"  # Access conflict is direct type
+
+    def test_no_conflict_for_unrelated_requirements(self) -> None:
+        """Should not detect conflicts for unrelated requirements."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="login",
+            refined_text="Users can log in with email",
+            category="functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="dashboard",
+            refined_text="Users see a dashboard after login",
+            category="functional",
+            testable=True,
+        )
+        conflicts = _find_direct_conflicts((req1, req2))
+
+        assert len(conflicts) == 0
+
+    def test_handles_single_requirement(self) -> None:
+        """Should return empty list for single requirement."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="Data must be encrypted",
+            category="non_functional",
+            testable=True,
+        )
+        conflicts = _find_direct_conflicts((req1,))
+
+        assert len(conflicts) == 0
+
+    def test_handles_empty_requirements(self) -> None:
+        """Should return empty list for empty requirements."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        conflicts = _find_direct_conflicts(())
+
+        assert len(conflicts) == 0
+
+    def test_detects_consistency_conflict_as_semantic(self) -> None:
+        """Should detect real-time vs eventual consistency as SEMANTIC type."""
+        from yolo_developer.agents.analyst.node import _find_direct_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="real-time updates",
+            refined_text="Data must be available in real-time",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="eventual consistency",
+            refined_text="System uses eventual consistency for scalability",
+            category="non_functional",
+            testable=True,
+        )
+        conflicts = _find_direct_conflicts((req1, req2))
+
+        assert len(conflicts) == 1
+        assert conflicts[0][0] == "req-001"
+        assert conflicts[0][1] == "req-002"
+        assert "consistency" in conflicts[0][2].lower()
+        assert conflicts[0][3] == "semantic"  # Consistency conflicts are semantic type
+
+
+class TestFindImplicitConflicts:
+    """Tests for _find_implicit_conflicts function (Story 5.6)."""
+
+    def test_detects_memory_resource_conflict(self) -> None:
+        """Should detect high vs low memory resource conflict."""
+        from yolo_developer.agents.analyst.node import _find_implicit_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="cache all",
+            refined_text="Cache all user data in-memory for fast access",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="embedded",
+            refined_text="Run on embedded low memory devices",
+            category="constraint",
+            testable=True,
+        )
+        conflicts = _find_implicit_conflicts((req1, req2))
+
+        assert len(conflicts) == 1
+        assert conflicts[0][2] == "implicit_resource"
+        assert "memory" in conflicts[0][3].lower()
+
+    def test_detects_throughput_latency_conflict(self) -> None:
+        """Should detect throughput vs latency tradeoff conflict."""
+        from yolo_developer.agents.analyst.node import _find_implicit_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="batch",
+            refined_text="Process data in batch operations for high throughput",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="instant",
+            refined_text="Provide instant response to all requests",
+            category="non_functional",
+            testable=True,
+        )
+        conflicts = _find_implicit_conflicts((req1, req2))
+
+        assert len(conflicts) >= 1
+
+    def test_no_conflict_for_compatible_requirements(self) -> None:
+        """Should not flag compatible requirements as conflicts."""
+        from yolo_developer.agents.analyst.node import _find_implicit_conflicts
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="fast reads",
+            refined_text="Optimize for fast read operations",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="caching",
+            refined_text="Use caching for frequently accessed data",
+            category="non_functional",
+            testable=True,
+        )
+        conflicts = _find_implicit_conflicts((req1, req2))
+
+        # These are compatible (both read-oriented), shouldn't conflict
+        # The test passes if there's no memory conflict detected
+        memory_conflicts = [c for c in conflicts if "memory" in c[3].lower()]
+        assert len(memory_conflicts) == 0
+
+
+class TestClassifyConflictCategory:
+    """Tests for _classify_conflict_category function (Story 5.6)."""
+
+    def test_classifies_security_conflicts(self) -> None:
+        """Should classify encryption/security as security category."""
+        from yolo_developer.agents.analyst.node import _classify_conflict_category
+
+        assert _classify_conflict_category("encryption conflict") == "security"
+        assert _classify_conflict_category("Security issue: auth") == "security"
+        assert _classify_conflict_category("Private vs public") == "security"
+
+    def test_classifies_consistency_conflicts(self) -> None:
+        """Should classify consistency-related as consistency category."""
+        from yolo_developer.agents.analyst.node import _classify_conflict_category
+
+        assert _classify_conflict_category("real-time vs eventual") == "consistency"
+        assert _classify_conflict_category("Consistency model") == "consistency"
+
+    def test_classifies_performance_conflicts(self) -> None:
+        """Should classify latency/throughput as performance category."""
+        from yolo_developer.agents.analyst.node import _classify_conflict_category
+
+        assert _classify_conflict_category("latency vs throughput") == "performance"
+        assert _classify_conflict_category("Performance tradeoff") == "performance"
+
+    def test_default_category_for_unmatched(self) -> None:
+        """Should return default for unmatched descriptions."""
+        from yolo_developer.agents.analyst.node import _classify_conflict_category
+
+        assert _classify_conflict_category("unknown conflict type") == "default"
+
+
+class TestAssessContradictionSeverity:
+    """Tests for _assess_contradiction_severity function (Story 5.6)."""
+
+    def test_security_conflicts_are_critical(self) -> None:
+        """Security conflicts should be assessed as CRITICAL."""
+        from yolo_developer.agents.analyst.node import _assess_contradiction_severity
+        from yolo_developer.agents.analyst.types import ContradictionType, Severity
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="Must encrypt",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="plain",
+            refined_text="Store plaintext",
+            category="constraint",
+            testable=True,
+        )
+        severity = _assess_contradiction_severity(
+            ContradictionType.DIRECT, req1, req2, "Security conflict: encrypted vs unencrypted"
+        )
+
+        assert severity == Severity.CRITICAL
+
+    def test_performance_conflicts_with_constraints_are_high(self) -> None:
+        """Performance conflicts involving constraints should be HIGH."""
+        from yolo_developer.agents.analyst.node import _assess_contradiction_severity
+        from yolo_developer.agents.analyst.types import ContradictionType, Severity
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="high throughput",
+            refined_text="Handle high throughput",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="low latency",
+            refined_text="Must have low latency",
+            category="constraint",
+            testable=True,
+        )
+        severity = _assess_contradiction_severity(
+            ContradictionType.IMPLICIT_RESOURCE, req1, req2, "Performance tradeoff: throughput vs latency"
+        )
+
+        assert severity == Severity.HIGH
+
+    def test_state_conflicts_functional_are_medium(self) -> None:
+        """State conflicts between functional requirements should be MEDIUM."""
+        from yolo_developer.agents.analyst.node import _assess_contradiction_severity
+        from yolo_developer.agents.analyst.types import ContradictionType, Severity
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="stateless",
+            refined_text="Stateless design",
+            category="functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="session",
+            refined_text="Maintain user session",
+            category="functional",
+            testable=True,
+        )
+        severity = _assess_contradiction_severity(
+            ContradictionType.DIRECT, req1, req2, "State management conflict: stateless vs stateful"
+        )
+
+        assert severity == Severity.MEDIUM
+
+    def test_handles_invalid_category_gracefully(self) -> None:
+        """Should handle unknown categories without crashing."""
+        from yolo_developer.agents.analyst.node import _assess_contradiction_severity
+        from yolo_developer.agents.analyst.types import ContradictionType, Severity
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="some ui requirement",
+            refined_text="UI should be responsive",
+            category="ui",  # Invalid/unknown category
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="another requirement",
+            refined_text="Another constraint",
+            category="unknown",  # Another invalid category
+            testable=True,
+        )
+        # Should not raise ValueError for unknown categories
+        severity = _assess_contradiction_severity(
+            ContradictionType.DIRECT, req1, req2, "UI conflict"
+        )
+
+        # Unknown categories get lowest priority, default to MEDIUM
+        assert severity in (Severity.MEDIUM, Severity.LOW)
+
+
+class TestGenerateResolutionSuggestions:
+    """Tests for _generate_resolution_suggestions function (Story 5.6)."""
+
+    def test_returns_suggestions_for_direct_conflict(self) -> None:
+        """Should return suggestions for direct conflicts."""
+        from yolo_developer.agents.analyst.node import _generate_resolution_suggestions
+        from yolo_developer.agents.analyst.types import ContradictionType
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="public",
+            refined_text="Public API",
+            category="functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="private",
+            refined_text="Private access",
+            category="non_functional",
+            testable=True,
+        )
+        suggestions = _generate_resolution_suggestions(ContradictionType.DIRECT, req1, req2)
+
+        assert len(suggestions) > 0
+        assert all(isinstance(s, str) for s in suggestions)
+
+    def test_adds_context_specific_suggestions_for_security(self) -> None:
+        """Should add security-specific suggestions for security conflicts."""
+        from yolo_developer.agents.analyst.node import _generate_resolution_suggestions
+        from yolo_developer.agents.analyst.types import ContradictionType
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="Must encrypt data",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="plaintext",
+            refined_text="Store plaintext",
+            category="constraint",
+            testable=True,
+        )
+        suggestions = _generate_resolution_suggestions(ContradictionType.DIRECT, req1, req2)
+
+        # Should have security-specific suggestion
+        security_suggestions = [s for s in suggestions if "security" in s.lower()]
+        assert len(security_suggestions) >= 1
+
+    def test_limits_to_five_suggestions(self) -> None:
+        """Should limit suggestions to maximum of 5."""
+        from yolo_developer.agents.analyst.node import _generate_resolution_suggestions
+        from yolo_developer.agents.analyst.types import ContradictionType
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt stateless performance",
+            refined_text="Must encrypt with stateless high performance design",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="session latency memory",
+            refined_text="Maintain session with low latency in memory",
+            category="constraint",
+            testable=True,
+        )
+        suggestions = _generate_resolution_suggestions(ContradictionType.DIRECT, req1, req2)
+
+        assert len(suggestions) <= 5
+
+
+class TestAnalyzeContradictions:
+    """Tests for _analyze_contradictions main function (Story 5.6)."""
+
+    def test_analyzes_direct_conflicts(self) -> None:
+        """Should detect and analyze direct conflicts."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+        from yolo_developer.agents.analyst.types import ContradictionType
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="All data must be encrypted",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="plain text",
+            refined_text="Store in plain text for debugging",
+            category="constraint",
+            testable=True,
+        )
+        contradictions = _analyze_contradictions((req1, req2))
+
+        assert len(contradictions) >= 1
+        direct_contradictions = [
+            c for c in contradictions if c.contradiction_type == ContradictionType.DIRECT
+        ]
+        assert len(direct_contradictions) >= 1
+
+    def test_analyzes_implicit_conflicts(self) -> None:
+        """Should detect and analyze implicit conflicts."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+        from yolo_developer.agents.analyst.types import ContradictionType
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="cache all",
+            refined_text="Cache all data in-memory",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="low memory",
+            refined_text="Run on low memory embedded devices",
+            category="constraint",
+            testable=True,
+        )
+        contradictions = _analyze_contradictions((req1, req2))
+
+        assert len(contradictions) >= 1
+        implicit_contradictions = [
+            c
+            for c in contradictions
+            if c.contradiction_type == ContradictionType.IMPLICIT_RESOURCE
+        ]
+        assert len(implicit_contradictions) >= 1
+
+    def test_returns_empty_for_single_requirement(self) -> None:
+        """Should return empty tuple for single requirement."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="Must encrypt",
+            category="non_functional",
+            testable=True,
+        )
+        contradictions = _analyze_contradictions((req1,))
+
+        assert contradictions == ()
+
+    def test_returns_empty_for_empty_requirements(self) -> None:
+        """Should return empty tuple for empty requirements."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+
+        contradictions = _analyze_contradictions(())
+
+        assert contradictions == ()
+
+    def test_sorts_by_severity(self) -> None:
+        """Should sort contradictions by severity (critical first)."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+        from yolo_developer.agents.analyst.types import Severity
+
+        # Create requirements that produce multiple conflicts with different severities
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="public",
+                refined_text="Public API access",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="authenticated",
+                refined_text="Requires authenticated access",
+                category="non_functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-003",
+                original_text="encrypt",
+                refined_text="All data must be encrypted",
+                category="non_functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-004",
+                original_text="plain text",
+                refined_text="Store in plain text",
+                category="constraint",
+                testable=True,
+            ),
+        )
+        contradictions = _analyze_contradictions(reqs)
+
+        if len(contradictions) >= 2:
+            # Check severity ordering
+            severity_order = {
+                Severity.CRITICAL: 0,
+                Severity.HIGH: 1,
+                Severity.MEDIUM: 2,
+                Severity.LOW: 3,
+            }
+            for i in range(len(contradictions) - 1):
+                current_order = severity_order.get(contradictions[i].severity, 4)
+                next_order = severity_order.get(contradictions[i + 1].severity, 4)
+                assert current_order <= next_order
+
+    def test_contradiction_has_resolution_suggestions(self) -> None:
+        """Each contradiction should have resolution suggestions."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+
+        req1 = CrystallizedRequirement(
+            id="req-001",
+            original_text="encrypt",
+            refined_text="Must encrypt all data",
+            category="non_functional",
+            testable=True,
+        )
+        req2 = CrystallizedRequirement(
+            id="req-002",
+            original_text="plain text",
+            refined_text="Store in plain text",
+            category="constraint",
+            testable=True,
+        )
+        contradictions = _analyze_contradictions((req1, req2))
+
+        for c in contradictions:
+            assert len(c.resolution_suggestions) > 0
+
+    def test_contradiction_ids_are_sequential(self) -> None:
+        """Contradiction IDs should be sequential."""
+        from yolo_developer.agents.analyst.node import _analyze_contradictions
+
+        reqs = (
+            CrystallizedRequirement(
+                id="req-001",
+                original_text="encrypt",
+                refined_text="Must encrypt",
+                category="non_functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-002",
+                original_text="plain text",
+                refined_text="Store plaintext",
+                category="constraint",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-003",
+                original_text="public",
+                refined_text="Public access",
+                category="functional",
+                testable=True,
+            ),
+            CrystallizedRequirement(
+                id="req-004",
+                original_text="authenticated",
+                refined_text="Authenticated only",
+                category="non_functional",
+                testable=True,
+            ),
+        )
+        contradictions = _analyze_contradictions(reqs)
+
+        for i, c in enumerate(contradictions, start=1):
+            assert c.id == f"conflict-{i:03d}"

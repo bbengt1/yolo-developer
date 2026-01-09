@@ -13,6 +13,8 @@ from yolo_developer.agents.analyst.types import (
     CategorizationResult,
     ComplexityLevel,
     ConstraintSubCategory,
+    Contradiction,
+    ContradictionType,
     CrystallizedRequirement,
     DependencyType,
     ExternalDependency,
@@ -1504,3 +1506,301 @@ class TestCrystallizedRequirementImplementability:
         assert d["scope_notes"] == "scope"
         assert d["sub_category"] == "user_management"
         assert d["implementability_status"] == "implementable"
+
+
+# =============================================================================
+# Story 5.6: Contradiction Flagging Types
+# =============================================================================
+
+
+class TestContradictionType:
+    """Tests for ContradictionType enum (Story 5.6)."""
+
+    def test_contradiction_type_values(self) -> None:
+        """ContradictionType should have expected string values."""
+        assert ContradictionType.DIRECT.value == "direct"
+        assert ContradictionType.IMPLICIT_RESOURCE.value == "implicit_resource"
+        assert ContradictionType.IMPLICIT_BEHAVIOR.value == "implicit_behavior"
+        assert ContradictionType.SEMANTIC.value == "semantic"
+
+    def test_contradiction_type_is_str_enum(self) -> None:
+        """ContradictionType should be a string enum."""
+        assert isinstance(ContradictionType.DIRECT, str)
+        assert ContradictionType.DIRECT == "direct"
+
+    def test_contradiction_type_from_string(self) -> None:
+        """ContradictionType should be creatable from string value."""
+        ct = ContradictionType("semantic")
+        assert ct == ContradictionType.SEMANTIC
+
+    def test_contradiction_type_invalid_value(self) -> None:
+        """ContradictionType should raise ValueError for invalid values."""
+        with pytest.raises(ValueError):
+            ContradictionType("invalid_type")
+
+    def test_contradiction_type_all_members(self) -> None:
+        """ContradictionType should have exactly 4 members."""
+        members = list(ContradictionType)
+        assert len(members) == 4
+
+
+class TestContradiction:
+    """Tests for Contradiction dataclass (Story 5.6)."""
+
+    def test_creation_with_all_fields(self) -> None:
+        """Contradiction should be creatable with all fields."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002"),
+            description="Encryption vs plaintext conflict",
+            explanation="req-001 requires encryption, req-002 requires plaintext",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=("Clarify security requirements",),
+        )
+
+        assert conflict.id == "conflict-001"
+        assert conflict.contradiction_type == ContradictionType.DIRECT
+        assert conflict.requirement_ids == ("req-001", "req-002")
+        assert conflict.description == "Encryption vs plaintext conflict"
+        assert conflict.explanation == "req-001 requires encryption, req-002 requires plaintext"
+        assert conflict.severity == Severity.CRITICAL
+        assert conflict.resolution_suggestions == ("Clarify security requirements",)
+
+    def test_immutability(self) -> None:
+        """Contradiction should be immutable (frozen dataclass)."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.SEMANTIC,
+            requirement_ids=("req-001", "req-002"),
+            description="desc",
+            explanation="expl",
+            severity=Severity.HIGH,
+            resolution_suggestions=("suggestion",),
+        )
+
+        with pytest.raises(AttributeError):
+            conflict.id = "new-id"  # type: ignore[misc]
+
+    def test_to_dict_serialization(self) -> None:
+        """to_dict should serialize all fields correctly."""
+        conflict = Contradiction(
+            id="conflict-002",
+            contradiction_type=ContradictionType.IMPLICIT_RESOURCE,
+            requirement_ids=("req-003", "req-004"),
+            description="Memory conflict",
+            explanation="One needs high memory, other needs low memory",
+            severity=Severity.MEDIUM,
+            resolution_suggestions=("Define resource constraints", "Split tiers"),
+        )
+
+        result = conflict.to_dict()
+
+        assert result == {
+            "id": "conflict-002",
+            "contradiction_type": "implicit_resource",
+            "requirement_ids": ["req-003", "req-004"],
+            "description": "Memory conflict",
+            "explanation": "One needs high memory, other needs low memory",
+            "severity": "medium",
+            "resolution_suggestions": ["Define resource constraints", "Split tiers"],
+        }
+
+    def test_to_dict_converts_enums_to_strings(self) -> None:
+        """to_dict should convert enums to their string values."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.IMPLICIT_BEHAVIOR,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.LOW,
+            resolution_suggestions=(),
+        )
+
+        d = conflict.to_dict()
+
+        assert d["contradiction_type"] == "implicit_behavior"
+        assert d["severity"] == "low"
+
+    def test_requirement_ids_is_list_in_dict(self) -> None:
+        """requirement_ids should be converted to list in to_dict."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002", "req-003"),
+            description="desc",
+            explanation="expl",
+            severity=Severity.HIGH,
+            resolution_suggestions=("s1",),
+        )
+
+        d = conflict.to_dict()
+
+        assert isinstance(d["requirement_ids"], list)
+        assert d["requirement_ids"] == ["req-001", "req-002", "req-003"]
+
+    def test_resolution_suggestions_is_list_in_dict(self) -> None:
+        """resolution_suggestions should be converted to list in to_dict."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.SEMANTIC,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.MEDIUM,
+            resolution_suggestions=("suggestion1", "suggestion2"),
+        )
+
+        d = conflict.to_dict()
+
+        assert isinstance(d["resolution_suggestions"], list)
+        assert d["resolution_suggestions"] == ["suggestion1", "suggestion2"]
+
+    def test_equality(self) -> None:
+        """Contradiction equality should be based on field values."""
+        conflict1 = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.HIGH,
+            resolution_suggestions=(),
+        )
+        conflict2 = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.HIGH,
+            resolution_suggestions=(),
+        )
+
+        assert conflict1 == conflict2
+
+    def test_hashability(self) -> None:
+        """Contradiction should be hashable for use in sets/dicts."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.SEMANTIC,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.LOW,
+            resolution_suggestions=("s1",),
+        )
+
+        s = {conflict}
+        assert conflict in s
+
+
+class TestAnalystOutputWithStructuredContradictions:
+    """Tests for AnalystOutput structured_contradictions field (Story 5.6)."""
+
+    def test_structured_contradictions_default_empty(self) -> None:
+        """structured_contradictions should default to empty tuple."""
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+        )
+
+        assert output.structured_contradictions == ()
+
+    def test_creation_with_structured_contradictions(self) -> None:
+        """AnalystOutput should accept structured_contradictions."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002"),
+            description="Encryption conflict",
+            explanation="Conflicting encryption requirements",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=("Clarify requirements",),
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=("legacy conflict",),
+            structured_contradictions=(conflict,),
+        )
+
+        assert len(output.structured_contradictions) == 1
+        assert output.structured_contradictions[0].id == "conflict-001"
+
+    def test_to_dict_includes_structured_contradictions(self) -> None:
+        """to_dict should include structured_contradictions."""
+        conflict = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.SEMANTIC,
+            requirement_ids=("req-001",),
+            description="desc",
+            explanation="expl",
+            severity=Severity.HIGH,
+            resolution_suggestions=(),
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            structured_contradictions=(conflict,),
+        )
+
+        d = output.to_dict()
+
+        assert "structured_contradictions" in d
+        assert len(d["structured_contradictions"]) == 1
+        assert d["structured_contradictions"][0]["id"] == "conflict-001"
+        assert d["structured_contradictions"][0]["contradiction_type"] == "semantic"
+
+    def test_backward_compatibility_without_structured_contradictions(self) -> None:
+        """AnalystOutput should work without structured_contradictions (backward compat)."""
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=("gap1",),
+            contradictions=("conflict1",),
+        )
+
+        d = output.to_dict()
+
+        assert d["identified_gaps"] == ["gap1"]
+        assert d["contradictions"] == ["conflict1"]
+        assert d["structured_contradictions"] == []
+
+    def test_to_dict_with_multiple_structured_contradictions(self) -> None:
+        """to_dict should serialize multiple structured contradictions."""
+        conflict1 = Contradiction(
+            id="conflict-001",
+            contradiction_type=ContradictionType.DIRECT,
+            requirement_ids=("req-001", "req-002"),
+            description="Direct conflict",
+            explanation="Must vs must not",
+            severity=Severity.CRITICAL,
+            resolution_suggestions=("Clarify",),
+        )
+        conflict2 = Contradiction(
+            id="conflict-002",
+            contradiction_type=ContradictionType.IMPLICIT_RESOURCE,
+            requirement_ids=("req-003", "req-004"),
+            description="Memory conflict",
+            explanation="High vs low memory",
+            severity=Severity.MEDIUM,
+            resolution_suggestions=("Define limits",),
+        )
+
+        output = AnalystOutput(
+            requirements=(),
+            identified_gaps=(),
+            contradictions=(),
+            structured_contradictions=(conflict1, conflict2),
+        )
+
+        d = output.to_dict()
+
+        assert len(d["structured_contradictions"]) == 2
+        assert d["structured_contradictions"][0]["id"] == "conflict-001"
+        assert d["structured_contradictions"][1]["id"] == "conflict-002"
