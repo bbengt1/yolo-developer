@@ -51,6 +51,7 @@ from yolo_developer.agents.architect import types
 from yolo_developer.agents.architect.adr_generator import generate_adr, generate_adrs
 from yolo_developer.agents.architect.node import architect_node
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
+from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
 from yolo_developer.agents.architect.twelve_factor import (
     analyze_twelve_factor,
     analyze_twelve_factor_with_llm,
@@ -65,11 +66,17 @@ from yolo_developer.agents.architect.types import (
     DesignDecisionType,
     FactorResult,
     MitigationEffort,
+    MitigationPriority,
     QualityAttributeEvaluation,
     QualityRisk,
     QualityTradeOff,
     RiskSeverity,
+    TechnicalRisk,
+    TechnicalRiskCategory,
+    TechnicalRiskReport,
     TwelveFactorAnalysis,
+    calculate_mitigation_priority,
+    calculate_overall_risk_level,
 )
 
 __all__ = [
@@ -82,16 +89,23 @@ __all__ = [
     "DesignDecisionType",
     "FactorResult",
     "MitigationEffort",
+    "MitigationPriority",
     "QualityAttributeEvaluation",
     "QualityRisk",
     "QualityTradeOff",
     "RiskSeverity",
+    "TechnicalRisk",
+    "TechnicalRiskCategory",
+    "TechnicalRiskReport",
     "TwelveFactorAnalysis",
     "analyze_twelve_factor",
     "analyze_twelve_factor_with_llm",
     "architect_node",
+    "calculate_mitigation_priority",
+    "calculate_overall_risk_level",
     "evaluate_quality_attributes",
     "generate_adr",
     "generate_adrs",
+    "identify_technical_risks",
     "types",
 ]

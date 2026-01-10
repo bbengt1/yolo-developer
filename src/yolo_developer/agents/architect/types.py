@@ -217,6 +217,7 @@ class ArchitectOutput:
         processing_notes: Notes about the processing (stats, issues, etc.)
         twelve_factor_analyses: Dict mapping story IDs to 12-Factor analyses (Story 7.2)
         quality_evaluations: Dict mapping story IDs to quality evaluations (Story 7.4)
+        technical_risk_reports: Dict mapping story IDs to technical risk reports (Story 7.5)
 
     Example:
         >>> output = ArchitectOutput(
@@ -233,6 +234,7 @@ class ArchitectOutput:
     processing_notes: str = ""
     twelve_factor_analyses: dict[str, Any] = field(default_factory=dict)
     quality_evaluations: dict[str, Any] = field(default_factory=dict)
+    technical_risk_reports: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -246,6 +248,7 @@ class ArchitectOutput:
             "processing_notes": self.processing_notes,
             "twelve_factor_analyses": self.twelve_factor_analyses,
             "quality_evaluations": self.quality_evaluations,
+            "technical_risk_reports": self.technical_risk_reports,
         }
 
 
@@ -547,4 +550,195 @@ class QualityAttributeEvaluation:
             "trade_offs": [t.to_dict() for t in self.trade_offs],
             "risks": [r.to_dict() for r in self.risks],
             "overall_score": self.overall_score,
+        }
+
+
+# =============================================================================
+# Technical Risk Types (Story 7.5)
+# =============================================================================
+
+TechnicalRiskCategory = Literal[
+    "technology",
+    "integration",
+    "scalability",
+    "compatibility",
+    "operational",
+]
+"""Category of technical risk.
+
+Values:
+    technology: Library/framework concerns (deprecated, experimental, version conflicts)
+    integration: External service concerns (rate limiting, API instability, vendor lock-in)
+    scalability: Growth/load concerns (single point of failure, stateful, bottlenecks)
+    compatibility: Cross-system concerns (version mismatch, protocol incompatibility)
+    operational: Runtime concerns (monitoring gaps, deployment complexity)
+"""
+
+MitigationPriority = Literal["P1", "P2", "P3", "P4"]
+"""Priority level for addressing a risk mitigation.
+
+Values:
+    P1: Urgent - must address immediately (critical severity or easy high-impact fix)
+    P2: High - address in current sprint
+    P3: Medium - address when convenient
+    P4: Low - nice to have, defer if needed
+"""
+
+
+def calculate_mitigation_priority(
+    severity: RiskSeverity, effort: MitigationEffort
+) -> MitigationPriority:
+    """Calculate mitigation priority from severity and effort.
+
+    Priority matrix:
+    | Severity | High Effort | Medium Effort | Low Effort |
+    |----------|-------------|---------------|------------|
+    | Critical | P1          | P1            | P1         |
+    | High     | P2          | P1            | P1         |
+    | Medium   | P3          | P2            | P2         |
+    | Low      | P4          | P3            | P3         |
+
+    Args:
+        severity: Risk severity level.
+        effort: Mitigation effort level.
+
+    Returns:
+        Calculated mitigation priority.
+    """
+    priority_matrix: dict[tuple[RiskSeverity, MitigationEffort], MitigationPriority] = {
+        ("critical", "high"): "P1",
+        ("critical", "medium"): "P1",
+        ("critical", "low"): "P1",
+        ("high", "high"): "P2",
+        ("high", "medium"): "P1",
+        ("high", "low"): "P1",
+        ("medium", "high"): "P3",
+        ("medium", "medium"): "P2",
+        ("medium", "low"): "P2",
+        ("low", "high"): "P4",
+        ("low", "medium"): "P3",
+        ("low", "low"): "P3",
+    }
+    return priority_matrix.get((severity, effort), "P3")
+
+
+@dataclass(frozen=True)
+class TechnicalRisk:
+    """A technical risk identified in a design.
+
+    Represents a risk to successful implementation including category,
+    severity, affected components, and mitigation strategy.
+
+    Attributes:
+        category: Type of technical risk
+        description: What the risk is
+        severity: Risk severity level (critical/high/medium/low)
+        affected_components: Components affected by this risk
+        mitigation: Suggested mitigation strategy
+        mitigation_effort: Effort to implement mitigation
+        mitigation_priority: Priority for addressing (P1-P4)
+
+    Example:
+        >>> risk = TechnicalRisk(
+        ...     category="integration",
+        ...     description="External API has no SLA",
+        ...     severity="high",
+        ...     affected_components=("AuthService",),
+        ...     mitigation="Implement circuit breaker",
+        ...     mitigation_effort="medium",
+        ...     mitigation_priority="P1",
+        ... )
+    """
+
+    category: TechnicalRiskCategory
+    description: str
+    severity: RiskSeverity
+    mitigation: str
+    mitigation_effort: MitigationEffort
+    mitigation_priority: MitigationPriority
+    affected_components: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the technical risk.
+        """
+        return {
+            "category": self.category,
+            "description": self.description,
+            "severity": self.severity,
+            "affected_components": list(self.affected_components),
+            "mitigation": self.mitigation,
+            "mitigation_effort": self.mitigation_effort,
+            "mitigation_priority": self.mitigation_priority,
+        }
+
+
+def calculate_overall_risk_level(risks: list[TechnicalRisk]) -> RiskSeverity:
+    """Calculate overall risk level from a list of risks.
+
+    Returns the highest severity among all risks, or "low" if no risks.
+
+    Args:
+        risks: List of technical risks.
+
+    Returns:
+        Overall risk level (highest severity found).
+    """
+    if not risks:
+        return "low"
+
+    severity_order: dict[RiskSeverity, int] = {
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1,
+    }
+
+    max_severity: RiskSeverity = "low"
+    max_order = 0
+
+    for risk in risks:
+        order = severity_order.get(risk.severity, 0)
+        if order > max_order:
+            max_order = order
+            max_severity = risk.severity
+
+    return max_severity
+
+
+@dataclass(frozen=True)
+class TechnicalRiskReport:
+    """Complete technical risk analysis report.
+
+    Contains all identified risks with overall assessment and summary.
+
+    Attributes:
+        risks: Tuple of identified technical risks
+        overall_risk_level: Highest severity among all risks
+        summary: Brief description of key risks
+
+    Example:
+        >>> report = TechnicalRiskReport(
+        ...     risks=(risk1, risk2),
+        ...     overall_risk_level="high",
+        ...     summary="Two integration risks identified",
+        ... )
+    """
+
+    risks: tuple[TechnicalRisk, ...]
+    overall_risk_level: RiskSeverity
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested risks.
+        """
+        return {
+            "risks": [r.to_dict() for r in self.risks],
+            "overall_risk_level": self.overall_risk_level,
+            "summary": self.summary,
         }

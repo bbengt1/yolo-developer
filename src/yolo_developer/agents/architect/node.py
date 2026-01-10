@@ -1,10 +1,11 @@
-"""Architect agent node for LangGraph orchestration (Stories 7.1-7.4).
+"""Architect agent node for LangGraph orchestration (Stories 7.1-7.5).
 
 This module provides the architect_node function that integrates with the
 LangGraph orchestration workflow. The Architect agent produces design
 decisions and Architecture Decision Records (ADRs) for stories with
 12-Factor compliance analysis (Story 7.2), enhanced ADR content
-generation (Story 7.3), and quality attribute evaluation (Story 7.4).
+generation (Story 7.3), quality attribute evaluation (Story 7.4),
+and technical risk identification (Story 7.5).
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -41,11 +42,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.architect.adr_generator import generate_adrs
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
+from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
 from yolo_developer.agents.architect.twelve_factor import analyze_twelve_factor
 from yolo_developer.agents.architect.types import (
     ArchitectOutput,
     DesignDecision,
     DesignDecisionType,
+    QualityRisk,
 )
 from yolo_developer.gates import quality_gate
 from yolo_developer.orchestrator.context import Decision
@@ -299,30 +302,57 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         evaluation = await evaluate_quality_attributes(story, story_decisions)
         quality_evaluations[story_id] = evaluation.to_dict()
 
-    # Build output with actual results including 12-Factor analyses and quality evaluations
+    # Identify technical risks for each story (Story 7.5)
+    technical_risk_reports: dict[str, Any] = {}
+    for story in stories:
+        story_id = story.get("id", "unknown")
+        # Get decisions for this story
+        story_decisions = [d for d in design_decisions if d.story_id == story_id]
+        # Get quality risks from evaluation to incorporate
+        quality_eval = quality_evaluations.get(story_id, {})
+        quality_risks_data = quality_eval.get("risks", [])
+        # Convert dict risks back to QualityRisk objects for the identifier
+        quality_risks = [
+            QualityRisk(
+                attribute=r.get("attribute", "unknown"),
+                description=r.get("description", ""),
+                severity=r.get("severity", "medium"),
+                mitigation=r.get("mitigation", ""),
+                mitigation_effort=r.get("mitigation_effort", "medium"),
+            )
+            for r in quality_risks_data
+        ]
+        risk_report = await identify_technical_risks(
+            story, story_decisions, quality_risks=quality_risks
+        )
+        technical_risk_reports[story_id] = risk_report.to_dict()
+
+    # Build output with actual results including 12-Factor analyses, quality evaluations, and risk reports
     output = ArchitectOutput(
         design_decisions=tuple(design_decisions),
         adrs=tuple(adrs),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {len(design_decisions)} design decisions, "
-        f"{len(adrs)} ADRs with 12-Factor compliance analysis and quality evaluation",
+        f"{len(adrs)} ADRs with 12-Factor compliance analysis, quality evaluation, and risk identification",
         twelve_factor_analyses=twelve_factor_analyses,
         quality_evaluations=quality_evaluations,
+        technical_risk_reports=technical_risk_reports,
     )
 
     # Create decision record with architect attribution
     decision = Decision(
         agent="architect",
-        summary=f"Generated {len(design_decisions)} design decisions and {len(adrs)} ADRs with quality evaluation",
+        summary=f"Generated {len(design_decisions)} design decisions, {len(adrs)} ADRs, and {len(technical_risk_reports)} risk reports",
         rationale=f"Processed {len(stories)} stories from PM. "
         "12-Factor compliance analysis (Story 7.2), enhanced ADR generation "
-        "with LLM fallback (Story 7.3), and quality attribute evaluation (Story 7.4) applied.",
+        "with LLM fallback (Story 7.3), quality attribute evaluation (Story 7.4), "
+        "and technical risk identification (Story 7.5) applied.",
         related_artifacts=tuple(d.id for d in design_decisions),
     )
 
     # Create output message with architect attribution
     message = create_agent_message(
-        content=f"Architect processing complete: {len(design_decisions)} design decisions, {len(adrs)} ADRs generated.",
+        content=f"Architect processing complete: {len(design_decisions)} design decisions, {len(adrs)} ADRs, {len(technical_risk_reports)} risk reports generated.",
         agent="architect",
         metadata={"output": output.to_dict()},
     )
@@ -333,6 +363,7 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         design_decision_count=len(output.design_decisions),
         adr_count=len(output.adrs),
         quality_evaluation_count=len(quality_evaluations),
+        technical_risk_report_count=len(technical_risk_reports),
     )
 
     # Return ONLY the updates, not full state
