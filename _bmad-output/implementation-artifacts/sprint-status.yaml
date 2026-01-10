@@ -110,7 +110,7 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: Architect Agent (8 stories)
-  epic-7: in-progress
+  epic-7: done
   7-1-create-architect-agent-node: done
   7-2-12-factor-design-generation: done
   7-3-adr-generation: done
@@ -118,7 +118,7 @@ development_status:
   7-5-risk-identification: done
   7-6-tech-stack-constraint-design: done
   7-7-atam-review: done
-  7-8-pattern-matching-to-codebase: backlog
+  7-8-pattern-matching-to-codebase: done
   epic-7-retrospective: optional
 
   # Epic 8: Dev Agent (8 stories)

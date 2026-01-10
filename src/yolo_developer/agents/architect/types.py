@@ -1,4 +1,4 @@
-"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4, 7.6, 7.7).
+"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4, 7.6, 7.7, 7.8).
 
 This module provides the data types used by the Architect agent:
 
@@ -25,6 +25,10 @@ This module provides the data types used by the Architect agent:
 - ATAMRiskAssessment: Assessment of risk impact (Story 7.7)
 - ATAMReviewResult: Complete ATAM review result (Story 7.7)
 - MitigationFeasibility: Feasibility level for mitigations (Story 7.7)
+- PatternCheckSeverity: Severity level for pattern check violations (Story 7.8)
+- PatternViolation: A violation of an established code pattern (Story 7.8)
+- PatternDeviation: A deviation from standard patterns (Story 7.8)
+- PatternMatchingResult: Complete pattern matching analysis result (Story 7.8)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -229,6 +233,7 @@ class ArchitectOutput:
         technical_risk_reports: Dict mapping story IDs to technical risk reports (Story 7.5)
         tech_stack_validations: Dict mapping story IDs to tech stack validations (Story 7.6)
         atam_reviews: Dict mapping story IDs to ATAM review results (Story 7.7)
+        pattern_matching_results: Dict mapping story IDs to pattern matching results (Story 7.8)
 
     Example:
         >>> output = ArchitectOutput(
@@ -248,6 +253,7 @@ class ArchitectOutput:
     technical_risk_reports: dict[str, Any] = field(default_factory=dict)
     tech_stack_validations: dict[str, Any] = field(default_factory=dict)
     atam_reviews: dict[str, Any] = field(default_factory=dict)
+    pattern_matching_results: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -264,6 +270,7 @@ class ArchitectOutput:
             "technical_risk_reports": self.technical_risk_reports,
             "tech_stack_validations": self.tech_stack_validations,
             "atam_reviews": self.atam_reviews,
+            "pattern_matching_results": self.pattern_matching_results,
         }
 
 
@@ -1109,5 +1116,176 @@ class ATAMReviewResult:
             "trade_off_conflicts": [c.to_dict() for c in self.trade_off_conflicts],
             "risk_assessments": [r.to_dict() for r in self.risk_assessments],
             "failure_reasons": list(self.failure_reasons),
+            "summary": self.summary,
+        }
+
+
+# =============================================================================
+# Pattern Matching Types (Story 7.8)
+# =============================================================================
+
+PatternCheckSeverity = Literal["critical", "high", "medium", "low"]
+"""Severity level for pattern check violations.
+
+Values:
+    critical: Fundamental pattern violation that must be fixed
+    high: Significant deviation that should be addressed
+    medium: Moderate inconsistency that may impact maintainability
+    low: Minor style deviation with minimal impact
+"""
+
+
+@dataclass(frozen=True)
+class PatternViolation:
+    """A violation of an established code pattern.
+
+    Represents a detected inconsistency between new design decisions
+    and learned codebase patterns. Each violation includes the expected
+    pattern, actual usage, and severity assessment.
+
+    Attributes:
+        pattern_type: Type of pattern violated (naming, structure, etc.)
+        expected: The expected pattern based on codebase analysis
+        actual: The actual pattern used in the design decision
+        file_context: File or component where violation was detected
+        severity: Severity level of the violation
+        justification: Optional justification if deviation is intentional
+
+    Example:
+        >>> violation = PatternViolation(
+        ...     pattern_type="naming_function",
+        ...     expected="snake_case",
+        ...     actual="camelCase",
+        ...     file_context="src/services/auth.py",
+        ...     severity="high",
+        ...     justification=None,
+        ... )
+    """
+
+    pattern_type: str
+    expected: str
+    actual: str
+    file_context: str
+    severity: PatternCheckSeverity
+    justification: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the pattern violation.
+        """
+        return {
+            "pattern_type": self.pattern_type,
+            "expected": self.expected,
+            "actual": self.actual,
+            "file_context": self.file_context,
+            "severity": self.severity,
+            "justification": self.justification,
+        }
+
+
+@dataclass(frozen=True)
+class PatternDeviation:
+    """A deviation from standard patterns with justification tracking.
+
+    Represents a deliberate departure from established patterns,
+    tracking whether the deviation is justified based on the
+    design decision rationale.
+
+    Attributes:
+        pattern_type: Type of pattern deviated from
+        standard_pattern: The standard pattern in the codebase
+        proposed_pattern: The proposed alternative pattern
+        justification: Rationale for the deviation
+        is_justified: Whether the deviation is considered acceptable
+        severity: Impact level of the deviation
+
+    Example:
+        >>> deviation = PatternDeviation(
+        ...     pattern_type="design_pattern",
+        ...     standard_pattern="Factory pattern",
+        ...     proposed_pattern="Builder pattern",
+        ...     justification="Builder provides better config flexibility",
+        ...     is_justified=True,
+        ...     severity="medium",
+        ... )
+    """
+
+    pattern_type: str
+    standard_pattern: str
+    proposed_pattern: str
+    justification: str
+    is_justified: bool
+    severity: PatternCheckSeverity
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the pattern deviation.
+        """
+        return {
+            "pattern_type": self.pattern_type,
+            "standard_pattern": self.standard_pattern,
+            "proposed_pattern": self.proposed_pattern,
+            "justification": self.justification,
+            "is_justified": self.is_justified,
+            "severity": self.severity,
+        }
+
+
+@dataclass(frozen=True)
+class PatternMatchingResult:
+    """Complete result of pattern matching analysis.
+
+    Contains the overall pass/fail decision, confidence score,
+    patterns checked, violations found, deviations detected,
+    recommendations, and summary text.
+
+    Attributes:
+        overall_pass: Whether the design passes pattern matching
+        confidence: Confidence score from 0.0 to 1.0
+        patterns_checked: Tuple of pattern types that were checked
+        violations: Tuple of detected pattern violations
+        deviations: Tuple of detected pattern deviations
+        recommendations: Tuple of recommendations for improvement
+        summary: Brief summary of the analysis outcome
+
+    Example:
+        >>> result = PatternMatchingResult(
+        ...     overall_pass=True,
+        ...     confidence=0.85,
+        ...     patterns_checked=("naming_function", "naming_class"),
+        ...     violations=(),
+        ...     deviations=(),
+        ...     recommendations=(),
+        ...     summary="Design conforms to established patterns",
+        ... )
+        >>> result.to_dict()
+        {'overall_pass': True, 'confidence': 0.85, ...}
+    """
+
+    overall_pass: bool
+    confidence: float
+    patterns_checked: tuple[str, ...]
+    violations: tuple[PatternViolation, ...]
+    deviations: tuple[PatternDeviation, ...]
+    recommendations: tuple[str, ...]
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested violations and deviations.
+        """
+        return {
+            "overall_pass": self.overall_pass,
+            "confidence": self.confidence,
+            "patterns_checked": list(self.patterns_checked),
+            "violations": [v.to_dict() for v in self.violations],
+            "deviations": [d.to_dict() for d in self.deviations],
+            "recommendations": list(self.recommendations),
             "summary": self.summary,
         }

@@ -1,4 +1,4 @@
-"""Architect agent module for design decisions and ADR generation (Stories 7.1-7.7).
+"""Architect agent module for design decisions and ADR generation (Stories 7.1-7.8).
 
 The Architect agent is responsible for:
 - Generating design decisions for stories
@@ -49,10 +49,11 @@ from __future__ import annotations
 
 from yolo_developer.agents.architect import types
 from yolo_developer.agents.architect.adr_generator import generate_adr, generate_adrs
+from yolo_developer.agents.architect.atam_reviewer import run_atam_review
 from yolo_developer.agents.architect.node import architect_node
+from yolo_developer.agents.architect.pattern_matcher import run_pattern_matching
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
 from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
-from yolo_developer.agents.architect.atam_reviewer import run_atam_review
 from yolo_developer.agents.architect.tech_stack_validator import (
     validate_tech_stack_constraints,
 )
@@ -77,6 +78,10 @@ from yolo_developer.agents.architect.types import (
     MitigationEffort,
     MitigationFeasibility,
     MitigationPriority,
+    PatternCheckSeverity,
+    PatternDeviation,
+    PatternMatchingResult,
+    PatternViolation,
     QualityAttributeEvaluation,
     QualityRisk,
     QualityTradeOff,
@@ -109,6 +114,10 @@ __all__ = [
     "MitigationEffort",
     "MitigationFeasibility",
     "MitigationPriority",
+    "PatternCheckSeverity",
+    "PatternDeviation",
+    "PatternMatchingResult",
+    "PatternViolation",
     "QualityAttributeEvaluation",
     "QualityRisk",
     "QualityTradeOff",
@@ -130,6 +139,7 @@ __all__ = [
     "generate_adrs",
     "identify_technical_risks",
     "run_atam_review",
+    "run_pattern_matching",
     "types",
     "validate_tech_stack_constraints",
 ]

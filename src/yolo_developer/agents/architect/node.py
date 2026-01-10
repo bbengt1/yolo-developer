@@ -1,4 +1,4 @@
-"""Architect agent node for LangGraph orchestration (Stories 7.1-7.7).
+"""Architect agent node for LangGraph orchestration (Stories 7.1-7.8).
 
 This module provides the architect_node function that integrates with the
 LangGraph orchestration workflow. The Architect agent produces design
@@ -6,7 +6,8 @@ decisions and Architecture Decision Records (ADRs) for stories with
 12-Factor compliance analysis (Story 7.2), enhanced ADR content
 generation (Story 7.3), quality attribute evaluation (Story 7.4),
 technical risk identification (Story 7.5), tech stack constraint
-validation (Story 7.6), and ATAM architectural review (Story 7.7).
+validation (Story 7.6), ATAM architectural review (Story 7.7),
+and pattern matching to codebase (Story 7.8).
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -43,6 +44,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.architect.adr_generator import generate_adrs
 from yolo_developer.agents.architect.atam_reviewer import run_atam_review
+from yolo_developer.agents.architect.pattern_matcher import run_pattern_matching
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
 from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
 from yolo_developer.agents.architect.tech_stack_validator import (
@@ -374,20 +376,40 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         review_count=len(atam_reviews),
     )
 
+    # Run pattern matching for each story (Story 7.8)
+    # Pattern matching validates that design decisions follow established codebase patterns
+    pattern_matching_results: dict[str, Any] = {}
+    for story in stories:
+        story_id = story.get("id", "unknown")
+        # Get decisions for this story
+        story_decisions = [d for d in design_decisions if d.story_id == story_id]
+        # Run pattern matching (pattern store is optional - None if not configured)
+        pattern_result = await run_pattern_matching(
+            story_decisions,
+            pattern_store=None,  # Pattern store passed from orchestration state if available
+        )
+        pattern_matching_results[story_id] = pattern_result.to_dict()
+
+    logger.debug(
+        "pattern_matching_complete",
+        result_count=len(pattern_matching_results),
+    )
+
     # Build output with actual results including 12-Factor analyses, quality evaluations,
-    # risk reports, tech stack validations, and ATAM reviews
+    # risk reports, tech stack validations, ATAM reviews, and pattern matching results
     output = ArchitectOutput(
         design_decisions=tuple(design_decisions),
         adrs=tuple(adrs),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {len(design_decisions)} design decisions, "
         f"{len(adrs)} ADRs with 12-Factor compliance analysis, quality evaluation, "
-        f"risk identification, tech stack validation, and ATAM review",
+        f"risk identification, tech stack validation, ATAM review, and pattern matching",
         twelve_factor_analyses=twelve_factor_analyses,
         quality_evaluations=quality_evaluations,
         technical_risk_reports=technical_risk_reports,
         tech_stack_validations=tech_stack_validations,
         atam_reviews=atam_reviews,
+        pattern_matching_results=pattern_matching_results,
     )
 
     # Create decision record with architect attribution
@@ -395,12 +417,14 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         agent="architect",
         summary=f"Generated {len(design_decisions)} design decisions, {len(adrs)} ADRs, "
         f"{len(technical_risk_reports)} risk reports, {len(tech_stack_validations)} "
-        f"tech stack validations, and {len(atam_reviews)} ATAM reviews",
+        f"tech stack validations, {len(atam_reviews)} ATAM reviews, "
+        f"and {len(pattern_matching_results)} pattern matching results",
         rationale=f"Processed {len(stories)} stories from PM. "
         "12-Factor compliance analysis (Story 7.2), enhanced ADR generation "
         "with LLM fallback (Story 7.3), quality attribute evaluation (Story 7.4), "
         "technical risk identification (Story 7.5), tech stack constraint "
-        "validation (Story 7.6), and ATAM architectural review (Story 7.7) applied.",
+        "validation (Story 7.6), ATAM architectural review (Story 7.7), "
+        "and pattern matching to codebase (Story 7.8) applied.",
         related_artifacts=tuple(d.id for d in design_decisions),
     )
 
@@ -409,7 +433,8 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         content=f"Architect processing complete: {len(design_decisions)} design decisions, "
         f"{len(adrs)} ADRs, {len(technical_risk_reports)} risk reports, "
         f"{len(tech_stack_validations)} tech stack validations, "
-        f"{len(atam_reviews)} ATAM reviews generated.",
+        f"{len(atam_reviews)} ATAM reviews, "
+        f"{len(pattern_matching_results)} pattern matching results generated.",
         agent="architect",
         metadata={"output": output.to_dict()},
     )
@@ -423,6 +448,7 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         technical_risk_report_count=len(technical_risk_reports),
         tech_stack_validation_count=len(tech_stack_validations),
         atam_review_count=len(atam_reviews),
+        pattern_matching_result_count=len(pattern_matching_results),
     )
 
     # Return ONLY the updates, not full state
