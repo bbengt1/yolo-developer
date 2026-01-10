@@ -1,8 +1,8 @@
-"""Architect agent module for design decisions and ADR generation (Story 7.1).
+"""Architect agent module for design decisions and ADR generation (Stories 7.1-7.3).
 
 The Architect agent is responsible for:
 - Generating design decisions for stories
-- Producing Architecture Decision Records (ADRs)
+- Producing Architecture Decision Records (ADRs) with 12-Factor analysis
 - Evaluating designs against quality attributes
 - Identifying technical risks
 - Ensuring designs follow 12-Factor principles
@@ -48,6 +48,7 @@ References:
 from __future__ import annotations
 
 from yolo_developer.agents.architect import types
+from yolo_developer.agents.architect.adr_generator import generate_adr, generate_adrs
 from yolo_developer.agents.architect.node import architect_node
 from yolo_developer.agents.architect.twelve_factor import (
     analyze_twelve_factor,
@@ -76,5 +77,7 @@ __all__ = [
     "analyze_twelve_factor",
     "analyze_twelve_factor_with_llm",
     "architect_node",
+    "generate_adr",
+    "generate_adrs",
     "types",
 ]

@@ -1,8 +1,10 @@
-"""Architect agent node for LangGraph orchestration (Story 7.1).
+"""Architect agent node for LangGraph orchestration (Stories 7.1-7.3).
 
 This module provides the architect_node function that integrates with the
 LangGraph orchestration workflow. The Architect agent produces design
-decisions and Architecture Decision Records (ADRs) for stories.
+decisions and Architecture Decision Records (ADRs) for stories with
+12-Factor compliance analysis (Story 7.2) and enhanced ADR content
+generation (Story 7.3).
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -37,9 +39,9 @@ from typing import Any, cast
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.agents.architect.adr_generator import generate_adrs
 from yolo_developer.agents.architect.twelve_factor import analyze_twelve_factor
 from yolo_developer.agents.architect.types import (
-    ADR,
     ArchitectOutput,
     DesignDecision,
     DesignDecisionType,
@@ -232,70 +234,6 @@ def _infer_decision_type(story: dict[str, Any]) -> DesignDecisionType:
     return "pattern"
 
 
-# Counter for generating unique ADR IDs within a session
-_adr_counter = 0
-
-
-def _generate_adrs(decisions: list[DesignDecision]) -> list[ADR]:
-    """Generate Architecture Decision Records from design decisions.
-
-    Creates ADRs for significant decisions (technology and pattern types).
-    This is a stub implementation - full ADR generation will be implemented
-    in Story 7.3.
-
-    Args:
-        decisions: List of DesignDecision objects.
-
-    Returns:
-        List of ADR objects for significant decisions.
-
-    Example:
-        >>> decisions = [DesignDecision(id="d-1", story_id="s-1", ...)]
-        >>> adrs = _generate_adrs(decisions)
-        >>> len(adrs)
-        1
-    """
-    global _adr_counter
-
-    if not decisions:
-        logger.debug("no_decisions_for_adrs")
-        return []
-
-    adrs: list[ADR] = []
-    # Generate ADRs for significant decisions (technology and pattern types)
-    significant_types = {"technology", "pattern"}
-
-    for decision in decisions:
-        if decision.decision_type in significant_types:
-            _adr_counter += 1
-
-            adr = ADR(
-                id=f"ADR-{_adr_counter:03d}",
-                title=f"ADR for {decision.description}",
-                status="proposed",
-                context=f"Decision required for story {decision.story_id}: {decision.description}",
-                decision=f"Selected approach: {decision.rationale}",
-                consequences="Stub implementation - full consequences analysis in Story 7.3",
-                story_ids=(decision.story_id,),
-            )
-            adrs.append(adr)
-
-            logger.debug(
-                "adr_generated",
-                adr_id=adr.id,
-                story_id=decision.story_id,
-                decision_type=decision.decision_type,
-            )
-
-    logger.info(
-        "adrs_generated",
-        count=len(adrs),
-        adr_ids=[a.id for a in adrs],
-    )
-
-    return adrs
-
-
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -348,8 +286,8 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
     # Generate design decisions for stories with 12-Factor analysis (AC3, Story 7.2)
     design_decisions, twelve_factor_analyses = await _generate_design_decisions(stories)
 
-    # Generate ADRs for significant decisions (AC4)
-    adrs = _generate_adrs(design_decisions)
+    # Generate ADRs for significant decisions (AC4, Story 7.3)
+    adrs = await generate_adrs(design_decisions, twelve_factor_analyses)
 
     # Build output with actual results including 12-Factor analyses
     output = ArchitectOutput(
@@ -366,8 +304,8 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         agent="architect",
         summary=f"Generated {len(design_decisions)} design decisions and {len(adrs)} ADRs",
         rationale=f"Processed {len(stories)} stories from PM. "
-        "Story 7.1 provides stub implementation with keyword-based inference. "
-        "Full LLM-powered design generation in Stories 7.2-7.8.",
+        "12-Factor compliance analysis (Story 7.2) and enhanced ADR generation "
+        "with LLM fallback (Story 7.3) applied.",
         related_artifacts=tuple(d.id for d in design_decisions),
     )
 

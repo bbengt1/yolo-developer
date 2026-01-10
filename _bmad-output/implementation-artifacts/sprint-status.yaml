@@ -113,7 +113,7 @@ development_status:
   epic-7: in-progress
   7-1-create-architect-agent-node: done
   7-2-12-factor-design-generation: done
-  7-3-adr-generation: backlog
+  7-3-adr-generation: done
   7-4-quality-attribute-evaluation: backlog
   7-5-risk-identification: backlog
   7-6-tech-stack-constraint-design: backlog
