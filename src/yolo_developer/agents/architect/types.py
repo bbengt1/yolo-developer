@@ -1,4 +1,4 @@
-"""Type definitions for Architect agent (Story 7.1, 7.2).
+"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4).
 
 This module provides the data types used by the Architect agent:
 
@@ -10,6 +10,12 @@ This module provides the data types used by the Architect agent:
 - FactorResult: Result of a single 12-Factor compliance check (Story 7.2)
 - TwelveFactorAnalysis: Complete 12-Factor compliance analysis (Story 7.2)
 - TWELVE_FACTORS: Tuple of all 12 factor names (Story 7.2)
+- QUALITY_ATTRIBUTES: Tuple of quality attribute names (Story 7.4)
+- RiskSeverity: Literal type for risk severity levels (Story 7.4)
+- MitigationEffort: Literal type for mitigation effort levels (Story 7.4)
+- QualityRisk: A risk to meeting a quality attribute (Story 7.4)
+- QualityTradeOff: A trade-off between quality attributes (Story 7.4)
+- QualityAttributeEvaluation: Complete quality attribute evaluation (Story 7.4)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -210,6 +216,7 @@ class ArchitectOutput:
         adrs: Tuple of ADRs generated
         processing_notes: Notes about the processing (stats, issues, etc.)
         twelve_factor_analyses: Dict mapping story IDs to 12-Factor analyses (Story 7.2)
+        quality_evaluations: Dict mapping story IDs to quality evaluations (Story 7.4)
 
     Example:
         >>> output = ArchitectOutput(
@@ -225,6 +232,7 @@ class ArchitectOutput:
     adrs: tuple[ADR, ...] = field(default_factory=tuple)
     processing_notes: str = ""
     twelve_factor_analyses: dict[str, Any] = field(default_factory=dict)
+    quality_evaluations: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -237,6 +245,7 @@ class ArchitectOutput:
             "adrs": [a.to_dict() for a in self.adrs],
             "processing_notes": self.processing_notes,
             "twelve_factor_analyses": self.twelve_factor_analyses,
+            "quality_evaluations": self.quality_evaluations,
         }
 
 
@@ -364,4 +373,178 @@ class TwelveFactorAnalysis:
             "applicable_factors": list(self.applicable_factors),
             "overall_compliance": self.overall_compliance,
             "recommendations": list(self.recommendations),
+        }
+
+
+# =============================================================================
+# Quality Attribute Types (Story 7.4)
+# =============================================================================
+
+QUALITY_ATTRIBUTES: tuple[str, ...] = (
+    "performance",
+    "security",
+    "reliability",
+    "scalability",
+    "maintainability",
+    "integration",
+    "cost_efficiency",
+)
+"""Tuple of quality attribute names for NFR evaluation.
+
+Values:
+    performance: Response time, throughput, resource efficiency
+    security: Authentication, authorization, data protection
+    reliability: Fault tolerance, recovery, consistency
+    scalability: Horizontal scaling, load handling
+    maintainability: Code clarity, testability, documentation
+    integration: Multi-provider support, protocol compliance
+    cost_efficiency: Model tiering, caching, token optimization
+"""
+
+RiskSeverity = Literal["critical", "high", "medium", "low"]
+"""Severity level for quality risks.
+
+Values:
+    critical: Score 0.0-0.3, requires immediate attention
+    high: Score 0.3-0.5, significant risk to NFRs
+    medium: Score 0.5-0.7, moderate risk with workarounds
+    low: Score 0.7-1.0, acceptable risk level
+"""
+
+MitigationEffort = Literal["high", "medium", "low"]
+"""Effort level for implementing risk mitigations.
+
+Values:
+    high: Significant architectural changes required
+    medium: Moderate code changes or configuration
+    low: Simple fixes or minor adjustments
+"""
+
+
+@dataclass(frozen=True)
+class QualityRisk:
+    """A risk to meeting a quality attribute requirement.
+
+    Represents an identified risk to a specific NFR, including severity
+    categorization and suggested mitigation strategy.
+
+    Attributes:
+        attribute: Quality attribute at risk (from QUALITY_ATTRIBUTES)
+        description: Description of the risk
+        severity: Risk severity level
+        mitigation: Suggested mitigation strategy
+        mitigation_effort: Estimated effort to implement mitigation
+
+    Example:
+        >>> risk = QualityRisk(
+        ...     attribute="performance",
+        ...     description="High latency in database queries",
+        ...     severity="high",
+        ...     mitigation="Add database indexing and connection pooling",
+        ...     mitigation_effort="medium",
+        ... )
+    """
+
+    attribute: str
+    description: str
+    severity: RiskSeverity
+    mitigation: str
+    mitigation_effort: MitigationEffort
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the quality risk.
+        """
+        return {
+            "attribute": self.attribute,
+            "description": self.description,
+            "severity": self.severity,
+            "mitigation": self.mitigation,
+            "mitigation_effort": self.mitigation_effort,
+        }
+
+
+@dataclass(frozen=True)
+class QualityTradeOff:
+    """A trade-off between two quality attributes.
+
+    Documents conflicts between quality attributes and the chosen
+    resolution approach.
+
+    Attributes:
+        attribute_a: First quality attribute in the trade-off
+        attribute_b: Second quality attribute in the trade-off
+        description: Description of the conflict
+        resolution: Chosen approach to balance both attributes
+
+    Example:
+        >>> tradeoff = QualityTradeOff(
+        ...     attribute_a="performance",
+        ...     attribute_b="security",
+        ...     description="Encryption adds 50ms latency per request",
+        ...     resolution="Use async encryption and cache encrypted results",
+        ... )
+    """
+
+    attribute_a: str
+    attribute_b: str
+    description: str
+    resolution: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the quality trade-off.
+        """
+        return {
+            "attribute_a": self.attribute_a,
+            "attribute_b": self.attribute_b,
+            "description": self.description,
+            "resolution": self.resolution,
+        }
+
+
+@dataclass(frozen=True)
+class QualityAttributeEvaluation:
+    """Complete quality attribute evaluation for a design.
+
+    Contains scores for each quality attribute, identified trade-offs,
+    risks with mitigations, and an overall weighted score.
+
+    Attributes:
+        attribute_scores: Dict mapping attribute names to scores (0.0-1.0)
+        trade_offs: Tuple of identified trade-offs between attributes
+        risks: Tuple of identified risks with mitigations
+        overall_score: Weighted overall quality score (0.0-1.0)
+
+    Example:
+        >>> evaluation = QualityAttributeEvaluation(
+        ...     attribute_scores={"performance": 0.8, "security": 0.7},
+        ...     trade_offs=(tradeoff,),
+        ...     risks=(risk,),
+        ...     overall_score=0.75,
+        ... )
+        >>> evaluation.to_dict()
+        {'attribute_scores': {...}, 'trade_offs': [...], ...}
+    """
+
+    attribute_scores: dict[str, float]
+    trade_offs: tuple[QualityTradeOff, ...] = field(default_factory=tuple)
+    risks: tuple[QualityRisk, ...] = field(default_factory=tuple)
+    overall_score: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested trade-offs and risks.
+        """
+        return {
+            "attribute_scores": dict(self.attribute_scores),
+            "trade_offs": [t.to_dict() for t in self.trade_offs],
+            "risks": [r.to_dict() for r in self.risks],
+            "overall_score": self.overall_score,
         }

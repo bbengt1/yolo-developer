@@ -114,7 +114,7 @@ development_status:
   7-1-create-architect-agent-node: done
   7-2-12-factor-design-generation: done
   7-3-adr-generation: done
-  7-4-quality-attribute-evaluation: backlog
+  7-4-quality-attribute-evaluation: done
   7-5-risk-identification: backlog
   7-6-tech-stack-constraint-design: backlog
   7-7-atam-review: backlog

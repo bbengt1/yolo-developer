@@ -1,10 +1,10 @@
-"""Architect agent node for LangGraph orchestration (Stories 7.1-7.3).
+"""Architect agent node for LangGraph orchestration (Stories 7.1-7.4).
 
 This module provides the architect_node function that integrates with the
 LangGraph orchestration workflow. The Architect agent produces design
 decisions and Architecture Decision Records (ADRs) for stories with
-12-Factor compliance analysis (Story 7.2) and enhanced ADR content
-generation (Story 7.3).
+12-Factor compliance analysis (Story 7.2), enhanced ADR content
+generation (Story 7.3), and quality attribute evaluation (Story 7.4).
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -40,6 +40,7 @@ import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.architect.adr_generator import generate_adrs
+from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
 from yolo_developer.agents.architect.twelve_factor import analyze_twelve_factor
 from yolo_developer.agents.architect.types import (
     ArchitectOutput,
@@ -289,23 +290,33 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
     # Generate ADRs for significant decisions (AC4, Story 7.3)
     adrs = await generate_adrs(design_decisions, twelve_factor_analyses)
 
-    # Build output with actual results including 12-Factor analyses
+    # Evaluate quality attributes for each story (Story 7.4)
+    quality_evaluations: dict[str, Any] = {}
+    for story in stories:
+        story_id = story.get("id", "unknown")
+        # Get decisions for this story
+        story_decisions = [d for d in design_decisions if d.story_id == story_id]
+        evaluation = await evaluate_quality_attributes(story, story_decisions)
+        quality_evaluations[story_id] = evaluation.to_dict()
+
+    # Build output with actual results including 12-Factor analyses and quality evaluations
     output = ArchitectOutput(
         design_decisions=tuple(design_decisions),
         adrs=tuple(adrs),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {len(design_decisions)} design decisions, "
-        f"{len(adrs)} ADRs with 12-Factor compliance analysis",
+        f"{len(adrs)} ADRs with 12-Factor compliance analysis and quality evaluation",
         twelve_factor_analyses=twelve_factor_analyses,
+        quality_evaluations=quality_evaluations,
     )
 
     # Create decision record with architect attribution
     decision = Decision(
         agent="architect",
-        summary=f"Generated {len(design_decisions)} design decisions and {len(adrs)} ADRs",
+        summary=f"Generated {len(design_decisions)} design decisions and {len(adrs)} ADRs with quality evaluation",
         rationale=f"Processed {len(stories)} stories from PM. "
-        "12-Factor compliance analysis (Story 7.2) and enhanced ADR generation "
-        "with LLM fallback (Story 7.3) applied.",
+        "12-Factor compliance analysis (Story 7.2), enhanced ADR generation "
+        "with LLM fallback (Story 7.3), and quality attribute evaluation (Story 7.4) applied.",
         related_artifacts=tuple(d.id for d in design_decisions),
     )
 
@@ -321,6 +332,7 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         story_count=len(stories),
         design_decision_count=len(output.design_decisions),
         adr_count=len(output.adrs),
+        quality_evaluation_count=len(quality_evaluations),
     )
 
     # Return ONLY the updates, not full state
