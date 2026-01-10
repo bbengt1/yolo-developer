@@ -1,4 +1,4 @@
-"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4, 7.6).
+"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4, 7.6, 7.7).
 
 This module provides the data types used by the Architect agent:
 
@@ -20,6 +20,11 @@ This module provides the data types used by the Architect agent:
 - ConstraintViolation: A violation of tech stack constraints (Story 7.6)
 - StackPattern: A stack-specific pattern suggestion (Story 7.6)
 - TechStackValidation: Complete tech stack validation result (Story 7.6)
+- ATAMScenario: A quality attribute scenario for ATAM review (Story 7.7)
+- ATAMTradeOffConflict: A conflict between trade-offs (Story 7.7)
+- ATAMRiskAssessment: Assessment of risk impact (Story 7.7)
+- ATAMReviewResult: Complete ATAM review result (Story 7.7)
+- MitigationFeasibility: Feasibility level for mitigations (Story 7.7)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -223,6 +228,7 @@ class ArchitectOutput:
         quality_evaluations: Dict mapping story IDs to quality evaluations (Story 7.4)
         technical_risk_reports: Dict mapping story IDs to technical risk reports (Story 7.5)
         tech_stack_validations: Dict mapping story IDs to tech stack validations (Story 7.6)
+        atam_reviews: Dict mapping story IDs to ATAM review results (Story 7.7)
 
     Example:
         >>> output = ArchitectOutput(
@@ -241,6 +247,7 @@ class ArchitectOutput:
     quality_evaluations: dict[str, Any] = field(default_factory=dict)
     technical_risk_reports: dict[str, Any] = field(default_factory=dict)
     tech_stack_validations: dict[str, Any] = field(default_factory=dict)
+    atam_reviews: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -256,6 +263,7 @@ class ArchitectOutput:
             "quality_evaluations": self.quality_evaluations,
             "technical_risk_reports": self.technical_risk_reports,
             "tech_stack_validations": self.tech_stack_validations,
+            "atam_reviews": self.atam_reviews,
         }
 
 
@@ -899,5 +907,207 @@ class TechStackValidation:
             "overall_compliance": self.overall_compliance,
             "violations": [v.to_dict() for v in self.violations],
             "suggested_patterns": [p.to_dict() for p in self.suggested_patterns],
+            "summary": self.summary,
+        }
+
+
+# =============================================================================
+# ATAM Review Types (Story 7.7)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ATAMScenario:
+    """A quality attribute scenario for ATAM architectural review.
+
+    Represents a concrete expression of how the system should respond
+    to a stimulus for a specific quality attribute.
+
+    Attributes:
+        scenario_id: Unique identifier (format: ATAM-{number})
+        quality_attribute: Quality attribute being evaluated
+        stimulus: What triggers the scenario (e.g., "100 concurrent requests")
+        response: Expected system response (e.g., "95th percentile < 500ms")
+        analysis: Assessment of how design addresses this scenario
+
+    Example:
+        >>> scenario = ATAMScenario(
+        ...     scenario_id="ATAM-001",
+        ...     quality_attribute="performance",
+        ...     stimulus="100 concurrent API requests",
+        ...     response="95th percentile < 500ms",
+        ...     analysis="Design supports async processing and caching",
+        ... )
+    """
+
+    scenario_id: str
+    quality_attribute: str
+    stimulus: str
+    response: str
+    analysis: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the ATAM scenario.
+        """
+        return {
+            "scenario_id": self.scenario_id,
+            "quality_attribute": self.quality_attribute,
+            "stimulus": self.stimulus,
+            "response": self.response,
+            "analysis": self.analysis,
+        }
+
+
+@dataclass(frozen=True)
+class ATAMTradeOffConflict:
+    """A conflict between quality attribute trade-offs.
+
+    Represents a situation where trade-off resolutions between quality
+    attributes are in conflict and need reconciliation.
+
+    Attributes:
+        attribute_a: First quality attribute in the conflict
+        attribute_b: Second quality attribute in the conflict
+        description: Description of the conflict
+        severity: Conflict severity (critical, high, medium, low)
+        resolution_strategy: Suggested approach to resolve the conflict
+
+    Example:
+        >>> conflict = ATAMTradeOffConflict(
+        ...     attribute_a="performance",
+        ...     attribute_b="security",
+        ...     description="Encryption adds latency to all requests",
+        ...     severity="medium",
+        ...     resolution_strategy="Use async encryption with caching",
+        ... )
+    """
+
+    attribute_a: str
+    attribute_b: str
+    description: str
+    severity: RiskSeverity
+    resolution_strategy: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the trade-off conflict.
+        """
+        return {
+            "attribute_a": self.attribute_a,
+            "attribute_b": self.attribute_b,
+            "description": self.description,
+            "severity": self.severity,
+            "resolution_strategy": self.resolution_strategy,
+        }
+
+
+MitigationFeasibility = Literal["high", "medium", "low"]
+"""Feasibility level for implementing risk mitigations.
+
+Values:
+    high: Mitigation is straightforward to implement
+    medium: Mitigation requires moderate effort
+    low: Mitigation is difficult or costly to implement
+"""
+
+
+@dataclass(frozen=True)
+class ATAMRiskAssessment:
+    """Assessment of a technical risk's impact on quality attributes.
+
+    Represents the ATAM-style evaluation of how a technical risk
+    affects quality attributes and whether mitigation is feasible.
+
+    Attributes:
+        risk_id: Reference to the original TechnicalRisk
+        quality_impact: Quality attributes affected by this risk
+        mitigation_feasibility: How feasible is the mitigation (high/medium/low)
+        unmitigated: Whether the risk remains unmitigated
+
+    Example:
+        >>> assessment = ATAMRiskAssessment(
+        ...     risk_id="RISK-001",
+        ...     quality_impact=("reliability", "performance"),
+        ...     mitigation_feasibility="high",
+        ...     unmitigated=False,
+        ... )
+    """
+
+    risk_id: str
+    quality_impact: tuple[str, ...]
+    mitigation_feasibility: MitigationFeasibility
+    unmitigated: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the risk assessment.
+        """
+        return {
+            "risk_id": self.risk_id,
+            "quality_impact": list(self.quality_impact),
+            "mitigation_feasibility": self.mitigation_feasibility,
+            "unmitigated": self.unmitigated,
+        }
+
+
+@dataclass(frozen=True)
+class ATAMReviewResult:
+    """Complete result of an ATAM architectural review.
+
+    Contains the overall pass/fail decision, confidence score,
+    evaluated scenarios, detected conflicts, risk assessments,
+    and any failure reasons.
+
+    Attributes:
+        overall_pass: Whether the design passes ATAM review
+        confidence: Confidence score from 0.0 to 1.0
+        scenarios_evaluated: Quality attribute scenarios evaluated
+        trade_off_conflicts: Conflicts between trade-offs
+        risk_assessments: Assessments of technical risks
+        failure_reasons: Specific reasons if review failed
+        summary: Brief summary of the review outcome
+
+    Example:
+        >>> result = ATAMReviewResult(
+        ...     overall_pass=True,
+        ...     confidence=0.85,
+        ...     scenarios_evaluated=(scenario,),
+        ...     trade_off_conflicts=(),
+        ...     risk_assessments=(),
+        ...     failure_reasons=(),
+        ...     summary="Design passes ATAM review with 85% confidence",
+        ... )
+        >>> result.to_dict()
+        {'overall_pass': True, 'confidence': 0.85, ...}
+    """
+
+    overall_pass: bool
+    confidence: float
+    scenarios_evaluated: tuple[ATAMScenario, ...]
+    trade_off_conflicts: tuple[ATAMTradeOffConflict, ...]
+    risk_assessments: tuple[ATAMRiskAssessment, ...]
+    failure_reasons: tuple[str, ...]
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested components.
+        """
+        return {
+            "overall_pass": self.overall_pass,
+            "confidence": self.confidence,
+            "scenarios_evaluated": [s.to_dict() for s in self.scenarios_evaluated],
+            "trade_off_conflicts": [c.to_dict() for c in self.trade_off_conflicts],
+            "risk_assessments": [r.to_dict() for r in self.risk_assessments],
+            "failure_reasons": list(self.failure_reasons),
             "summary": self.summary,
         }
