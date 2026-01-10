@@ -1,4 +1,4 @@
-"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4, 6.5, 6.6).
+"""PM agent node for LangGraph orchestration (Story 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7).
 
 This module provides the pm_node function that integrates with the
 LangGraph orchestration workflow. The PM agent transforms crystallized
@@ -13,6 +13,7 @@ Key Concepts:
 - **Epic Breakdown**: Large stories are broken into smaller sub-stories (Story 6.6)
 - **Dependency Analysis**: Stories are analyzed for dependencies (Story 6.5)
 - **Prioritization**: Stories are prioritized by value and dependencies (Story 6.4)
+- **Escalation**: Unclear requirements are escalated to Analyst (Story 6.7)
 
 LLM Usage:
     Set _USE_LLM in llm.py to True to enable actual LLM calls.
@@ -49,6 +50,7 @@ from yolo_developer.agents.pm.dependencies import (
     _update_stories_with_dependencies,
     analyze_dependencies,
 )
+from yolo_developer.agents.pm.escalation import check_for_escalation
 from yolo_developer.agents.pm.llm import (
     _estimate_complexity,
     _extract_story_components,
@@ -59,6 +61,7 @@ from yolo_developer.agents.pm.testability import validate_story_testability
 from yolo_developer.agents.pm.types import (
     AcceptanceCriterion,
     DependencyAnalysisResult,
+    PMEscalation,
     PMOutput,
     PrioritizationResult,
     Story,
@@ -348,8 +351,33 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         contradiction_count=contradiction_count,
     )
 
-    # Transform requirements to stories using LLM-powered transformation
-    stories, unprocessed_reqs = await _transform_requirements_to_stories(requirements)
+    # Step 1: Check requirements for escalation BEFORE story transformation (Story 6.7)
+    # This prevents wasted effort on unclear requirements
+    clear_requirements: list[dict[str, Any]] = []
+    escalations: list[PMEscalation] = []
+
+    for req in requirements:
+        escalation = check_for_escalation(req)
+        if escalation:
+            escalations.append(escalation)
+            logger.info(
+                "pm_requirement_escalated",
+                requirement_id=req.get("id"),
+                reason=escalation["reason"],
+                question_count=len(escalation["questions"]),
+            )
+        else:
+            clear_requirements.append(req)
+
+    logger.info(
+        "pm_escalation_check_complete",
+        total_requirements=len(requirements),
+        clear_count=len(clear_requirements),
+        escalation_count=len(escalations),
+    )
+
+    # Step 2: Transform CLEAR requirements to stories using LLM-powered transformation
+    stories, unprocessed_reqs = await _transform_requirements_to_stories(clear_requirements)
     original_story_count = len(stories)
 
     # Break down large stories (Story 6.6)
@@ -437,23 +465,37 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         else None,
     )
 
-    # Build processing notes with breakdown, validation, dependency, and prioritization summaries
+    # Build escalation summary for notes (Story 6.7)
+    escalation_summary = ""
+    if escalations:
+        escalation_summary = (
+            f"Escalations: {len(escalations)} requirements escalated to Analyst for clarification"
+        )
+    else:
+        escalation_summary = "Escalations: 0 (all requirements clear)"
+
+    # Build processing notes with breakdown, validation, dependency, prioritization, and escalation summaries
     processing_notes_parts = [
-        f"Transformed {len(requirements)} requirements into {original_story_count} stories using LLM analysis",
+        f"Transformed {len(clear_requirements)} of {len(requirements)} requirements into {original_story_count} stories using LLM analysis",
     ]
     if breakdown_summary:
         processing_notes_parts.append(breakdown_summary)
-    processing_notes_parts.extend([
-        f"Dependencies: {dependency_summary}",
-        validation_summary,
-        f"Prioritization: {prioritization_summary}",
-    ])
+    processing_notes_parts.extend(
+        [
+            f"Dependencies: {dependency_summary}",
+            validation_summary,
+            f"Prioritization: {prioritization_summary}",
+            escalation_summary,
+        ]
+    )
 
     # Create PM output
+    # Track escalated requirement IDs in PMOutput for backward compatibility
+    escalated_req_ids = tuple(esc["requirement_id"] for esc in escalations)
     output = PMOutput(
         stories=stories,
         unprocessed_requirements=unprocessed_reqs,
-        escalations_to_analyst=(),  # Escalation logic is Story 6.7
+        escalations_to_analyst=escalated_req_ids,  # Story 6.7: Track escalated reqs
         processing_notes="; ".join(processing_notes_parts),
     )
 
@@ -461,6 +503,11 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
     breakdown_rationale = ""
     if breakdown_results:
         breakdown_rationale = f" {breakdown_summary}."
+
+    # Build escalation rationale for Decision record (Story 6.7)
+    escalation_rationale = ""
+    if escalations:
+        escalation_rationale = f" {escalation_summary}."
 
     decision = Decision(
         agent="pm",
@@ -472,7 +519,8 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
             f"{breakdown_rationale} "
             f"Dependencies: {dependency_summary}. "
             f"{validation_summary}. "
-            f"Prioritization: {prioritization_summary}"
+            f"Prioritization: {prioritization_summary}."
+            f"{escalation_rationale}"
         ),
         related_artifacts=tuple(s.id for s in stories),
     )
@@ -524,4 +572,6 @@ async def pm_node(state: YoloState) -> dict[str, Any]:
         "dependency_analysis_result": dependency_result,
         "prioritization_result": prioritization_result,
         "breakdown_results": breakdown_results,
+        "escalations": escalations,  # Story 6.7: Full escalation objects for Analyst routing
+        "escalation_pending": len(escalations) > 0,  # Story 6.7 AC3: Flag for routing
     }

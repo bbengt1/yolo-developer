@@ -1,4 +1,4 @@
-"""Type definitions for PM agent (Story 6.1, 6.3, 6.4, 6.5, 6.6).
+"""Type definitions for PM agent (Story 6.1, 6.3, 6.4, 6.5, 6.6, 6.7).
 
 This module provides the data types used by the PM agent:
 
@@ -16,6 +16,10 @@ This module provides the data types used by the PM agent:
 - DependencyAnalysisResult: Complete dependency analysis result (Story 6.5)
 - CoverageMapping: Mapping of original AC to covering sub-stories (Story 6.6)
 - EpicBreakdownResult: Result of breaking down a large story (Story 6.6)
+- EscalationReason: Reason for escalating to Analyst (Story 6.7)
+- EscalationQuestion: A question to ask for clarification (Story 6.7)
+- PMEscalation: An escalation from PM to Analyst (Story 6.7)
+- EscalationResult: Result of escalation processing (Story 6.7)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -55,7 +59,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 
 class StoryStatus(str, Enum):
@@ -599,3 +603,116 @@ class EpicBreakdownResult(TypedDict):
     coverage_mappings: list[CoverageMapping]
     breakdown_rationale: str
     is_valid: bool
+
+
+# =============================================================================
+# Story 6.7: Escalation to Analyst Types
+# =============================================================================
+
+
+EscalationReason = Literal[
+    "ambiguous_terms",
+    "missing_criteria",
+    "contradictory",
+    "technical_question",
+]
+"""Reason for escalating a requirement to Analyst (Story 6.7).
+
+Literal type for categorizing why a requirement needs clarification.
+
+Values:
+    ambiguous_terms: Vague qualitative terms (e.g., "fast", "easy", "intuitive").
+    missing_criteria: No measurable success condition for acceptance criteria.
+    contradictory: Conflicting statements within the requirement.
+    technical_question: PM needs Analyst clarification on technical feasibility.
+
+Example:
+    >>> reason: EscalationReason = "ambiguous_terms"
+"""
+
+
+class EscalationQuestion(TypedDict):
+    """A question to ask for clarification on an ambiguous requirement (Story 6.7).
+
+    TypedDict containing a specific, actionable question generated for
+    an ambiguity detected in a requirement.
+
+    Fields:
+        question_text: The actual question to ask the Analyst.
+        source_requirement_id: ID of the requirement this question relates to.
+        ambiguity_type: Type of ambiguity this question addresses.
+        context: Additional context about why this question is needed.
+
+    Example:
+        >>> question: EscalationQuestion = {
+        ...     "question_text": "What specific metric defines 'fast' for this requirement?",
+        ...     "source_requirement_id": "req-001",
+        ...     "ambiguity_type": "vague_term",
+        ...     "context": "Requirement mentions 'fast response' without concrete metrics",
+        ... }
+    """
+
+    question_text: str
+    source_requirement_id: str
+    ambiguity_type: str
+    context: str
+
+
+class PMEscalation(TypedDict):
+    """An escalation from PM to Analyst with full context (Story 6.7).
+
+    TypedDict representing an escalation that the PM agent creates when
+    a requirement is too unclear to transform into a user story.
+
+    Fields:
+        id: Unique identifier for this escalation (format: "esc-{timestamp}-{counter}").
+        source_agent: Agent that created the escalation (always "pm").
+        target_agent: Agent that should handle the escalation (always "analyst").
+        requirement_id: ID of the requirement being escalated.
+        questions: List of EscalationQuestion objects with specific questions.
+        partial_work: Any partial story work completed before escalation, or None.
+        reason: Category of why escalation is needed (EscalationReason).
+        created_at: ISO format timestamp when escalation was created.
+
+    Example:
+        >>> escalation: PMEscalation = {
+        ...     "id": "esc-1704412345-001",
+        ...     "source_agent": "pm",
+        ...     "target_agent": "analyst",
+        ...     "requirement_id": "req-001",
+        ...     "questions": [...],
+        ...     "partial_work": None,
+        ...     "reason": "ambiguous_terms",
+        ...     "created_at": "2026-01-09T12:00:00Z",
+        ... }
+    """
+
+    id: str
+    source_agent: str
+    target_agent: str
+    requirement_id: str
+    questions: list[EscalationQuestion]
+    partial_work: dict[str, Any] | None
+    reason: EscalationReason
+    created_at: str
+
+
+class EscalationResult(TypedDict):
+    """Result of escalation processing in pm_node (Story 6.7).
+
+    TypedDict containing all escalations from PM processing and a count
+    for quick reference in processing notes.
+
+    Fields:
+        escalations: List of PMEscalation objects for unclear requirements.
+        escalation_count: Number of escalations for quick reference.
+
+    Example:
+        >>> result: EscalationResult = {
+        ...     "escalations": [...],
+        ...     "escalation_count": 2,
+        ... }
+    """
+
+    escalations: list[PMEscalation]
+    escalation_count: int
