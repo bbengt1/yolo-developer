@@ -6,7 +6,6 @@ orchestration state in various formats.
 
 from __future__ import annotations
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from yolo_developer.agents.architect.node import _extract_stories_from_state

@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
 from yolo_developer.agents.architect.node import _generate_adrs
 from yolo_developer.agents.architect.types import ADR, DesignDecision
 

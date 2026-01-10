@@ -49,20 +49,32 @@ from __future__ import annotations
 
 from yolo_developer.agents.architect import types
 from yolo_developer.agents.architect.node import architect_node
+from yolo_developer.agents.architect.twelve_factor import (
+    analyze_twelve_factor,
+    analyze_twelve_factor_with_llm,
+)
 from yolo_developer.agents.architect.types import (
     ADR,
+    TWELVE_FACTORS,
     ADRStatus,
     ArchitectOutput,
     DesignDecision,
     DesignDecisionType,
+    FactorResult,
+    TwelveFactorAnalysis,
 )
 
 __all__ = [
     "ADR",
+    "TWELVE_FACTORS",
     "ADRStatus",
     "ArchitectOutput",
     "DesignDecision",
     "DesignDecisionType",
+    "FactorResult",
+    "TwelveFactorAnalysis",
+    "analyze_twelve_factor",
+    "analyze_twelve_factor_with_llm",
     "architect_node",
     "types",
 ]

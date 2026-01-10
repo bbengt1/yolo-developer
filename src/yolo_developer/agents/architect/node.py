@@ -37,6 +37,7 @@ from typing import Any, cast
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.agents.architect.twelve_factor import analyze_twelve_factor
 from yolo_developer.agents.architect.types import (
     ADR,
     ArchitectOutput,
@@ -116,24 +117,24 @@ def _extract_stories_from_state(state: YoloState) -> list[dict[str, Any]]:
 _decision_counter = 0
 
 
-def _generate_design_decisions(
+async def _generate_design_decisions(
     stories: list[dict[str, Any]],
-) -> list[DesignDecision]:
-    """Generate design decisions for stories.
+) -> tuple[list[DesignDecision], dict[str, Any]]:
+    """Generate design decisions for stories with 12-Factor analysis.
 
     Creates a DesignDecision for each story that requires architectural
-    consideration. This is a stub implementation - full LLM-powered
-    design generation will be implemented in Story 7.2.
+    consideration, including 12-Factor App compliance analysis in the
+    rationale (Story 7.2).
 
     Args:
         stories: List of story dictionaries from PM output.
 
     Returns:
-        List of DesignDecision objects, one per story.
+        Tuple of (list of DesignDecision objects, dict of twelve-factor analyses).
 
     Example:
         >>> stories = [{"id": "story-001", "title": "User Auth"}]
-        >>> decisions = _generate_design_decisions(stories)
+        >>> decisions, analyses = await _generate_design_decisions(stories)
         >>> len(decisions)
         1
     """
@@ -141,9 +142,10 @@ def _generate_design_decisions(
 
     if not stories:
         logger.debug("no_stories_for_design_decisions")
-        return []
+        return [], {}
 
     decisions: list[DesignDecision] = []
+    twelve_factor_analyses: dict[str, Any] = {}
     timestamp = int(time.time())
 
     for story in stories:
@@ -151,16 +153,31 @@ def _generate_design_decisions(
         story_id = story.get("id", "unknown")
         story_title = story.get("title", "Untitled Story")
 
-        # Determine decision type based on story content (stub implementation)
-        # Full implementation in Story 7.2 will use LLM for classification
+        # Perform 12-Factor compliance analysis (Story 7.2)
+        twelve_factor_result = await analyze_twelve_factor(story)
+        twelve_factor_analyses[story_id] = twelve_factor_result.to_dict()
+
+        # Determine decision type based on story content
         decision_type: DesignDecisionType = _infer_decision_type(story)
+
+        # Build rationale with 12-Factor compliance information
+        compliance_pct = int(twelve_factor_result.overall_compliance * 100)
+        recommendations = twelve_factor_result.recommendations
+        recommendation_text = (
+            f" Recommendations: {', '.join(recommendations[:2])}"
+            if recommendations
+            else ""
+        )
+        rationale = (
+            f"12-Factor compliance: {compliance_pct}%.{recommendation_text}"
+        )
 
         decision = DesignDecision(
             id=f"design-{timestamp}-{_decision_counter:03d}",
             story_id=story_id,
             decision_type=decision_type,
             description=f"Design approach for: {story_title}",
-            rationale="Stub implementation - full rationale generation in Story 7.2",
+            rationale=rationale,
             alternatives_considered=("Alternative A", "Alternative B"),
         )
         decisions.append(decision)
@@ -170,6 +187,7 @@ def _generate_design_decisions(
             decision_id=decision.id,
             story_id=story_id,
             decision_type=decision_type,
+            twelve_factor_compliance=compliance_pct,
         )
 
     logger.info(
@@ -178,14 +196,15 @@ def _generate_design_decisions(
         story_ids=[d.story_id for d in decisions],
     )
 
-    return decisions
+    return decisions, twelve_factor_analyses
 
 
 def _infer_decision_type(story: dict[str, Any]) -> DesignDecisionType:
     """Infer the type of design decision based on story content.
 
-    This is a simple heuristic implementation. Full LLM-powered
-    classification will be implemented in Story 7.2.
+    Uses keyword-based heuristics to classify design decisions.
+    The 12-Factor compliance analysis (Story 7.2) provides additional
+    architectural guidance in the rationale.
 
     Args:
         story: Story dictionary with title and other fields.
@@ -326,19 +345,20 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
     # Extract stories from state (AC2)
     stories = _extract_stories_from_state(state)
 
-    # Generate design decisions for stories (AC3)
-    design_decisions = _generate_design_decisions(stories)
+    # Generate design decisions for stories with 12-Factor analysis (AC3, Story 7.2)
+    design_decisions, twelve_factor_analyses = await _generate_design_decisions(stories)
 
     # Generate ADRs for significant decisions (AC4)
     adrs = _generate_adrs(design_decisions)
 
-    # Build output with actual results
+    # Build output with actual results including 12-Factor analyses
     output = ArchitectOutput(
         design_decisions=tuple(design_decisions),
         adrs=tuple(adrs),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {len(design_decisions)} design decisions, "
-        f"{len(adrs)} ADRs (Story 7.1 - stub implementation, full LLM in 7.2+)",
+        f"{len(adrs)} ADRs with 12-Factor compliance analysis",
+        twelve_factor_analyses=twelve_factor_analyses,
     )
 
     # Create decision record with architect attribution

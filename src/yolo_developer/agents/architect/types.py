@@ -1,4 +1,4 @@
-"""Type definitions for Architect agent (Story 7.1).
+"""Type definitions for Architect agent (Story 7.1, 7.2).
 
 This module provides the data types used by the Architect agent:
 
@@ -7,6 +7,9 @@ This module provides the data types used by the Architect agent:
 - ADRStatus: Literal type for ADR lifecycle status
 - ADR: An Architecture Decision Record
 - ArchitectOutput: Complete output from architect processing
+- FactorResult: Result of a single 12-Factor compliance check (Story 7.2)
+- TwelveFactorAnalysis: Complete 12-Factor compliance analysis (Story 7.2)
+- TWELVE_FACTORS: Tuple of all 12 factor names (Story 7.2)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -206,6 +209,7 @@ class ArchitectOutput:
         design_decisions: Tuple of design decisions made
         adrs: Tuple of ADRs generated
         processing_notes: Notes about the processing (stats, issues, etc.)
+        twelve_factor_analyses: Dict mapping story IDs to 12-Factor analyses (Story 7.2)
 
     Example:
         >>> output = ArchitectOutput(
@@ -220,6 +224,7 @@ class ArchitectOutput:
     design_decisions: tuple[DesignDecision, ...] = field(default_factory=tuple)
     adrs: tuple[ADR, ...] = field(default_factory=tuple)
     processing_notes: str = ""
+    twelve_factor_analyses: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -231,4 +236,132 @@ class ArchitectOutput:
             "design_decisions": [d.to_dict() for d in self.design_decisions],
             "adrs": [a.to_dict() for a in self.adrs],
             "processing_notes": self.processing_notes,
+            "twelve_factor_analyses": self.twelve_factor_analyses,
+        }
+
+
+# =============================================================================
+# Twelve-Factor Types (Story 7.2)
+# =============================================================================
+
+TWELVE_FACTORS: tuple[str, ...] = (
+    "codebase",
+    "dependencies",
+    "config",
+    "backing_services",
+    "build_release_run",
+    "processes",
+    "port_binding",
+    "concurrency",
+    "disposability",
+    "dev_prod_parity",
+    "logs",
+    "admin_processes",
+)
+"""Tuple of all 12 factor names from the 12-Factor App methodology.
+
+Values:
+    codebase: One codebase tracked in revision control, many deploys
+    dependencies: Explicitly declare and isolate dependencies
+    config: Store config in the environment
+    backing_services: Treat backing services as attached resources
+    build_release_run: Strictly separate build and run stages
+    processes: Execute the app as one or more stateless processes
+    port_binding: Export services via port binding
+    concurrency: Scale out via the process model
+    disposability: Maximize robustness with fast startup and graceful shutdown
+    dev_prod_parity: Keep development, staging, and production similar
+    logs: Treat logs as event streams
+    admin_processes: Run admin/management tasks as one-off processes
+"""
+
+
+@dataclass(frozen=True)
+class FactorResult:
+    """Result of a single 12-Factor compliance check.
+
+    Represents the analysis of a story against one of the 12 factors,
+    indicating whether it applies and if compliant.
+
+    Attributes:
+        factor_name: Name of the factor (from TWELVE_FACTORS)
+        applies: Whether this factor is relevant to the story
+        compliant: Whether the story complies (None if not applicable)
+        finding: Description of what was found during analysis
+        recommendation: Suggested improvement (empty if compliant)
+
+    Example:
+        >>> result = FactorResult(
+        ...     factor_name="config",
+        ...     applies=True,
+        ...     compliant=False,
+        ...     finding="Hardcoded database URL detected",
+        ...     recommendation="Use environment variable DATABASE_URL",
+        ... )
+    """
+
+    factor_name: str
+    applies: bool
+    compliant: bool | None
+    finding: str
+    recommendation: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the factor result.
+        """
+        return {
+            "factor_name": self.factor_name,
+            "applies": self.applies,
+            "compliant": self.compliant,
+            "finding": self.finding,
+            "recommendation": self.recommendation,
+        }
+
+
+@dataclass(frozen=True)
+class TwelveFactorAnalysis:
+    """Complete 12-Factor compliance analysis for a story.
+
+    Contains the results of analyzing a story against all 12 factors,
+    with an overall compliance score and aggregated recommendations.
+
+    Attributes:
+        factor_results: Dict mapping factor names to their results
+        applicable_factors: Tuple of factor names that apply to this story
+        overall_compliance: Score from 0.0 to 1.0 (ratio of compliant factors)
+        recommendations: Tuple of aggregated recommendations
+
+    Example:
+        >>> analysis = TwelveFactorAnalysis(
+        ...     factor_results={"config": result1, "processes": result2},
+        ...     applicable_factors=("config", "processes"),
+        ...     overall_compliance=0.5,
+        ...     recommendations=("Use env vars for config",),
+        ... )
+        >>> analysis.to_dict()
+        {'factor_results': {...}, 'overall_compliance': 0.5, ...}
+    """
+
+    factor_results: dict[str, FactorResult]
+    applicable_factors: tuple[str, ...]
+    overall_compliance: float
+    recommendations: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested factor results.
+        """
+        return {
+            "factor_results": {
+                name: result.to_dict()
+                for name, result in self.factor_results.items()
+            },
+            "applicable_factors": list(self.applicable_factors),
+            "overall_compliance": self.overall_compliance,
+            "recommendations": list(self.recommendations),
         }
