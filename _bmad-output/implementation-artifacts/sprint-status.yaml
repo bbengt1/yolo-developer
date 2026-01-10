@@ -116,7 +116,7 @@ development_status:
   7-3-adr-generation: done
   7-4-quality-attribute-evaluation: done
   7-5-risk-identification: done
-  7-6-tech-stack-constraint-design: backlog
+  7-6-tech-stack-constraint-design: done
   7-7-atam-review: backlog
   7-8-pattern-matching-to-codebase: backlog
   epic-7-retrospective: optional

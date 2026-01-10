@@ -52,6 +52,9 @@ from yolo_developer.agents.architect.adr_generator import generate_adr, generate
 from yolo_developer.agents.architect.node import architect_node
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
 from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
+from yolo_developer.agents.architect.tech_stack_validator import (
+    validate_tech_stack_constraints,
+)
 from yolo_developer.agents.architect.twelve_factor import (
     analyze_twelve_factor,
     analyze_twelve_factor_with_llm,
@@ -62,6 +65,7 @@ from yolo_developer.agents.architect.types import (
     TWELVE_FACTORS,
     ADRStatus,
     ArchitectOutput,
+    ConstraintViolation,
     DesignDecision,
     DesignDecisionType,
     FactorResult,
@@ -71,9 +75,12 @@ from yolo_developer.agents.architect.types import (
     QualityRisk,
     QualityTradeOff,
     RiskSeverity,
+    StackPattern,
     TechnicalRisk,
     TechnicalRiskCategory,
     TechnicalRiskReport,
+    TechStackCategory,
+    TechStackValidation,
     TwelveFactorAnalysis,
     calculate_mitigation_priority,
     calculate_overall_risk_level,
@@ -85,6 +92,7 @@ __all__ = [
     "TWELVE_FACTORS",
     "ADRStatus",
     "ArchitectOutput",
+    "ConstraintViolation",
     "DesignDecision",
     "DesignDecisionType",
     "FactorResult",
@@ -94,6 +102,9 @@ __all__ = [
     "QualityRisk",
     "QualityTradeOff",
     "RiskSeverity",
+    "StackPattern",
+    "TechStackCategory",
+    "TechStackValidation",
     "TechnicalRisk",
     "TechnicalRiskCategory",
     "TechnicalRiskReport",
@@ -108,4 +119,5 @@ __all__ = [
     "generate_adrs",
     "identify_technical_risks",
     "types",
+    "validate_tech_stack_constraints",
 ]

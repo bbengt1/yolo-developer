@@ -1,4 +1,4 @@
-"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4).
+"""Type definitions for Architect agent (Story 7.1, 7.2, 7.4, 7.6).
 
 This module provides the data types used by the Architect agent:
 
@@ -16,6 +16,10 @@ This module provides the data types used by the Architect agent:
 - QualityRisk: A risk to meeting a quality attribute (Story 7.4)
 - QualityTradeOff: A trade-off between quality attributes (Story 7.4)
 - QualityAttributeEvaluation: Complete quality attribute evaluation (Story 7.4)
+- TechStackCategory: Category of technology in the stack (Story 7.6)
+- ConstraintViolation: A violation of tech stack constraints (Story 7.6)
+- StackPattern: A stack-specific pattern suggestion (Story 7.6)
+- TechStackValidation: Complete tech stack validation result (Story 7.6)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -218,6 +222,7 @@ class ArchitectOutput:
         twelve_factor_analyses: Dict mapping story IDs to 12-Factor analyses (Story 7.2)
         quality_evaluations: Dict mapping story IDs to quality evaluations (Story 7.4)
         technical_risk_reports: Dict mapping story IDs to technical risk reports (Story 7.5)
+        tech_stack_validations: Dict mapping story IDs to tech stack validations (Story 7.6)
 
     Example:
         >>> output = ArchitectOutput(
@@ -235,6 +240,7 @@ class ArchitectOutput:
     twelve_factor_analyses: dict[str, Any] = field(default_factory=dict)
     quality_evaluations: dict[str, Any] = field(default_factory=dict)
     technical_risk_reports: dict[str, Any] = field(default_factory=dict)
+    tech_stack_validations: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -249,6 +255,7 @@ class ArchitectOutput:
             "twelve_factor_analyses": self.twelve_factor_analyses,
             "quality_evaluations": self.quality_evaluations,
             "technical_risk_reports": self.technical_risk_reports,
+            "tech_stack_validations": self.tech_stack_validations,
         }
 
 
@@ -740,5 +747,157 @@ class TechnicalRiskReport:
         return {
             "risks": [r.to_dict() for r in self.risks],
             "overall_risk_level": self.overall_risk_level,
+            "summary": self.summary,
+        }
+
+
+# =============================================================================
+# Tech Stack Types (Story 7.6)
+# =============================================================================
+
+TechStackCategory = Literal[
+    "runtime",
+    "framework",
+    "database",
+    "testing",
+    "tooling",
+]
+"""Category of technology in the configured stack.
+
+Values:
+    runtime: Language runtime (e.g., Python 3.10+, Node.js 20+)
+    framework: Application framework (e.g., LangGraph, FastAPI, Django)
+    database: Data storage (e.g., ChromaDB, PostgreSQL, Neo4j)
+    testing: Test framework (e.g., pytest, pytest-asyncio)
+    tooling: Build/dev tools (e.g., uv, ruff, mypy)
+"""
+
+
+@dataclass(frozen=True)
+class ConstraintViolation:
+    """A violation of tech stack constraints.
+
+    Represents a design decision that conflicts with the configured
+    technology stack, including version mismatches and unconfigured
+    technologies.
+
+    Attributes:
+        technology: The technology that violates constraints
+        expected_version: Configured version requirement (None if not configured)
+        actual_version: Version used in the design decision
+        severity: Severity of the violation (critical, high, medium, low)
+        suggested_alternative: How to fix the violation
+
+    Example:
+        >>> violation = ConstraintViolation(
+        ...     technology="SQLite",
+        ...     expected_version=None,
+        ...     actual_version="3.x",
+        ...     severity="critical",
+        ...     suggested_alternative="Use ChromaDB as configured for vector storage",
+        ... )
+    """
+
+    technology: str
+    expected_version: str | None
+    actual_version: str
+    severity: RiskSeverity
+    suggested_alternative: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the constraint violation.
+        """
+        return {
+            "technology": self.technology,
+            "expected_version": self.expected_version,
+            "actual_version": self.actual_version,
+            "severity": self.severity,
+            "suggested_alternative": self.suggested_alternative,
+        }
+
+
+@dataclass(frozen=True)
+class StackPattern:
+    """A stack-specific pattern suggestion.
+
+    Represents a recommended pattern based on the configured technology
+    stack, with rationale explaining why it applies.
+
+    Attributes:
+        pattern_name: Short identifier for the pattern
+        description: What the pattern is about
+        rationale: Why this pattern applies to the configured stack
+        applicable_technologies: Technologies this pattern relates to
+
+    Example:
+        >>> pattern = StackPattern(
+        ...     pattern_name="pytest-fixtures",
+        ...     description="Use pytest fixtures for test setup/teardown",
+        ...     rationale="pytest is configured as test framework; fixtures provide clean test isolation",
+        ...     applicable_technologies=("pytest", "pytest-asyncio"),
+        ... )
+    """
+
+    pattern_name: str
+    description: str
+    rationale: str
+    applicable_technologies: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of the stack pattern.
+        """
+        return {
+            "pattern_name": self.pattern_name,
+            "description": self.description,
+            "rationale": self.rationale,
+            "applicable_technologies": list(self.applicable_technologies),
+        }
+
+
+@dataclass(frozen=True)
+class TechStackValidation:
+    """Complete tech stack validation result.
+
+    Contains the overall compliance status, any constraint violations,
+    and suggested patterns for the configured technology stack.
+
+    Attributes:
+        overall_compliance: Overall compliance (False if any critical violations)
+        violations: Tuple of constraint violations found
+        suggested_patterns: Tuple of stack-specific pattern suggestions
+        summary: Brief description of validation results
+
+    Example:
+        >>> validation = TechStackValidation(
+        ...     overall_compliance=False,
+        ...     violations=(violation,),
+        ...     suggested_patterns=(pattern,),
+        ...     summary="1 constraint violation found",
+        ... )
+        >>> validation.to_dict()
+        {'overall_compliance': False, 'violations': [...], ...}
+    """
+
+    overall_compliance: bool
+    violations: tuple[ConstraintViolation, ...]
+    suggested_patterns: tuple[StackPattern, ...]
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation with nested violations and patterns.
+        """
+        return {
+            "overall_compliance": self.overall_compliance,
+            "violations": [v.to_dict() for v in self.violations],
+            "suggested_patterns": [p.to_dict() for p in self.suggested_patterns],
             "summary": self.summary,
         }

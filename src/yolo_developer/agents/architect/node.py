@@ -1,11 +1,12 @@
-"""Architect agent node for LangGraph orchestration (Stories 7.1-7.5).
+"""Architect agent node for LangGraph orchestration (Stories 7.1-7.6).
 
 This module provides the architect_node function that integrates with the
 LangGraph orchestration workflow. The Architect agent produces design
 decisions and Architecture Decision Records (ADRs) for stories with
 12-Factor compliance analysis (Story 7.2), enhanced ADR content
 generation (Story 7.3), quality attribute evaluation (Story 7.4),
-and technical risk identification (Story 7.5).
+technical risk identification (Story 7.5), and tech stack constraint
+validation (Story 7.6).
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -43,6 +44,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from yolo_developer.agents.architect.adr_generator import generate_adrs
 from yolo_developer.agents.architect.quality_evaluator import evaluate_quality_attributes
 from yolo_developer.agents.architect.risk_identifier import identify_technical_risks
+from yolo_developer.agents.architect.tech_stack_validator import (
+    validate_tech_stack_constraints,
+)
 from yolo_developer.agents.architect.twelve_factor import analyze_twelve_factor
 from yolo_developer.agents.architect.types import (
     ArchitectOutput,
@@ -327,32 +331,52 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         )
         technical_risk_reports[story_id] = risk_report.to_dict()
 
-    # Build output with actual results including 12-Factor analyses, quality evaluations, and risk reports
+    # Validate tech stack constraints for each story (Story 7.6)
+    tech_stack_validations: dict[str, Any] = {}
+    for story in stories:
+        story_id = story.get("id", "unknown")
+        # Get decisions for this story
+        story_decisions = [d for d in design_decisions if d.story_id == story_id]
+        validation = await validate_tech_stack_constraints(story_decisions)
+        tech_stack_validations[story_id] = validation.to_dict()
+
+    logger.debug(
+        "tech_stack_validation_complete",
+        validation_count=len(tech_stack_validations),
+    )
+
+    # Build output with actual results including 12-Factor analyses, quality evaluations, risk reports, and tech stack validations
     output = ArchitectOutput(
         design_decisions=tuple(design_decisions),
         adrs=tuple(adrs),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {len(design_decisions)} design decisions, "
-        f"{len(adrs)} ADRs with 12-Factor compliance analysis, quality evaluation, and risk identification",
+        f"{len(adrs)} ADRs with 12-Factor compliance analysis, quality evaluation, "
+        f"risk identification, and tech stack validation",
         twelve_factor_analyses=twelve_factor_analyses,
         quality_evaluations=quality_evaluations,
         technical_risk_reports=technical_risk_reports,
+        tech_stack_validations=tech_stack_validations,
     )
 
     # Create decision record with architect attribution
     decision = Decision(
         agent="architect",
-        summary=f"Generated {len(design_decisions)} design decisions, {len(adrs)} ADRs, and {len(technical_risk_reports)} risk reports",
+        summary=f"Generated {len(design_decisions)} design decisions, {len(adrs)} ADRs, "
+        f"{len(technical_risk_reports)} risk reports, and {len(tech_stack_validations)} tech stack validations",
         rationale=f"Processed {len(stories)} stories from PM. "
         "12-Factor compliance analysis (Story 7.2), enhanced ADR generation "
         "with LLM fallback (Story 7.3), quality attribute evaluation (Story 7.4), "
-        "and technical risk identification (Story 7.5) applied.",
+        "technical risk identification (Story 7.5), and tech stack constraint "
+        "validation (Story 7.6) applied.",
         related_artifacts=tuple(d.id for d in design_decisions),
     )
 
     # Create output message with architect attribution
     message = create_agent_message(
-        content=f"Architect processing complete: {len(design_decisions)} design decisions, {len(adrs)} ADRs, {len(technical_risk_reports)} risk reports generated.",
+        content=f"Architect processing complete: {len(design_decisions)} design decisions, "
+        f"{len(adrs)} ADRs, {len(technical_risk_reports)} risk reports, "
+        f"{len(tech_stack_validations)} tech stack validations generated.",
         agent="architect",
         metadata={"output": output.to_dict()},
     )
@@ -364,6 +388,7 @@ async def architect_node(state: YoloState) -> dict[str, Any]:
         adr_count=len(output.adrs),
         quality_evaluation_count=len(quality_evaluations),
         technical_risk_report_count=len(technical_risk_reports),
+        tech_stack_validation_count=len(tech_stack_validations),
     )
 
     # Return ONLY the updates, not full state
