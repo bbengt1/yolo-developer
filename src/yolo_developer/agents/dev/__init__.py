@@ -1,9 +1,9 @@
-"""Dev agent module for code implementation and testing (Story 8.1, 8.3).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
 - Writing unit tests for implementations
-- Writing integration tests for component interactions
+- Writing integration tests for component interactions (Story 8.4)
 - Generating documentation
 - Validating code against Definition of Done
 
@@ -16,6 +16,8 @@ Example:
     ...     TestFile,
     ...     extract_public_functions,
     ...     FunctionInfo,
+    ...     analyze_component_boundaries,
+    ...     ComponentBoundary,
     ... )
     >>>
     >>> # Create a code file
@@ -27,6 +29,9 @@ Example:
     >>>
     >>> # Extract functions for testing (Story 8.3)
     >>> functions = extract_public_functions(code_file.content)
+    >>>
+    >>> # Analyze component boundaries (Story 8.4)
+    >>> boundaries = analyze_component_boundaries([code_file])
     >>>
     >>> # Run the dev node
     >>> result = await dev_node(state)
@@ -48,6 +53,17 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.dev.integration_utils import (
+    ComponentBoundary,
+    DataFlowPath,
+    ErrorScenario,
+    IntegrationTestQualityReport,
+    analyze_component_boundaries,
+    analyze_data_flow,
+    detect_error_scenarios,
+    generate_integration_tests_with_llm,
+    validate_integration_test_quality,
+)
 from yolo_developer.agents.dev.node import dev_node
 from yolo_developer.agents.dev.test_utils import (
     FunctionInfo,
@@ -72,18 +88,27 @@ from yolo_developer.agents.dev.types import (
 __all__ = [
     "CodeFile",
     "CodeFileType",
+    "ComponentBoundary",
+    "DataFlowPath",
     "DevOutput",
+    "ErrorScenario",
     "FunctionInfo",
     "ImplementationArtifact",
     "ImplementationStatus",
+    "IntegrationTestQualityReport",
     "QualityReport",
     "TestFile",
     "TestFileType",
+    "analyze_component_boundaries",
+    "analyze_data_flow",
     "calculate_coverage_estimate",
     "check_coverage_threshold",
+    "detect_error_scenarios",
     "dev_node",
     "extract_public_functions",
+    "generate_integration_tests_with_llm",
     "generate_unit_tests_with_llm",
     "identify_edge_cases",
+    "validate_integration_test_quality",
     "validate_test_quality",
 ]

@@ -1,4 +1,4 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
@@ -6,6 +6,7 @@ artifacts including code files and test files for stories with designs.
 
 Story 8.2 adds LLM-powered code generation with maintainability guidelines.
 Story 8.3 adds LLM-powered unit test generation with coverage validation.
+Story 8.4 adds LLM-powered integration test generation with boundary analysis.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -44,6 +45,13 @@ from yolo_developer.agents.dev.code_utils import (
     check_maintainability,
     extract_code_from_response,
     validate_python_syntax,
+)
+from yolo_developer.agents.dev.integration_utils import (
+    analyze_component_boundaries,
+    analyze_data_flow,
+    detect_error_scenarios,
+    generate_integration_tests_with_llm,
+    validate_integration_test_quality,
 )
 from yolo_developer.agents.dev.prompts import build_code_generation_prompt
 from yolo_developer.agents.dev.test_utils import (
@@ -497,10 +505,13 @@ async def _generate_tests(
     router: LLMRouter | None = None,
     coverage_threshold: float | None = None,
 ) -> list[TestFile]:
-    """Generate test files for a story's code files (Story 8.3).
+    """Generate test files for a story's code files (Story 8.3, 8.4).
 
     Uses LLM-powered test generation with coverage validation and
     quality checks. Falls back to stub tests if LLM unavailable.
+
+    Story 8.4 adds integration test generation for multi-file scenarios
+    with component boundary detection and data flow analysis.
 
     Args:
         story: Story dictionary with id, title, and other fields.
@@ -543,6 +554,7 @@ async def _generate_tests(
 
     test_files: list[TestFile] = []
 
+    # Generate unit tests for each code file
     for code_file in source_files:
         # Extract module name from file path
         file_name = code_file.file_path.split("/")[-1].replace(".py", "")
@@ -635,13 +647,214 @@ async def _generate_tests(
         test_file = _generate_stub_test(story_id, story_title, module_name, code_file)
         test_files.append(test_file)
 
+    # Story 8.4: Generate integration tests if multiple source files
+    if len(source_files) >= 2 and router is not None:
+        integration_test = await _generate_integration_tests(
+            story_id=story_id,
+            story_title=story_title,
+            code_files=source_files,
+            router=router,
+        )
+        if integration_test:
+            test_files.append(integration_test)
+
     logger.debug(
         "tests_generated",
         story_id=story_id,
         test_count=len(test_files),
+        unit_tests=len([t for t in test_files if t.test_type == "unit"]),
+        integration_tests=len([t for t in test_files if t.test_type == "integration"]),
     )
 
     return test_files
+
+
+async def _generate_integration_tests(
+    story_id: str,
+    story_title: str,
+    code_files: list[CodeFile],
+    router: LLMRouter,
+) -> TestFile | None:
+    """Generate integration tests for multi-file scenarios (Story 8.4).
+
+    Analyzes component boundaries, data flows, and error scenarios to
+    generate comprehensive integration tests using LLM.
+
+    Args:
+        story_id: Story identifier.
+        story_title: Story title for context.
+        code_files: List of source code files.
+        router: LLMRouter for LLM-powered generation.
+
+    Returns:
+        TestFile with integration tests, or None if generation fails.
+    """
+    # Analyze component boundaries (AC1, AC7)
+    boundaries = analyze_component_boundaries(code_files)
+
+    # Analyze data flows (AC2)
+    flows = analyze_data_flow(code_files)
+
+    # Detect error scenarios (AC3)
+    error_scenarios = detect_error_scenarios(code_files)
+
+    logger.info(
+        "integration_test_analysis_complete",
+        story_id=story_id,
+        boundary_count=len(boundaries),
+        flow_count=len(flows),
+        error_scenario_count=len(error_scenarios),
+    )
+
+    # Only generate integration tests if we detected boundaries
+    if not boundaries and not flows:
+        logger.debug(
+            "skipping_integration_tests",
+            story_id=story_id,
+            reason="no_boundaries_or_flows_detected",
+        )
+        return None
+
+    try:
+        # Generate integration tests with LLM (AC6)
+        test_code, is_valid = await generate_integration_tests_with_llm(
+            code_files=code_files,
+            boundaries=boundaries,
+            flows=flows,
+            error_scenarios=error_scenarios,
+            router=router,
+            additional_context=f"Story: {story_title} (ID: {story_id})",
+            max_retries=2,
+        )
+
+        if is_valid and test_code:
+            # Validate integration test quality (AC4)
+            quality_report = validate_integration_test_quality(test_code)
+
+            if not quality_report.is_acceptable():
+                logger.warning(
+                    "integration_test_quality_warning",
+                    story_id=story_id,
+                    warnings=quality_report.warnings,
+                    uses_fixtures=quality_report.uses_fixtures,
+                    uses_mocks=quality_report.uses_mocks,
+                    has_cleanup=quality_report.has_cleanup,
+                )
+
+            # Create integration test file (AC5)
+            # Naming convention: test_<story_id>_integration.py
+            # where story_id serves as the component/scenario identifier
+            base_name = story_id.replace("-", "_").replace(".", "_")
+            test_path = f"tests/integration/implementations/test_{base_name}_integration.py"
+
+            test_file = TestFile(
+                file_path=test_path,
+                content=test_code,
+                test_type="integration",
+            )
+
+            logger.info(
+                "integration_test_generation_success",
+                story_id=story_id,
+                test_path=test_path,
+                quality_acceptable=quality_report.is_acceptable(),
+            )
+
+            return test_file
+
+    except Exception as e:
+        logger.warning(
+            "integration_test_generation_error",
+            story_id=story_id,
+            error=str(e),
+        )
+
+    # Fallback: Generate stub integration test
+    return _generate_stub_integration_test(story_id, story_title, code_files)
+
+
+def _generate_stub_integration_test(
+    story_id: str,
+    story_title: str,
+    code_files: list[CodeFile],
+) -> TestFile:
+    """Generate a stub integration test file when LLM is unavailable.
+
+    Args:
+        story_id: Story identifier.
+        story_title: Story title for documentation.
+        code_files: List of code files being tested.
+
+    Returns:
+        TestFile with stub integration test content.
+    """
+    base_name = story_id.replace("-", "_").replace(".", "_")
+    test_path = f"tests/integration/implementations/test_{base_name}_integration.py"
+
+    # Extract module names for imports
+    module_names = []
+    for cf in code_files:
+        if cf.file_type == "source":
+            file_name = cf.file_path.split("/")[-1].replace(".py", "")
+            module_names.append(file_name.replace("-", "_"))
+
+    class_name = base_name.title().replace("_", "")
+    test_content = f'''"""Integration tests for {story_title} (Story {story_id}).
+
+Generated by Dev agent (stub fallback - LLM unavailable).
+Tests component interactions between: {', '.join(module_names)}.
+"""
+
+from __future__ import annotations
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+
+
+@pytest.fixture
+def mock_dependencies() -> MagicMock:
+    """Mock external dependencies for integration tests."""
+    return MagicMock()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_state():
+    """Clean up state after each test."""
+    yield
+    # Cleanup code here
+
+
+class Test{class_name}Integration:
+    """Integration test suite for {story_title}."""
+
+    @pytest.mark.asyncio
+    async def test_component_interaction_placeholder(
+        self, mock_dependencies: MagicMock
+    ) -> None:
+        """Placeholder test for component interactions.
+
+        TODO: Implement actual integration tests for:
+        - Component boundary testing
+        - Data flow verification
+        - Error handling across components
+        """
+        # Stub test - full LLM generation in Story 8.4+
+        assert True, "Placeholder - implement actual integration tests"
+
+    def test_data_flow_placeholder(self) -> None:
+        """Placeholder test for data flow verification.
+
+        TODO: Verify data transformations across component boundaries.
+        """
+        # Stub test
+        assert True, "Placeholder - implement data flow tests"
+'''
+
+    return TestFile(
+        file_path=test_path,
+        content=test_content,
+        test_type="integration",
+    )
 
 
 def _generate_stub_test(
