@@ -6,7 +6,7 @@ LLM integration (mocked), and syntax validation.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,7 +21,6 @@ from yolo_developer.agents.dev.node import (
     _generate_implementation,
 )
 from yolo_developer.agents.dev.prompts import build_code_generation_prompt
-from yolo_developer.config.schema import LLMConfig
 from yolo_developer.llm.router import LLMRouter
 
 

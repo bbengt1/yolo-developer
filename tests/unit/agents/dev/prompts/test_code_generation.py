@@ -6,8 +6,6 @@ and project conventions.
 
 from __future__ import annotations
 
-import pytest
-
 from yolo_developer.agents.dev.prompts import (
     CODE_GENERATION_TEMPLATE,
     MAINTAINABILITY_GUIDELINES,

@@ -1,4 +1,4 @@
-"""Dev agent module for code implementation and testing (Story 8.1).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
@@ -14,6 +14,8 @@ Example:
     ...     ImplementationArtifact,
     ...     CodeFile,
     ...     TestFile,
+    ...     extract_public_functions,
+    ...     FunctionInfo,
     ... )
     >>>
     >>> # Create a code file
@@ -22,6 +24,9 @@ Example:
     ...     content="def hello(): pass",
     ...     file_type="source",
     ... )
+    >>>
+    >>> # Extract functions for testing (Story 8.3)
+    >>> functions = extract_public_functions(code_file.content)
     >>>
     >>> # Run the dev node
     >>> result = await dev_node(state)
@@ -44,6 +49,16 @@ References:
 from __future__ import annotations
 
 from yolo_developer.agents.dev.node import dev_node
+from yolo_developer.agents.dev.test_utils import (
+    FunctionInfo,
+    QualityReport,
+    calculate_coverage_estimate,
+    check_coverage_threshold,
+    extract_public_functions,
+    generate_unit_tests_with_llm,
+    identify_edge_cases,
+    validate_test_quality,
+)
 from yolo_developer.agents.dev.types import (
     CodeFile,
     CodeFileType,
@@ -58,9 +73,17 @@ __all__ = [
     "CodeFile",
     "CodeFileType",
     "DevOutput",
+    "FunctionInfo",
     "ImplementationArtifact",
     "ImplementationStatus",
+    "QualityReport",
     "TestFile",
     "TestFileType",
+    "calculate_coverage_estimate",
+    "check_coverage_threshold",
     "dev_node",
+    "extract_public_functions",
+    "generate_unit_tests_with_llm",
+    "identify_edge_cases",
+    "validate_test_quality",
 ]

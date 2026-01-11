@@ -1,10 +1,11 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
 artifacts including code files and test files for stories with designs.
 
 Story 8.2 adds LLM-powered code generation with maintainability guidelines.
+Story 8.3 adds LLM-powered unit test generation with coverage validation.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -45,12 +46,20 @@ from yolo_developer.agents.dev.code_utils import (
     validate_python_syntax,
 )
 from yolo_developer.agents.dev.prompts import build_code_generation_prompt
+from yolo_developer.agents.dev.test_utils import (
+    calculate_coverage_estimate,
+    check_coverage_threshold,
+    extract_public_functions,
+    generate_unit_tests_with_llm,
+    validate_test_quality,
+)
 from yolo_developer.agents.dev.types import (
     CodeFile,
     DevOutput,
     ImplementationArtifact,
     TestFile,
 )
+from yolo_developer.config import load_config
 from yolo_developer.config.schema import LLMConfig
 from yolo_developer.gates import quality_gate
 from yolo_developer.llm.router import LLMProviderError, LLMRouter
@@ -226,7 +235,7 @@ def _extract_project_context(state: YoloState) -> dict[str, Any]:
     return context
 
 
-def _generate_stub_implementation(story: dict[str, Any]) -> ImplementationArtifact:
+async def _generate_stub_implementation(story: dict[str, Any]) -> ImplementationArtifact:
     """Generate stub implementation artifact for a story (fallback).
 
     Creates a stub implementation with placeholder code and test files.
@@ -267,8 +276,8 @@ def implement_{module_name}() -> dict[str, str]:
         file_type="source",
     )
 
-    # Generate stub test files
-    test_files = _generate_tests(story, [code_file])
+    # Generate stub test files (no router = stub fallback)
+    test_files = await _generate_tests(story, [code_file])
 
     artifact = ImplementationArtifact(
         story_id=story_id,
@@ -453,8 +462,8 @@ async def _generate_implementation(
                 file_type="source",
             )
 
-            # Generate test files for the code
-            test_files = _generate_tests(story, [code_file])
+            # Generate test files for the code (LLM-powered, Story 8.3)
+            test_files = await _generate_tests(story, [code_file], router)
 
             artifact = ImplementationArtifact(
                 story_id=story_id,
@@ -479,50 +488,206 @@ async def _generate_implementation(
         story_id=story_id,
         reason="LLM unavailable or generation failed",
     )
-    return _generate_stub_implementation(story)
+    return await _generate_stub_implementation(story)
 
 
-def _generate_tests(story: dict[str, Any], code_files: list[CodeFile]) -> list[TestFile]:
-    """Generate test files for a story's code files.
+async def _generate_tests(
+    story: dict[str, Any],
+    code_files: list[CodeFile],
+    router: LLMRouter | None = None,
+    coverage_threshold: float | None = None,
+) -> list[TestFile]:
+    """Generate test files for a story's code files (Story 8.3).
 
-    Creates a single stub test file for the story. Full LLM-powered
-    per-file test generation will be added in Stories 8.3-8.4.
+    Uses LLM-powered test generation with coverage validation and
+    quality checks. Falls back to stub tests if LLM unavailable.
 
     Args:
         story: Story dictionary with id, title, and other fields.
         code_files: List of code files to generate tests for.
+        router: Optional LLMRouter for LLM-powered generation.
+        coverage_threshold: Minimum coverage threshold (0.0-1.0).
+            If None, loads from config.quality.test_coverage_threshold (AC4).
 
     Returns:
-        List containing a single TestFile stub, or empty if no source files.
+        List of TestFile objects. Empty if no source files.
 
     Example:
         >>> story = {"id": "story-001", "title": "User Auth"}
         >>> code_files = [CodeFile(...)]
-        >>> tests = _generate_tests(story, code_files)
-        >>> len(tests)
-        1
+        >>> tests = await _generate_tests(story, code_files, router)
+        >>> len(tests) >= 1
+        True
     """
     story_id = story.get("id", "unknown")
     story_title = story.get("title", "Untitled Story")
 
+    # Load coverage threshold from config if not provided (AC4)
+    if coverage_threshold is None:
+        try:
+            config = load_config()
+            coverage_threshold = config.quality.test_coverage_threshold
+        except Exception:
+            coverage_threshold = 0.8  # Fallback default
+
     # Check if there are any source files to test
-    has_source_files = any(cf.file_type == "source" for cf in code_files)
-    if not has_source_files:
+    source_files = [cf for cf in code_files if cf.file_type == "source"]
+    if not source_files:
         logger.debug(
             "tests_generated",
             story_id=story_id,
             test_count=0,
+            reason="no_source_files",
         )
         return []
 
-    # Generate single test file for the story (stub behavior)
-    # Full per-file test generation in Story 8.3
-    module_name = story_id.replace("-", "_").replace(".", "_")
+    test_files: list[TestFile] = []
+
+    for code_file in source_files:
+        # Extract module name from file path
+        file_name = code_file.file_path.split("/")[-1].replace(".py", "")
+        module_name = file_name.replace("-", "_")
+
+        # Try LLM-powered test generation
+        if router is not None:
+            try:
+                # Extract public functions from code (AC1)
+                functions = extract_public_functions(code_file.content)
+
+                if functions:
+                    logger.info(
+                        "llm_test_generation_start",
+                        story_id=story_id,
+                        module_name=module_name,
+                        function_count=len(functions),
+                    )
+
+                    # Generate tests with LLM (AC5, AC6)
+                    test_code, is_valid = await generate_unit_tests_with_llm(
+                        implementation_code=code_file.content,
+                        functions=functions,
+                        module_name=module_name,
+                        router=router,
+                        max_retries=2,
+                        additional_context=f"Story: {story_title} (ID: {story_id})",
+                    )
+
+                    if is_valid and test_code:
+                        # Validate test quality (AC3)
+                        quality_report = validate_test_quality(test_code)
+
+                        if not quality_report.is_acceptable():
+                            logger.warning(
+                                "test_quality_warning",
+                                story_id=story_id,
+                                module_name=module_name,
+                                warnings=quality_report.warnings,
+                                has_assertions=quality_report.has_assertions,
+                                is_deterministic=quality_report.is_deterministic,
+                            )
+
+                        # Check coverage estimate (AC4)
+                        coverage = calculate_coverage_estimate(
+                            code_file.content, test_code
+                        )
+                        meets_threshold, coverage_msg = check_coverage_threshold(
+                            coverage, coverage_threshold
+                        )
+
+                        if not meets_threshold:
+                            logger.warning(
+                                "test_coverage_below_threshold",
+                                story_id=story_id,
+                                module_name=module_name,
+                                coverage=coverage,
+                                threshold=coverage_threshold,
+                                message=coverage_msg,
+                            )
+
+                        # Create test file
+                        test_path = f"tests/unit/implementations/test_{module_name}.py"
+                        test_file = TestFile(
+                            file_path=test_path,
+                            content=test_code,
+                            test_type="unit",
+                        )
+                        test_files.append(test_file)
+
+                        logger.info(
+                            "llm_test_generation_success",
+                            story_id=story_id,
+                            module_name=module_name,
+                            coverage=coverage,
+                            quality_acceptable=quality_report.is_acceptable(),
+                        )
+                        continue  # Move to next code file
+
+            except Exception as e:
+                logger.warning(
+                    "llm_test_generation_error",
+                    story_id=story_id,
+                    module_name=module_name,
+                    error=str(e),
+                )
+                # Fall through to stub generation
+
+        # Fallback: Generate stub test file
+        test_file = _generate_stub_test(story_id, story_title, module_name, code_file)
+        test_files.append(test_file)
+
+    logger.debug(
+        "tests_generated",
+        story_id=story_id,
+        test_count=len(test_files),
+    )
+
+    return test_files
+
+
+def _generate_stub_test(
+    story_id: str,
+    story_title: str,
+    module_name: str,
+    code_file: CodeFile,
+) -> TestFile:
+    """Generate a stub test file when LLM is unavailable.
+
+    Args:
+        story_id: Story identifier.
+        story_title: Story title for documentation.
+        module_name: Module name for import and class naming.
+        code_file: The code file being tested.
+
+    Returns:
+        TestFile with stub test content.
+    """
     test_path = f"tests/unit/implementations/test_{module_name}.py"
 
+    # Extract function names for stub tests
+    functions = extract_public_functions(code_file.content)
+    func_names = [f.name for f in functions] if functions else ["main"]
+
+    # Generate test methods for each function
+    test_methods = []
+    for func_name in func_names[:5]:  # Limit to 5 functions
+        test_methods.append(f'''
+    def test_{func_name}_exists(self) -> None:
+        """Test that {func_name} function exists and is callable."""
+        # Stub test - full LLM generation in Story 8.3+
+        from yolo_developer.implementations.{module_name} import {func_name}
+
+        assert callable({func_name})''')
+
+    test_methods_str = "\n".join(test_methods) if test_methods else '''
+    def test_implementation_exists(self) -> None:
+        """Test that implementation module exists."""
+        # Stub test - full LLM generation in Story 8.3+
+        pass'''
+
+    class_name = module_name.title().replace("_", "")
     test_content = f'''"""Unit tests for {story_title} (Story {story_id}).
 
-Generated by Dev agent (stub - full LLM test generation in Story 8.3+).
+Generated by Dev agent (stub fallback - LLM unavailable).
 """
 
 from __future__ import annotations
@@ -530,34 +695,16 @@ from __future__ import annotations
 import pytest
 
 
-class Test{module_name.title().replace("_", "")}:
+class Test{class_name}:
     """Test suite for {story_title}."""
-
-    def test_implementation_returns_dict(self) -> None:
-        """Test that implementation returns expected dict."""
-        # Stub test - full implementation in Story 8.3
-        # Note: Import path assumes src/ is in PYTHONPATH or using editable install
-        from yolo_developer.implementations.{module_name} import implement_{module_name}
-
-        result = implement_{module_name}()
-        assert isinstance(result, dict)
-        assert result["status"] == "implemented"
-        assert result["story_id"] == "{story_id}"
+{test_methods_str}
 '''
 
-    test_file = TestFile(
+    return TestFile(
         file_path=test_path,
         content=test_content,
         test_type="unit",
     )
-
-    logger.debug(
-        "tests_generated",
-        story_id=story_id,
-        test_count=1,
-    )
-
-    return [test_file]
 
 
 @retry(

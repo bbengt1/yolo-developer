@@ -196,8 +196,10 @@ class TestMaintainabilityWarning:
 
     def test_frozen_dataclass(self) -> None:
         """Test that warning is immutable."""
+        from dataclasses import FrozenInstanceError
+
         warning = MaintainabilityWarning(category="test", message="test")
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
             warning.category = "modified"  # type: ignore
 
 
@@ -661,7 +663,7 @@ def hello():
         # All calls return invalid code
         mock_router.call.return_value = "```python\ndef broken(\n```"
 
-        code, is_valid = await generate_code_with_validation(
+        _code, is_valid = await generate_code_with_validation(
             router=mock_router,
             prompt="Generate function",
             max_retries=2,
