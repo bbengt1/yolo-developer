@@ -1,10 +1,10 @@
-"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
 - Writing unit tests for implementations
 - Writing integration tests for component interactions (Story 8.4)
-- Generating documentation
+- Generating documentation with LLM enhancement (Story 8.5)
 - Validating code against Definition of Done
 
 Example:
@@ -18,6 +18,8 @@ Example:
     ...     FunctionInfo,
     ...     analyze_component_boundaries,
     ...     ComponentBoundary,
+    ...     extract_documentation_info,
+    ...     DocumentationInfo,
     ... )
     >>>
     >>> # Create a code file
@@ -32,6 +34,9 @@ Example:
     >>>
     >>> # Analyze component boundaries (Story 8.4)
     >>> boundaries = analyze_component_boundaries([code_file])
+    >>>
+    >>> # Analyze documentation status (Story 8.5)
+    >>> doc_info = extract_documentation_info(code_file.content)
     >>>
     >>> # Run the dev node
     >>> result = await dev_node(state)
@@ -53,6 +58,17 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.dev.doc_utils import (
+    ComplexSection,
+    DocumentationInfo,
+    DocumentationQualityReport,
+    detect_complex_sections,
+    extract_documentation_info,
+    format_complex_sections_for_prompt,
+    format_documentation_info_for_prompt,
+    generate_documentation_with_llm,
+    validate_documentation_quality,
+)
 from yolo_developer.agents.dev.integration_utils import (
     ComponentBoundary,
     DataFlowPath,
@@ -88,9 +104,12 @@ from yolo_developer.agents.dev.types import (
 __all__ = [
     "CodeFile",
     "CodeFileType",
+    "ComplexSection",
     "ComponentBoundary",
     "DataFlowPath",
     "DevOutput",
+    "DocumentationInfo",
+    "DocumentationQualityReport",
     "ErrorScenario",
     "FunctionInfo",
     "ImplementationArtifact",
@@ -103,12 +122,18 @@ __all__ = [
     "analyze_data_flow",
     "calculate_coverage_estimate",
     "check_coverage_threshold",
+    "detect_complex_sections",
     "detect_error_scenarios",
     "dev_node",
+    "extract_documentation_info",
     "extract_public_functions",
+    "format_complex_sections_for_prompt",
+    "format_documentation_info_for_prompt",
+    "generate_documentation_with_llm",
     "generate_integration_tests_with_llm",
     "generate_unit_tests_with_llm",
     "identify_edge_cases",
+    "validate_documentation_quality",
     "validate_integration_test_quality",
     "validate_test_quality",
 ]

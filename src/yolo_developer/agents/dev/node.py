@@ -1,4 +1,4 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4, 8.5).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
@@ -7,6 +7,7 @@ artifacts including code files and test files for stories with designs.
 Story 8.2 adds LLM-powered code generation with maintainability guidelines.
 Story 8.3 adds LLM-powered unit test generation with coverage validation.
 Story 8.4 adds LLM-powered integration test generation with boundary analysis.
+Story 8.5 adds LLM-powered documentation enhancement with quality validation.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -45,6 +46,10 @@ from yolo_developer.agents.dev.code_utils import (
     check_maintainability,
     extract_code_from_response,
     validate_python_syntax,
+)
+from yolo_developer.agents.dev.doc_utils import (
+    generate_documentation_with_llm,
+    validate_documentation_quality,
 )
 from yolo_developer.agents.dev.integration_utils import (
     analyze_component_boundaries,
@@ -429,6 +434,85 @@ async def _generate_code_with_llm(
         return "", False
 
 
+async def _enhance_documentation(
+    code: str,
+    story_id: str,
+    story_title: str,
+    router: LLMRouter,
+) -> str:
+    """Enhance code with comprehensive documentation (Story 8.5).
+
+    Uses LLM to add module docstrings, function docstrings, and
+    explanatory comments. Falls back to original code on failure.
+
+    Args:
+        code: Python source code to document.
+        story_id: ID of the story being implemented.
+        story_title: Title of the story for context.
+        router: LLM router for documentation generation.
+
+    Returns:
+        Enhanced code with documentation, or original code on failure.
+
+    Example:
+        >>> documented = await _enhance_documentation(
+        ...     code="def hello(): pass",
+        ...     story_id="story-001",
+        ...     story_title="User Authentication",
+        ...     router=router,
+        ... )
+    """
+    logger.info(
+        "documentation_enhancement_start",
+        story_id=story_id,
+    )
+
+    try:
+        # Generate documentation using LLM
+        documented_code, is_valid = await generate_documentation_with_llm(
+            code=code,
+            context=f"Implementation for story '{story_title}' (ID: {story_id})",
+            router=router,
+        )
+
+        if is_valid:
+            # Validate documentation quality
+            report = validate_documentation_quality(documented_code)
+
+            if report.is_acceptable():
+                logger.info(
+                    "documentation_enhancement_success",
+                    story_id=story_id,
+                    has_module_docstring=report.has_module_docstring,
+                    functions_with_args=report.functions_with_args,
+                    total_functions=report.total_functions,
+                )
+                return documented_code
+            else:
+                logger.warning(
+                    "documentation_quality_below_threshold",
+                    story_id=story_id,
+                    warnings=report.warnings[:5],  # Log first 5 warnings
+                )
+                # Still use documented code, just log the warning
+                return documented_code
+        else:
+            logger.warning(
+                "documentation_enhancement_invalid_syntax",
+                story_id=story_id,
+            )
+            return code
+
+    except Exception as e:
+        logger.error(
+            "documentation_enhancement_error",
+            story_id=story_id,
+            error=str(e),
+        )
+        # Return original code on any error
+        return code
+
+
 async def _generate_implementation(
     story: dict[str, Any],
     context: dict[str, Any],
@@ -464,9 +548,17 @@ async def _generate_implementation(
             # LLM generation succeeded
             module_name = story_id.replace("-", "_").replace(".", "_")
 
+            # Story 8.5: Enhance code with documentation
+            documented_code = await _enhance_documentation(
+                code=code,
+                story_id=story_id,
+                story_title=story_title,
+                router=router,
+            )
+
             code_file = CodeFile(
                 file_path=f"src/implementations/{module_name}.py",
-                content=code,
+                content=documented_code,
                 file_type="source",
             )
 
