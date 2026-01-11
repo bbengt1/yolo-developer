@@ -1060,6 +1060,15 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         message_count=len(state.get("messages", [])),
     )
 
+    # Log gate evaluation context (Story 8.6 AC5)
+    advisory_warnings = state.get("advisory_warnings", [])
+    if advisory_warnings:
+        logger.info(
+            "dev_node_gate_warnings",
+            warning_count=len(advisory_warnings),
+            warnings=advisory_warnings,
+        )
+
     # Get LLM router (may be None if not configured)
     router = _get_llm_router()
 
@@ -1092,12 +1101,23 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     )
 
     # Create decision record with dev attribution (AC6)
+    # Include gate failure summary if advisory warnings exist (Story 8.6 AC5)
+    rationale_parts = [
+        f"Processed {len(stories)} stories from Architect.",
+        f"Used {generation_method} code generation with maintainability guidelines.",
+    ]
+    if advisory_warnings:
+        gate_summary = "; ".join(
+            f"{w.get('gate_name', 'unknown')}: {w.get('reason', 'no reason')[:100]}"
+            for w in advisory_warnings
+        )
+        rationale_parts.append(f"Gate warnings: {gate_summary}")
+
     decision = Decision(
         agent="dev",
         summary=f"Generated {total_code_files} code files, {total_test_files} test files "
         f"for {len(stories)} stories ({generation_method})",
-        rationale=f"Processed {len(stories)} stories from Architect. "
-        f"Used {generation_method} code generation with maintainability guidelines.",
+        rationale=" ".join(rationale_parts),
         related_artifacts=tuple(impl.story_id for impl in implementations),
     )
 

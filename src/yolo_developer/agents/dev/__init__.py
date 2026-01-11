@@ -1,11 +1,11 @@
-"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5, 8.6).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
 - Writing unit tests for implementations
 - Writing integration tests for component interactions (Story 8.4)
 - Generating documentation with LLM enhancement (Story 8.5)
-- Validating code against Definition of Done
+- Validating code against Definition of Done (Story 8.6)
 
 Example:
     >>> from yolo_developer.agents.dev import (
@@ -20,6 +20,9 @@ Example:
     ...     ComponentBoundary,
     ...     extract_documentation_info,
     ...     DocumentationInfo,
+    ...     validate_implementation_dod,
+    ...     DoDValidationResult,
+    ...     DoDChecklistItem,
     ... )
     >>>
     >>> # Create a code file
@@ -37,6 +40,9 @@ Example:
     >>>
     >>> # Analyze documentation status (Story 8.5)
     >>> doc_info = extract_documentation_info(code_file.content)
+    >>>
+    >>> # Validate against DoD (Story 8.6)
+    >>> result = validate_implementation_dod(code, story)
     >>>
     >>> # Run the dev node
     >>> result = await dev_node(state)
@@ -68,6 +74,14 @@ from yolo_developer.agents.dev.doc_utils import (
     format_documentation_info_for_prompt,
     generate_documentation_with_llm,
     validate_documentation_quality,
+)
+from yolo_developer.agents.dev.dod_utils import (
+    DoDChecklistItem,
+    DoDValidationResult,
+    validate_artifact_dod,
+    validate_dev_output_dod,
+    validate_dod,
+    validate_implementation_dod,
 )
 from yolo_developer.agents.dev.integration_utils import (
     ComponentBoundary,
@@ -108,6 +122,8 @@ __all__ = [
     "ComponentBoundary",
     "DataFlowPath",
     "DevOutput",
+    "DoDChecklistItem",
+    "DoDValidationResult",
     "DocumentationInfo",
     "DocumentationQualityReport",
     "ErrorScenario",
@@ -133,7 +149,11 @@ __all__ = [
     "generate_integration_tests_with_llm",
     "generate_unit_tests_with_llm",
     "identify_edge_cases",
+    "validate_artifact_dod",
+    "validate_dev_output_dod",
+    "validate_dod",
     "validate_documentation_quality",
+    "validate_implementation_dod",
     "validate_integration_test_quality",
     "validate_test_quality",
 ]

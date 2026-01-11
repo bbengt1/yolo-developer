@@ -128,7 +128,7 @@ development_status:
   8-3-unit-test-generation: done
   8-4-integration-test-generation: done
   8-5-documentation-generation: done
-  8-6-dod-validation: backlog
+  8-6-dod-validation: done
   8-7-pattern-following: backlog
   8-8-communicative-commits: backlog
   epic-8-retrospective: optional
