@@ -120,9 +120,7 @@ class CodeFile:
     file_path: str
     content: str = field(repr=False)
     file_type: CodeFileType
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -171,9 +169,7 @@ class TestFile:
     file_path: str
     content: str = field(repr=False)
     test_type: TestFileType
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -221,9 +217,7 @@ class ImplementationArtifact:
     test_files: tuple[TestFile, ...] = field(default_factory=tuple)
     implementation_status: ImplementationStatus = "pending"
     notes: str = ""
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.

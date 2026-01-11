@@ -1,14 +1,17 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
 artifacts including code files and test files for stories with designs.
+
+Story 8.2 adds LLM-powered code generation with maintainability guidelines.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
 - **Immutable Updates**: Returns state update dict, never mutates input
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
+- **Maintainability-First**: Generated code prioritizes readability and simplicity
 
 Example:
     >>> from yolo_developer.agents.dev import dev_node
@@ -36,17 +39,55 @@ from typing import Any
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.agents.dev.code_utils import (
+    check_maintainability,
+    extract_code_from_response,
+    validate_python_syntax,
+)
+from yolo_developer.agents.dev.prompts import build_code_generation_prompt
 from yolo_developer.agents.dev.types import (
     CodeFile,
     DevOutput,
     ImplementationArtifact,
     TestFile,
 )
+from yolo_developer.config.schema import LLMConfig
 from yolo_developer.gates import quality_gate
+from yolo_developer.llm.router import LLMProviderError, LLMRouter
 from yolo_developer.orchestrator.context import Decision
 from yolo_developer.orchestrator.state import YoloState, create_agent_message
 
 logger = structlog.get_logger(__name__)
+
+# Module-level LLM router (lazy initialized)
+_llm_router: LLMRouter | None = None
+
+
+def _reset_llm_router() -> None:
+    """Reset the global LLM router for testing.
+
+    This function clears the cached router instance, allowing
+    tests to start with fresh state.
+    """
+    global _llm_router
+    _llm_router = None
+
+
+def _get_llm_router() -> LLMRouter | None:
+    """Get or create the LLM router instance.
+
+    Returns:
+        LLMRouter instance or None if configuration is missing.
+    """
+    global _llm_router
+    if _llm_router is None:
+        try:
+            config = LLMConfig()
+            _llm_router = LLMRouter(config)
+        except Exception as e:
+            logger.warning("llm_router_init_failed", error=str(e))
+            return None
+    return _llm_router
 
 
 def _extract_stories_for_implementation(state: YoloState) -> list[dict[str, Any]]:
@@ -132,23 +173,70 @@ def _extract_stories_for_implementation(state: YoloState) -> list[dict[str, Any]
     return []
 
 
-def _generate_implementation(story: dict[str, Any]) -> ImplementationArtifact:
-    """Generate implementation artifact for a story.
+def _extract_project_context(state: YoloState) -> dict[str, Any]:
+    """Extract project context from state for code generation (Task 6).
+
+    Extracts relevant context including:
+    - Architecture constraints from architect_output
+    - Project conventions from config
+    - Patterns from memory (if available)
+
+    Args:
+        state: Current orchestration state.
+
+    Returns:
+        Dictionary with project context for prompts.
+    """
+    context: dict[str, Any] = {
+        "conventions": {
+            "naming": "snake_case for functions and variables, PascalCase for classes",
+            "typing": "Full type annotations required",
+            "async": "Use async/await for I/O operations",
+            "docstrings": "Google-style docstrings required",
+        },
+        "patterns": [],
+        "constraints": [],
+    }
+
+    # Extract architecture constraints
+    architect_output = state.get("architect_output")
+    if architect_output and isinstance(architect_output, dict):
+        design_decisions = architect_output.get("design_decisions", [])
+        for decision in design_decisions:
+            if isinstance(decision, dict):
+                pattern = decision.get("pattern")
+                if pattern:
+                    context["patterns"].append(pattern)
+                constraint = decision.get("constraint")
+                if constraint:
+                    context["constraints"].append(constraint)
+
+    # Extract from memory if available
+    memory_context = state.get("memory_context")
+    if memory_context and isinstance(memory_context, dict):
+        learned_patterns = memory_context.get("patterns", [])
+        context["patterns"].extend(learned_patterns)
+
+    logger.debug(
+        "project_context_extracted",
+        pattern_count=len(context["patterns"]),
+        constraint_count=len(context["constraints"]),
+    )
+
+    return context
+
+
+def _generate_stub_implementation(story: dict[str, Any]) -> ImplementationArtifact:
+    """Generate stub implementation artifact for a story (fallback).
 
     Creates a stub implementation with placeholder code and test files.
-    Full LLM-powered implementation will be added in Story 8.2.
+    Used as fallback when LLM generation fails.
 
     Args:
         story: Story dictionary with id, title, and other fields.
 
     Returns:
         ImplementationArtifact with stub code and test files.
-
-    Example:
-        >>> story = {"id": "story-001", "title": "User Authentication"}
-        >>> artifact = _generate_implementation(story)
-        >>> artifact.implementation_status
-        'completed'
     """
     story_id = story.get("id", "unknown")
     story_title = story.get("title", "Untitled Story")
@@ -158,7 +246,7 @@ def _generate_implementation(story: dict[str, Any]) -> ImplementationArtifact:
     code_content = f'''"""Implementation for {story_title} (Story {story_id}).
 
 This module provides the implementation for the story requirements.
-Generated by Dev agent (stub - full implementation in Story 8.2+).
+Generated by Dev agent (stub fallback).
 """
 
 from __future__ import annotations
@@ -187,22 +275,214 @@ def implement_{module_name}() -> dict[str, str]:
         code_files=(code_file,),
         test_files=tuple(test_files),
         implementation_status="completed",
-        notes=f"Stub implementation for {story_title}. Full LLM implementation in Story 8.2+.",
+        notes=f"Stub implementation for {story_title} (LLM fallback).",
     )
 
     logger.debug(
-        "implementation_generated",
+        "stub_implementation_generated",
         story_id=story_id,
-        code_file_count=len(artifact.code_files),
-        test_file_count=len(artifact.test_files),
     )
 
     return artifact
 
 
-def _generate_tests(
-    story: dict[str, Any], code_files: list[CodeFile]
-) -> list[TestFile]:
+async def _generate_code_with_llm(
+    story: dict[str, Any],
+    context: dict[str, Any],
+    router: LLMRouter,
+) -> tuple[str, bool]:
+    """Generate code using LLM with maintainability guidelines (AC5, AC6).
+
+    Args:
+        story: Story dictionary with id, title, requirements, etc.
+        context: Project context from _extract_project_context.
+        router: LLMRouter instance for making calls.
+
+    Returns:
+        Tuple of (code, is_valid). code is generated code string,
+        is_valid indicates if syntax validation passed.
+    """
+    story_id = story.get("id", "unknown")
+    story_title = story.get("title", "Untitled Story")
+    requirements = story.get("requirements", story.get("description", ""))
+    acceptance_criteria = story.get("acceptance_criteria", [])
+    design_decisions = story.get("design_decisions", {})
+
+    # Build prompt with maintainability guidelines
+    prompt = build_code_generation_prompt(
+        story_title=story_title,
+        requirements=requirements or f"Implement functionality for {story_title}",
+        acceptance_criteria=acceptance_criteria if acceptance_criteria else None,
+        design_decisions=design_decisions if design_decisions else None,
+        additional_context=f"Story ID: {story_id}\n"
+        f"Patterns to follow: {', '.join(context.get('patterns', []))}\n"
+        f"Constraints: {', '.join(context.get('constraints', []))}",
+        include_maintainability=True,
+        include_conventions=True,
+    )
+
+    logger.info(
+        "llm_code_generation_start",
+        story_id=story_id,
+        prompt_length=len(prompt),
+    )
+
+    try:
+        # Use "complex" tier per ADR-003 for code generation
+        response = await router.call(
+            messages=[{"role": "user", "content": prompt}],
+            tier="complex",
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+        # Extract code from response
+        code = extract_code_from_response(response)
+
+        # Validate syntax
+        is_valid, error = validate_python_syntax(code)
+
+        if is_valid:
+            # Check maintainability (advisory only)
+            report = check_maintainability(code)
+            if report.has_warnings():
+                logger.info(
+                    "maintainability_warnings",
+                    story_id=story_id,
+                    warning_count=len(report.warnings),
+                    max_function_length=report.max_function_length,
+                    max_nesting_depth=report.max_nesting_depth,
+                )
+
+            logger.info(
+                "llm_code_generation_success",
+                story_id=story_id,
+                code_length=len(code),
+            )
+            return code, True
+        else:
+            logger.warning(
+                "llm_code_generation_syntax_error",
+                story_id=story_id,
+                error=error,
+            )
+            # Retry with error context
+            from yolo_developer.agents.dev.prompts.code_generation import (
+                build_retry_prompt,
+            )
+
+            retry_prompt = build_retry_prompt(prompt, error or "Unknown error", code)
+            retry_response = await router.call(
+                messages=[{"role": "user", "content": retry_prompt}],
+                tier="complex",
+                temperature=0.5,  # Lower temp for fixing
+            )
+
+            retry_code = extract_code_from_response(retry_response)
+            retry_valid, retry_error = validate_python_syntax(retry_code)
+
+            if retry_valid:
+                logger.info(
+                    "llm_code_generation_retry_success",
+                    story_id=story_id,
+                )
+                return retry_code, True
+            else:
+                logger.warning(
+                    "llm_code_generation_retry_failed",
+                    story_id=story_id,
+                    error=retry_error,
+                )
+                return code, False
+
+    except LLMProviderError as e:
+        logger.error(
+            "llm_code_generation_provider_error",
+            story_id=story_id,
+            error=str(e),
+        )
+        return "", False
+
+    except Exception as e:
+        logger.error(
+            "llm_code_generation_error",
+            story_id=story_id,
+            error=str(e),
+        )
+        return "", False
+
+
+async def _generate_implementation(
+    story: dict[str, Any],
+    context: dict[str, Any],
+    router: LLMRouter | None = None,
+) -> ImplementationArtifact:
+    """Generate implementation artifact for a story (Task 4).
+
+    Uses LLM-powered code generation when available, with fallback
+    to stub implementation on failure.
+
+    Args:
+        story: Story dictionary with id, title, and other fields.
+        context: Project context for code generation.
+        router: Optional LLMRouter. If None, uses stub implementation.
+
+    Returns:
+        ImplementationArtifact with code and test files.
+
+    Example:
+        >>> story = {"id": "story-001", "title": "User Authentication"}
+        >>> artifact = await _generate_implementation(story, {})
+        >>> artifact.implementation_status
+        'completed'
+    """
+    story_id = story.get("id", "unknown")
+    story_title = story.get("title", "Untitled Story")
+
+    # Try LLM generation if router available
+    if router is not None:
+        code, is_valid = await _generate_code_with_llm(story, context, router)
+
+        if is_valid and code:
+            # LLM generation succeeded
+            module_name = story_id.replace("-", "_").replace(".", "_")
+
+            code_file = CodeFile(
+                file_path=f"src/implementations/{module_name}.py",
+                content=code,
+                file_type="source",
+            )
+
+            # Generate test files for the code
+            test_files = _generate_tests(story, [code_file])
+
+            artifact = ImplementationArtifact(
+                story_id=story_id,
+                code_files=(code_file,),
+                test_files=tuple(test_files),
+                implementation_status="completed",
+                notes=f"LLM-generated implementation for {story_title}.",
+            )
+
+            logger.info(
+                "llm_implementation_generated",
+                story_id=story_id,
+                code_file_count=len(artifact.code_files),
+                test_file_count=len(artifact.test_files),
+            )
+
+            return artifact
+
+    # Fallback to stub implementation
+    logger.info(
+        "falling_back_to_stub_implementation",
+        story_id=story_id,
+        reason="LLM unavailable or generation failed",
+    )
+    return _generate_stub_implementation(story)
+
+
+def _generate_tests(story: dict[str, Any], code_files: list[CodeFile]) -> list[TestFile]:
     """Generate test files for a story's code files.
 
     Creates a single stub test file for the story. Full LLM-powered
@@ -242,7 +522,7 @@ def _generate_tests(
 
     test_content = f'''"""Unit tests for {story_title} (Story {story_id}).
 
-Generated by Dev agent (stub - full implementation in Story 8.3+).
+Generated by Dev agent (stub - full LLM test generation in Story 8.3+).
 """
 
 from __future__ import annotations
@@ -292,6 +572,9 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     Receives stories with designs from state and produces implementation
     artifacts including code files and test files.
 
+    Story 8.2 adds LLM-powered code generation with maintainability
+    guidelines. Falls back to stub generation if LLM unavailable.
+
     This function follows the LangGraph node pattern:
     - Receives full state as YoloState TypedDict
     - Returns only the state updates (not full state)
@@ -325,41 +608,52 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         message_count=len(state.get("messages", [])),
     )
 
+    # Get LLM router (may be None if not configured)
+    router = _get_llm_router()
+
+    # Extract project context for code generation (Task 6)
+    context = _extract_project_context(state)
+
     # Extract stories from state (AC2)
     stories = _extract_stories_for_implementation(state)
 
     # Generate implementations for each story (AC3)
     implementations: list[ImplementationArtifact] = []
     for story in stories:
-        artifact = _generate_implementation(story)
+        artifact = await _generate_implementation(story, context, router)
         implementations.append(artifact)
 
     # Build output with actual results
     total_code_files = sum(len(impl.code_files) for impl in implementations)
     total_test_files = sum(len(impl.test_files) for impl in implementations)
 
+    # Determine generation method
+    llm_used = router is not None
+    generation_method = "LLM-powered" if llm_used else "stub"
+
     output = DevOutput(
         implementations=tuple(implementations),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {total_code_files} code files, "
         f"{total_test_files} test files. "
-        "Stub implementation - full LLM integration in Story 8.2+.",
+        f"Generation method: {generation_method}.",
     )
 
     # Create decision record with dev attribution (AC6)
     decision = Decision(
         agent="dev",
         summary=f"Generated {total_code_files} code files, {total_test_files} test files "
-        f"for {len(stories)} stories",
+        f"for {len(stories)} stories ({generation_method})",
         rationale=f"Processed {len(stories)} stories from Architect. "
-        "Stub implementation - full LLM-powered code generation in Story 8.2+.",
+        f"Used {generation_method} code generation with maintainability guidelines.",
         related_artifacts=tuple(impl.story_id for impl in implementations),
     )
 
     # Create output message with dev attribution (AC6)
     message = create_agent_message(
         content=f"Dev processing complete: {total_code_files} code files, "
-        f"{total_test_files} test files generated for {len(stories)} stories.",
+        f"{total_test_files} test files generated for {len(stories)} stories "
+        f"({generation_method}).",
         agent="dev",
         metadata={"output": output.to_dict()},
     )
@@ -370,6 +664,7 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         implementation_count=len(implementations),
         code_file_count=total_code_files,
         test_file_count=total_test_files,
+        generation_method=generation_method,
     )
 
     # Return ONLY the updates, not full state (AC6)

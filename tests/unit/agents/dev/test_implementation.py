@@ -1,28 +1,35 @@
-"""Implementation generation tests for Dev agent (Story 8.1, AC3).
+"""Implementation generation tests for Dev agent (Story 8.1, 8.2, AC3).
 
-Tests for _generate_implementation and _generate_tests functions.
+Tests for _generate_implementation, _generate_stub_implementation, and _generate_tests functions.
+Updated for Story 8.2 with async implementation and context parameter.
 """
 
 from __future__ import annotations
 
-from yolo_developer.agents.dev.node import _generate_implementation, _generate_tests
+import pytest
+
+from yolo_developer.agents.dev.node import (
+    _generate_implementation,
+    _generate_stub_implementation,
+    _generate_tests,
+)
 from yolo_developer.agents.dev.types import CodeFile
 
 
-class TestGenerateImplementation:
-    """Tests for _generate_implementation function."""
+class TestGenerateStubImplementation:
+    """Tests for _generate_stub_implementation function (fallback)."""
 
     def test_generates_implementation_artifact(self) -> None:
         """Test generates ImplementationArtifact for story."""
         story = {"id": "story-001", "title": "User Authentication"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert artifact.story_id == "story-001"
         assert artifact.implementation_status == "completed"
 
     def test_generates_code_file(self) -> None:
         """Test generates at least one code file."""
         story = {"id": "story-001", "title": "User Auth"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert len(artifact.code_files) >= 1
         code_file = artifact.code_files[0]
         assert code_file.file_type == "source"
@@ -31,7 +38,7 @@ class TestGenerateImplementation:
     def test_generates_test_files(self) -> None:
         """Test generates test files for code files."""
         story = {"id": "story-001", "title": "User Auth"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert len(artifact.test_files) >= 1
         test_file = artifact.test_files[0]
         assert test_file.test_type == "unit"
@@ -39,23 +46,93 @@ class TestGenerateImplementation:
     def test_handles_story_without_id(self) -> None:
         """Test handles story without id gracefully."""
         story = {"title": "No ID Story"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert artifact.story_id == "unknown"
         assert artifact.implementation_status == "completed"
 
     def test_handles_story_without_title(self) -> None:
         """Test handles story without title gracefully."""
         story = {"id": "story-001"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert artifact.story_id == "story-001"
         assert "Untitled Story" in artifact.notes
 
     def test_includes_notes(self) -> None:
         """Test includes implementation notes."""
         story = {"id": "story-001", "title": "Test Story"}
-        artifact = _generate_implementation(story)
+        artifact = _generate_stub_implementation(story)
         assert artifact.notes != ""
-        assert "stub" in artifact.notes.lower() or "Story 8.2" in artifact.notes
+        assert "stub" in artifact.notes.lower() or "fallback" in artifact.notes.lower()
+
+
+class TestGenerateImplementation:
+    """Tests for async _generate_implementation function."""
+
+    @pytest.mark.asyncio
+    async def test_generates_implementation_artifact(self) -> None:
+        """Test generates ImplementationArtifact for story."""
+        story = {"id": "story-001", "title": "User Authentication"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert artifact.story_id == "story-001"
+        assert artifact.implementation_status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_generates_code_file(self) -> None:
+        """Test generates at least one code file."""
+        story = {"id": "story-001", "title": "User Auth"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert len(artifact.code_files) >= 1
+        code_file = artifact.code_files[0]
+        assert code_file.file_type == "source"
+        assert "story_001" in code_file.file_path
+
+    @pytest.mark.asyncio
+    async def test_generates_test_files(self) -> None:
+        """Test generates test files for code files."""
+        story = {"id": "story-001", "title": "User Auth"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert len(artifact.test_files) >= 1
+        test_file = artifact.test_files[0]
+        assert test_file.test_type == "unit"
+
+    @pytest.mark.asyncio
+    async def test_handles_story_without_id(self) -> None:
+        """Test handles story without id gracefully."""
+        story = {"title": "No ID Story"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert artifact.story_id == "unknown"
+        assert artifact.implementation_status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_handles_story_without_title(self) -> None:
+        """Test handles story without title gracefully."""
+        story = {"id": "story-001"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert artifact.story_id == "story-001"
+        assert "Untitled Story" in artifact.notes or "fallback" in artifact.notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_includes_notes(self) -> None:
+        """Test includes implementation notes."""
+        story = {"id": "story-001", "title": "Test Story"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        artifact = await _generate_implementation(story, context)
+        assert artifact.notes != ""
+
+    @pytest.mark.asyncio
+    async def test_uses_stub_when_no_router(self) -> None:
+        """Test falls back to stub when no router provided."""
+        story = {"id": "story-001", "title": "Test Story"}
+        context: dict = {"patterns": [], "constraints": [], "conventions": {}}
+        # No router = None, so should use stub
+        artifact = await _generate_implementation(story, context, router=None)
+        assert artifact.story_id == "story-001"
+        assert "stub" in artifact.notes.lower() or "fallback" in artifact.notes.lower()
 
 
 class TestGenerateTests:
