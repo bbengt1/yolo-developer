@@ -122,8 +122,8 @@ development_status:
   epic-7-retrospective: optional
 
   # Epic 8: Dev Agent (8 stories)
-  epic-8: backlog
-  8-1-create-dev-agent-node: backlog
+  epic-8: in-progress
+  8-1-create-dev-agent-node: done
   8-2-maintainable-code-generation: backlog
   8-3-unit-test-generation: backlog
   8-4-integration-test-generation: backlog
