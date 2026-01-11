@@ -1,4 +1,4 @@
-"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5, 8.6).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5, 8.6, 8.7).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
@@ -6,6 +6,7 @@ The Dev agent is responsible for:
 - Writing integration tests for component interactions (Story 8.4)
 - Generating documentation with LLM enhancement (Story 8.5)
 - Validating code against Definition of Done (Story 8.6)
+- Following established codebase patterns (Story 8.7)
 
 Example:
     >>> from yolo_developer.agents.dev import (
@@ -23,6 +24,9 @@ Example:
     ...     validate_implementation_dod,
     ...     DoDValidationResult,
     ...     DoDChecklistItem,
+    ...     validate_pattern_adherence,
+    ...     PatternValidationResult,
+    ...     PatternDeviation,
     ... )
     >>>
     >>> # Create a code file
@@ -43,6 +47,9 @@ Example:
     >>>
     >>> # Validate against DoD (Story 8.6)
     >>> result = validate_implementation_dod(code, story)
+    >>>
+    >>> # Validate pattern adherence (Story 8.7)
+    >>> pattern_result = validate_pattern_adherence(code_file.content, state)
     >>>
     >>> # Run the dev node
     >>> result = await dev_node(state)
@@ -95,6 +102,20 @@ from yolo_developer.agents.dev.integration_utils import (
     validate_integration_test_quality,
 )
 from yolo_developer.agents.dev.node import dev_node
+from yolo_developer.agents.dev.pattern_utils import (
+    ErrorHandlingPattern,
+    PatternDeviation,
+    PatternValidationResult,
+    StylePattern,
+    analyze_error_handling_patterns,
+    analyze_naming_patterns,
+    analyze_style_patterns,
+    clear_pattern_cache,
+    get_error_patterns,
+    get_naming_patterns,
+    get_style_patterns,
+    validate_pattern_adherence,
+)
 from yolo_developer.agents.dev.test_utils import (
     FunctionInfo,
     QualityReport,
@@ -116,6 +137,7 @@ from yolo_developer.agents.dev.types import (
 )
 
 __all__ = [
+    # Types
     "CodeFile",
     "CodeFileType",
     "ComplexSection",
@@ -126,16 +148,25 @@ __all__ = [
     "DoDValidationResult",
     "DocumentationInfo",
     "DocumentationQualityReport",
+    "ErrorHandlingPattern",
     "ErrorScenario",
     "FunctionInfo",
     "ImplementationArtifact",
     "ImplementationStatus",
     "IntegrationTestQualityReport",
+    "PatternDeviation",
+    "PatternValidationResult",
     "QualityReport",
+    "StylePattern",
     "TestFile",
     "TestFileType",
+    # Functions
     "analyze_component_boundaries",
     "analyze_data_flow",
+    "analyze_error_handling_patterns",
+    "analyze_naming_patterns",
+    "analyze_style_patterns",
+    "clear_pattern_cache",
     "calculate_coverage_estimate",
     "check_coverage_threshold",
     "detect_complex_sections",
@@ -148,6 +179,9 @@ __all__ = [
     "generate_documentation_with_llm",
     "generate_integration_tests_with_llm",
     "generate_unit_tests_with_llm",
+    "get_error_patterns",
+    "get_naming_patterns",
+    "get_style_patterns",
     "identify_edge_cases",
     "validate_artifact_dod",
     "validate_dev_output_dod",
@@ -155,5 +189,6 @@ __all__ = [
     "validate_documentation_quality",
     "validate_implementation_dod",
     "validate_integration_test_quality",
+    "validate_pattern_adherence",
     "validate_test_quality",
 ]

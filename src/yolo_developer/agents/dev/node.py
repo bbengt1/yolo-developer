@@ -1,4 +1,4 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4, 8.5).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4, 8.5, 8.7).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
@@ -8,6 +8,7 @@ Story 8.2 adds LLM-powered code generation with maintainability guidelines.
 Story 8.3 adds LLM-powered unit test generation with coverage validation.
 Story 8.4 adds LLM-powered integration test generation with boundary analysis.
 Story 8.5 adds LLM-powered documentation enhancement with quality validation.
+Story 8.7 adds pattern following with validation and prompt integration.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -15,6 +16,7 @@ Key Concepts:
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
 - **Maintainability-First**: Generated code prioritizes readability and simplicity
+- **Pattern Following**: Generated code follows established codebase patterns
 
 Example:
     >>> from yolo_developer.agents.dev import dev_node
@@ -57,6 +59,13 @@ from yolo_developer.agents.dev.integration_utils import (
     detect_error_scenarios,
     generate_integration_tests_with_llm,
     validate_integration_test_quality,
+)
+from yolo_developer.agents.dev.pattern_utils import (
+    clear_pattern_cache,
+    get_error_patterns,
+    get_naming_patterns,
+    get_style_patterns,
+    validate_pattern_adherence,
 )
 from yolo_developer.agents.dev.prompts import build_code_generation_prompt
 from yolo_developer.agents.dev.test_utils import (
@@ -248,6 +257,91 @@ def _extract_project_context(state: YoloState) -> dict[str, Any]:
     return context
 
 
+def _get_relevant_patterns(state: dict[str, Any]) -> dict[str, list[Any]]:
+    """Get patterns from state for code generation prompts (Story 8.7).
+
+    Queries PatternLearner from memory_context for naming, error handling,
+    and style patterns. Falls back to defaults if memory_context unavailable.
+
+    Args:
+        state: YoloState containing memory_context with patterns.
+
+    Returns:
+        Dictionary with keys 'naming', 'error_handling', 'style',
+        each containing list of patterns.
+
+    Example:
+        >>> state = {"memory_context": {}}
+        >>> patterns = _get_relevant_patterns(state)
+        >>> len(patterns["naming"]) >= 1
+        True
+    """
+    naming = get_naming_patterns(state)
+    error = get_error_patterns(state)
+    style = get_style_patterns(state)
+
+    logger.debug(
+        "relevant_patterns_extracted",
+        naming_count=len(naming),
+        error_count=len(error),
+        style_count=len(style),
+    )
+
+    return {
+        "naming": naming,
+        "error_handling": error,
+        "style": style,
+    }
+
+
+def _format_patterns_for_prompt(patterns: dict[str, list[Any]]) -> str:
+    """Format patterns for inclusion in LLM prompts (Story 8.7).
+
+    Converts pattern objects to human-readable text for code generation prompts.
+
+    Args:
+        patterns: Dictionary from _get_relevant_patterns().
+
+    Returns:
+        Formatted string with pattern instructions.
+    """
+    sections: list[str] = []
+
+    # Naming patterns
+    naming = patterns.get("naming", [])
+    if naming:
+        naming_lines = ["### Naming Conventions (from codebase patterns)"]
+        for p in naming[:5]:  # Limit to 5
+            if hasattr(p, "value") and hasattr(p, "examples"):
+                examples = ", ".join(p.examples[:3]) if p.examples else ""
+                naming_lines.append(f"- {p.name}: {p.value} (e.g., {examples})")
+        sections.append("\n".join(naming_lines))
+
+    # Error handling patterns
+    error = patterns.get("error_handling", [])
+    if error:
+        error_lines = ["### Error Handling Conventions"]
+        for p in error[:3]:  # Limit to 3
+            if hasattr(p, "handling_style") and hasattr(p, "exception_types"):
+                types = ", ".join(p.exception_types[:3])
+                error_lines.append(f"- {p.pattern_name}: {p.handling_style}")
+                error_lines.append(f"  Preferred exceptions: {types}")
+        sections.append("\n".join(error_lines))
+
+    # Style patterns
+    style = patterns.get("style", [])
+    if style:
+        style_lines = ["### Code Style Conventions"]
+        for p in style[:3]:  # Limit to 3
+            if hasattr(p, "value") and hasattr(p, "category"):
+                style_lines.append(f"- {p.pattern_name} ({p.category}): {p.value}")
+        sections.append("\n".join(style_lines))
+
+    if sections:
+        return "\n\n".join(sections)
+    return ""
+
+
 async def _generate_stub_implementation(story: dict[str, Any]) -> ImplementationArtifact:
     """Generate stub implementation artifact for a story (fallback).
 
@@ -312,17 +406,23 @@ async def _generate_code_with_llm(
     story: dict[str, Any],
     context: dict[str, Any],
     router: LLMRouter,
-) -> tuple[str, bool]:
-    """Generate code using LLM with maintainability guidelines (AC5, AC6).
+    state: dict[str, Any] | None = None,
+) -> tuple[str, bool, dict[str, Any] | None]:
+    """Generate code using LLM with maintainability guidelines (AC5, AC6, Story 8.7).
+
+    Story 8.7 adds pattern following: patterns are included in the prompt,
+    and generated code is validated for pattern adherence.
 
     Args:
         story: Story dictionary with id, title, requirements, etc.
         context: Project context from _extract_project_context.
         router: LLMRouter instance for making calls.
+        state: Optional YoloState for pattern queries.
 
     Returns:
-        Tuple of (code, is_valid). code is generated code string,
-        is_valid indicates if syntax validation passed.
+        Tuple of (code, is_valid, pattern_result). code is generated code string,
+        is_valid indicates if syntax validation passed, pattern_result is the
+        PatternValidationResult dict (or None if state unavailable).
     """
     story_id = story.get("id", "unknown")
     story_title = story.get("title", "Untitled Story")
@@ -330,15 +430,30 @@ async def _generate_code_with_llm(
     acceptance_criteria = story.get("acceptance_criteria", [])
     design_decisions = story.get("design_decisions", {})
 
+    # Story 8.7: Get patterns for prompt and validation
+    patterns_dict: dict[str, list[Any]] = {}
+    if state is not None:
+        patterns_dict = _get_relevant_patterns(state)
+
+    # Format patterns for inclusion in prompt
+    pattern_context = _format_patterns_for_prompt(patterns_dict)
+
+    # Build additional context including patterns
+    additional_context_parts = [
+        f"Story ID: {story_id}",
+        f"Architecture patterns: {', '.join(context.get('patterns', []))}",
+        f"Constraints: {', '.join(context.get('constraints', []))}",
+    ]
+    if pattern_context:
+        additional_context_parts.append(f"\n{pattern_context}")
+
     # Build prompt with maintainability guidelines
     prompt = build_code_generation_prompt(
         story_title=story_title,
         requirements=requirements or f"Implement functionality for {story_title}",
         acceptance_criteria=acceptance_criteria if acceptance_criteria else None,
         design_decisions=design_decisions if design_decisions else None,
-        additional_context=f"Story ID: {story_id}\n"
-        f"Patterns to follow: {', '.join(context.get('patterns', []))}\n"
-        f"Constraints: {', '.join(context.get('constraints', []))}",
+        additional_context="\n".join(additional_context_parts),
         include_maintainability=True,
         include_conventions=True,
     )
@@ -376,12 +491,28 @@ async def _generate_code_with_llm(
                     max_nesting_depth=report.max_nesting_depth,
                 )
 
+            # Story 8.7: Validate pattern adherence (advisory only)
+            pattern_result_dict: dict[str, Any] | None = None
+            if state is not None:
+                pattern_result = validate_pattern_adherence(code, state)
+                pattern_result_dict = pattern_result.to_dict()
+
+                if not pattern_result.passed:
+                    logger.info(
+                        "pattern_adherence_warnings",
+                        story_id=story_id,
+                        score=pattern_result.score,
+                        deviation_count=len(pattern_result.deviations),
+                        threshold=pattern_result.threshold,
+                    )
+
             logger.info(
                 "llm_code_generation_success",
                 story_id=story_id,
                 code_length=len(code),
+                pattern_score=pattern_result_dict.get("score") if pattern_result_dict else None,
             )
-            return code, True
+            return code, True, pattern_result_dict
         else:
             logger.warning(
                 "llm_code_generation_syntax_error",
@@ -404,18 +535,24 @@ async def _generate_code_with_llm(
             retry_valid, retry_error = validate_python_syntax(retry_code)
 
             if retry_valid:
+                # Story 8.7: Validate pattern adherence for retry code
+                retry_pattern_result_dict: dict[str, Any] | None = None
+                if state is not None:
+                    retry_pattern_result = validate_pattern_adherence(retry_code, state)
+                    retry_pattern_result_dict = retry_pattern_result.to_dict()
+
                 logger.info(
                     "llm_code_generation_retry_success",
                     story_id=story_id,
                 )
-                return retry_code, True
+                return retry_code, True, retry_pattern_result_dict
             else:
                 logger.warning(
                     "llm_code_generation_retry_failed",
                     story_id=story_id,
                     error=retry_error,
                 )
-                return code, False
+                return code, False, None
 
     except LLMProviderError as e:
         logger.error(
@@ -423,7 +560,7 @@ async def _generate_code_with_llm(
             story_id=story_id,
             error=str(e),
         )
-        return "", False
+        return "", False, None
 
     except Exception as e:
         logger.error(
@@ -431,7 +568,7 @@ async def _generate_code_with_llm(
             story_id=story_id,
             error=str(e),
         )
-        return "", False
+        return "", False, None
 
 
 async def _enhance_documentation(
@@ -517,16 +654,20 @@ async def _generate_implementation(
     story: dict[str, Any],
     context: dict[str, Any],
     router: LLMRouter | None = None,
+    state: dict[str, Any] | None = None,
 ) -> ImplementationArtifact:
-    """Generate implementation artifact for a story (Task 4).
+    """Generate implementation artifact for a story (Task 4, Story 8.7).
 
     Uses LLM-powered code generation when available, with fallback
     to stub implementation on failure.
+
+    Story 8.7: Includes pattern validation results in artifact notes.
 
     Args:
         story: Story dictionary with id, title, and other fields.
         context: Project context for code generation.
         router: Optional LLMRouter. If None, uses stub implementation.
+        state: Optional YoloState for pattern queries.
 
     Returns:
         ImplementationArtifact with code and test files.
@@ -542,7 +683,9 @@ async def _generate_implementation(
 
     # Try LLM generation if router available
     if router is not None:
-        code, is_valid = await _generate_code_with_llm(story, context, router)
+        code, is_valid, pattern_result = await _generate_code_with_llm(
+            story, context, router, state
+        )
 
         if is_valid and code:
             # LLM generation succeeded
@@ -565,12 +708,26 @@ async def _generate_implementation(
             # Generate test files for the code (LLM-powered, Story 8.3)
             test_files = await _generate_tests(story, [code_file], router)
 
+            # Story 8.7: Include pattern adherence in notes
+            notes_parts = [f"LLM-generated implementation for {story_title}."]
+            if pattern_result:
+                score = pattern_result.get("score", 100)
+                passed = pattern_result.get("passed", True)
+                deviation_count = pattern_result.get("deviation_count", 0)
+                if deviation_count > 0:
+                    notes_parts.append(
+                        f"Pattern adherence: score={score}, "
+                        f"passed={passed}, deviations={deviation_count}."
+                    )
+                else:
+                    notes_parts.append(f"Pattern adherence: score={score}, no deviations.")
+
             artifact = ImplementationArtifact(
                 story_id=story_id,
                 code_files=(code_file,),
                 test_files=tuple(test_files),
                 implementation_status="completed",
-                notes=f"LLM-generated implementation for {story_title}.",
+                notes=" ".join(notes_parts),
             )
 
             logger.info(
@@ -1054,6 +1211,9 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         >>> "messages" in result
         True
     """
+    # Clear pattern cache for fresh queries (Story 8.7)
+    clear_pattern_cache()
+
     logger.info(
         "dev_node_start",
         current_agent=state.get("current_agent"),
@@ -1061,8 +1221,8 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     )
 
     # Log gate evaluation context (Story 8.6 AC5)
-    advisory_warnings = state.get("advisory_warnings", [])
-    if advisory_warnings:
+    advisory_warnings: list[dict[str, Any]] = state.get("advisory_warnings", [])  # type: ignore[assignment]
+    if advisory_warnings and isinstance(advisory_warnings, list):
         logger.info(
             "dev_node_gate_warnings",
             warning_count=len(advisory_warnings),
@@ -1079,9 +1239,11 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     stories = _extract_stories_for_implementation(state)
 
     # Generate implementations for each story (AC3)
+    # Story 8.7: Pass state for pattern queries
     implementations: list[ImplementationArtifact] = []
+    state_dict: dict[str, Any] = dict(state)  # Convert TypedDict to dict
     for story in stories:
-        artifact = await _generate_implementation(story, context, router)
+        artifact = await _generate_implementation(story, context, router, state_dict)
         implementations.append(artifact)
 
     # Build output with actual results
@@ -1106,7 +1268,7 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         f"Processed {len(stories)} stories from Architect.",
         f"Used {generation_method} code generation with maintainability guidelines.",
     ]
-    if advisory_warnings:
+    if advisory_warnings and isinstance(advisory_warnings, list):
         gate_summary = "; ".join(
             f"{w.get('gate_name', 'unknown')}: {w.get('reason', 'no reason')[:100]}"
             for w in advisory_warnings
