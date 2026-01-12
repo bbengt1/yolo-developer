@@ -1,4 +1,4 @@
-"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4, 8.5, 8.7).
+"""Dev agent node for LangGraph orchestration (Story 8.1, 8.2, 8.3, 8.4, 8.5, 8.7, 8.8).
 
 This module provides the dev_node function that integrates with the
 LangGraph orchestration workflow. The Dev agent produces implementation
@@ -9,6 +9,7 @@ Story 8.3 adds LLM-powered unit test generation with coverage validation.
 Story 8.4 adds LLM-powered integration test generation with boundary analysis.
 Story 8.5 adds LLM-powered documentation enhancement with quality validation.
 Story 8.7 adds pattern following with validation and prompt integration.
+Story 8.8 adds communicative commit message generation.
 
 Key Concepts:
 - **YoloState Input**: Receives state as TypedDict, not Pydantic
@@ -48,6 +49,12 @@ from yolo_developer.agents.dev.code_utils import (
     check_maintainability,
     extract_code_from_response,
     validate_python_syntax,
+)
+from yolo_developer.agents.dev.commit_utils import (
+    CommitMessageContext,
+    CommitType,
+    generate_commit_message,
+    generate_commit_message_with_llm,
 )
 from yolo_developer.agents.dev.doc_utils import (
     generate_documentation_with_llm,
@@ -1169,6 +1176,109 @@ class Test{class_name}:
     )
 
 
+async def _generate_commit_message_for_implementations(
+    stories: list[dict[str, Any]],
+    implementations: list[ImplementationArtifact],
+    router: LLMRouter | None = None,
+) -> str | None:
+    """Generate a commit message for the implementations (Story 8.8).
+
+    Builds context from stories and implementations, then generates
+    a commit message using LLM (if available) or template fallback.
+
+    Args:
+        stories: List of story dictionaries with id, title, etc.
+        implementations: List of implementation artifacts.
+        router: Optional LLMRouter for LLM-powered generation.
+
+    Returns:
+        Commit message string, or None if generation fails.
+
+    Example:
+        >>> stories = [{"id": "8-8", "title": "Communicative Commits"}]
+        >>> impls = [ImplementationArtifact(story_id="8-8")]
+        >>> msg = await _generate_commit_message_for_implementations(stories, impls)
+        >>> msg.startswith("feat")
+        True
+    """
+    if not implementations:
+        return None
+
+    # Build context from stories and implementations
+    story_ids = tuple(impl.story_id for impl in implementations)
+    story_titles = {}
+    decisions: list[str] = []
+
+    for story in stories:
+        story_id = story.get("id", "")
+        title = story.get("title", "")
+        if story_id:
+            story_titles[story_id] = title
+
+        # Extract decisions from story if available
+        story_decisions = story.get("design_decisions", {})
+        if isinstance(story_decisions, dict):
+            for key, value in story_decisions.items():
+                if value:
+                    decisions.append(f"{key}: {value}")
+
+    # Collect all files changed
+    files_changed: list[str] = []
+    for impl in implementations:
+        for code_file in impl.code_files:
+            files_changed.append(code_file.file_path)
+        for test_file in impl.test_files:
+            files_changed.append(test_file.file_path)
+
+    # Build summary from implementation notes
+    summary_parts = []
+    for impl in implementations:
+        if impl.notes:
+            summary_parts.append(impl.notes)
+
+    code_summary = " ".join(summary_parts) if summary_parts else ""
+
+    # Create context
+    context = CommitMessageContext(
+        story_ids=story_ids,
+        story_titles=story_titles,
+        decisions=tuple(decisions),
+        code_summary=code_summary,
+        files_changed=tuple(files_changed),
+        change_type=CommitType.FEAT,  # Default to feat for new implementations
+        scope="dev",  # Dev agent scope
+    )
+
+    # Generate commit message
+    if router is not None:
+        try:
+            message, is_valid = await generate_commit_message_with_llm(context, router)
+            if is_valid:
+                logger.info(
+                    "commit_message_generated",
+                    story_ids=story_ids,
+                    method="llm",
+                    message_length=len(message),
+                )
+                return message
+        except Exception as e:
+            logger.warning(
+                "llm_commit_message_failed",
+                story_ids=story_ids,
+                error=str(e),
+            )
+
+    # Fallback to template-based generation
+    message = generate_commit_message(context)
+    logger.info(
+        "commit_message_generated",
+        story_ids=story_ids,
+        method="template",
+        message_length=len(message),
+    )
+    return message
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -1254,12 +1364,20 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     llm_used = router is not None
     generation_method = "LLM-powered" if llm_used else "stub"
 
+    # Story 8.8: Generate commit message
+    commit_message = await _generate_commit_message_for_implementations(
+        stories=stories,
+        implementations=implementations,
+        router=router,
+    )
+
     output = DevOutput(
         implementations=tuple(implementations),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {total_code_files} code files, "
         f"{total_test_files} test files. "
         f"Generation method: {generation_method}.",
+        suggested_commit_message=commit_message,
     )
 
     # Create decision record with dev attribution (AC6)

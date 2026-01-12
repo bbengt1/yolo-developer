@@ -183,7 +183,9 @@ def process_data(items: list[str]) -> dict[str, int]:
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
 
-        code, is_valid = await _generate_code_with_llm(story, context, mock_router)
+        code, is_valid, pattern_result = await _generate_code_with_llm(
+            story, context, mock_router
+        )
 
         assert is_valid is True
         assert "def process_data" in code
@@ -206,7 +208,9 @@ def fixed() -> None:
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
 
-        code, is_valid = await _generate_code_with_llm(story, context, mock_router)
+        code, is_valid, pattern_result = await _generate_code_with_llm(
+            story, context, mock_router
+        )
 
         # Should have called LLM twice (original + retry)
         assert mock_router.call.call_count == 2

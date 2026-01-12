@@ -240,23 +240,28 @@ class DevOutput:
     """Complete output from Dev agent processing.
 
     Contains all implementation artifacts generated during
-    dev_node execution, plus processing notes.
+    dev_node execution, plus processing notes and suggested commit message.
+
+    Story 8.8 adds suggested_commit_message for communicative commits.
 
     Attributes:
         implementations: Tuple of implementation artifacts per story
         processing_notes: Notes about the processing (stats, issues, etc.)
+        suggested_commit_message: Optional commit message for the changes (Story 8.8)
 
     Example:
         >>> output = DevOutput(
         ...     implementations=(artifact1, artifact2),
         ...     processing_notes="Processed 2 stories, generated 4 files",
+        ...     suggested_commit_message="feat: add authentication",
         ... )
         >>> output.to_dict()
-        {'implementations': [...], 'processing_notes': '...'}
+        {'implementations': [...], 'processing_notes': '...', 'suggested_commit_message': '...'}
     """
 
     implementations: tuple[ImplementationArtifact, ...] = field(default_factory=tuple)
     processing_notes: str = ""
+    suggested_commit_message: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -267,4 +272,5 @@ class DevOutput:
         return {
             "implementations": [i.to_dict() for i in self.implementations],
             "processing_notes": self.processing_notes,
+            "suggested_commit_message": self.suggested_commit_message,
         }

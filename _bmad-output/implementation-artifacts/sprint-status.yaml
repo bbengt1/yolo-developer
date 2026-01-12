@@ -122,7 +122,7 @@ development_status:
   epic-7-retrospective: optional
 
   # Epic 8: Dev Agent (8 stories)
-  epic-8: in-progress
+  epic-8: done
   8-1-create-dev-agent-node: done
   8-2-maintainable-code-generation: done
   8-3-unit-test-generation: done
@@ -130,7 +130,7 @@ development_status:
   8-5-documentation-generation: done
   8-6-dod-validation: done
   8-7-pattern-following: done
-  8-8-communicative-commits: backlog
+  8-8-communicative-commits: done
   epic-8-retrospective: optional
 
   # Epic 9: TEA Agent (8 stories)

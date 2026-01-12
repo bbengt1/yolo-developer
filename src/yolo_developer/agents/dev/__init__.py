@@ -1,4 +1,4 @@
-"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5, 8.6, 8.7).
+"""Dev agent module for code implementation and testing (Story 8.1, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8).
 
 The Dev agent is responsible for:
 - Implementing code from stories with designs
@@ -7,6 +7,7 @@ The Dev agent is responsible for:
 - Generating documentation with LLM enhancement (Story 8.5)
 - Validating code against Definition of Done (Story 8.6)
 - Following established codebase patterns (Story 8.7)
+- Generating communicative commit messages (Story 8.8)
 
 Example:
     >>> from yolo_developer.agents.dev import (
@@ -27,6 +28,12 @@ Example:
     ...     validate_pattern_adherence,
     ...     PatternValidationResult,
     ...     PatternDeviation,
+    ...     generate_commit_message,
+    ...     generate_commit_message_with_llm,
+    ...     validate_commit_message,
+    ...     CommitMessageContext,
+    ...     CommitMessageValidationResult,
+    ...     CommitType,
     ... )
     >>>
     >>> # Create a code file
@@ -71,6 +78,14 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.dev.commit_utils import (
+    CommitMessageContext,
+    CommitMessageValidationResult,
+    CommitType,
+    generate_commit_message,
+    generate_commit_message_with_llm,
+    validate_commit_message,
+)
 from yolo_developer.agents.dev.doc_utils import (
     ComplexSection,
     DocumentationInfo,
@@ -137,9 +152,11 @@ from yolo_developer.agents.dev.types import (
 )
 
 __all__ = [
-    # Types
     "CodeFile",
     "CodeFileType",
+    "CommitMessageContext",
+    "CommitMessageValidationResult",
+    "CommitType",
     "ComplexSection",
     "ComponentBoundary",
     "DataFlowPath",
@@ -160,15 +177,14 @@ __all__ = [
     "StylePattern",
     "TestFile",
     "TestFileType",
-    # Functions
     "analyze_component_boundaries",
     "analyze_data_flow",
     "analyze_error_handling_patterns",
     "analyze_naming_patterns",
     "analyze_style_patterns",
-    "clear_pattern_cache",
     "calculate_coverage_estimate",
     "check_coverage_threshold",
+    "clear_pattern_cache",
     "detect_complex_sections",
     "detect_error_scenarios",
     "dev_node",
@@ -176,6 +192,8 @@ __all__ = [
     "extract_public_functions",
     "format_complex_sections_for_prompt",
     "format_documentation_info_for_prompt",
+    "generate_commit_message",
+    "generate_commit_message_with_llm",
     "generate_documentation_with_llm",
     "generate_integration_tests_with_llm",
     "generate_unit_tests_with_llm",
@@ -184,9 +202,10 @@ __all__ = [
     "get_style_patterns",
     "identify_edge_cases",
     "validate_artifact_dod",
+    "validate_commit_message",
     "validate_dev_output_dod",
-    "validate_dod",
     "validate_documentation_quality",
+    "validate_dod",
     "validate_implementation_dod",
     "validate_integration_test_quality",
     "validate_pattern_adherence",
