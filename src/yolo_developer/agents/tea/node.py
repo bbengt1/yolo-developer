@@ -178,24 +178,34 @@ def _extract_artifacts_for_validation(state: YoloState) -> list[dict[str, Any]]:
     return []
 
 
-def _validate_artifact(artifact: dict[str, Any]) -> ValidationResult:
+def _validate_artifact(
+    artifact: dict[str, Any],
+    test_content: str = "",
+) -> ValidationResult:
     """Validate a single artifact and generate validation result.
 
-    This is a stub implementation that generates placeholder validation
-    results. Full LLM-powered validation will be added in Story 9.2+.
+    For code files, includes coverage analysis using the provided test content.
+    For test files, validates assertion presence and quality.
 
     Args:
         artifact: Artifact dictionary with type, artifact_id, content, etc.
+        test_content: Combined test file content for coverage analysis.
 
     Returns:
-        ValidationResult with stub findings and scores.
+        ValidationResult with findings and scores.
 
     Example:
         >>> artifact = {"type": "code_file", "artifact_id": "src/main.py", ...}
-        >>> result = _validate_artifact(artifact)
+        >>> result = _validate_artifact(artifact, test_content="def test_main(): assert True")
         >>> result.validation_status
         'passed'
     """
+    from yolo_developer.agents.tea.coverage import (
+        analyze_coverage,
+        check_coverage_threshold,
+        validate_critical_paths,
+    )
+
     artifact_id = artifact.get("artifact_id", "unknown")
     artifact_type = artifact.get("type", "unknown")
     content = artifact.get("content", "")
@@ -204,7 +214,7 @@ def _validate_artifact(artifact: dict[str, Any]) -> ValidationResult:
     recommendations: list[str] = []
     score = 100
 
-    # Stub validation logic - basic checks
+    # Validation logic
     if artifact_type == "code_file":
         # Check for docstring presence
         if '"""' not in content and "'''" not in content:
@@ -233,6 +243,27 @@ def _validate_artifact(artifact: dict[str, Any]) -> ValidationResult:
                 )
             )
             score -= 5
+
+        # Coverage analysis (Story 9.2)
+        code_files = [{"artifact_id": artifact_id, "content": content}]
+        test_files = [{"artifact_id": "tests/combined.py", "content": test_content}] if test_content else []
+
+        coverage_report = analyze_coverage(code_files, test_files)
+
+        # Check threshold
+        _threshold_passed, threshold_findings = check_coverage_threshold(coverage_report)
+        findings.extend(threshold_findings)
+
+        # Validate critical paths
+        critical_findings = validate_critical_paths(coverage_report)
+        findings.extend(critical_findings)
+
+        # Adjust score based on coverage
+        if coverage_report.results:
+            coverage_pct = coverage_report.results[0].coverage_percentage
+            # Coverage impact: -0.2 points per % below 100
+            coverage_penalty = int((100 - coverage_pct) * 0.2)
+            score -= coverage_penalty
 
         recommendations.append("Consider running mypy for comprehensive type checking")
 
@@ -383,10 +414,22 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
     # Extract artifacts for validation (AC2)
     artifacts = _extract_artifacts_for_validation(state)
 
+    # Separate test files for coverage analysis context
+    test_artifacts = [a for a in artifacts if a.get("type") == "test_file"]
+
+    # Combine all test content for coverage heuristics
+    combined_test_content = "\n".join(
+        a.get("content", "") for a in test_artifacts
+    )
+
     # Validate each artifact (AC3)
     validation_results: list[ValidationResult] = []
     for artifact in artifacts:
-        result = _validate_artifact(artifact)
+        # Pass test content for code file coverage analysis
+        if artifact.get("type") == "code_file":
+            result = _validate_artifact(artifact, test_content=combined_test_content)
+        else:
+            result = _validate_artifact(artifact)
         validation_results.append(result)
 
     # Calculate overall confidence (AC3, AC5)

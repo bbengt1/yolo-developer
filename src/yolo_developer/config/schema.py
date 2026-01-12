@@ -171,12 +171,14 @@ class QualityConfig(BaseModel):
         confidence_threshold: Global confidence score threshold (0.0-1.0).
         gate_thresholds: Per-gate threshold configuration overrides.
         seed_thresholds: Seed quality threshold configuration (Story 4.7).
+        critical_paths: Path patterns that require 100% test coverage (Story 9.2).
 
     Example:
         >>> from yolo_developer.config.schema import QualityConfig, GateThreshold
         >>> config = QualityConfig(
         ...     test_coverage_threshold=0.85,
-        ...     gate_thresholds={"testability": GateThreshold(min_score=0.90)}
+        ...     gate_thresholds={"testability": GateThreshold(min_score=0.90)},
+        ...     critical_paths=["orchestrator/", "gates/", "agents/"]
         ... )
     """
 
@@ -199,6 +201,10 @@ class QualityConfig(BaseModel):
     seed_thresholds: SeedThresholdConfig = Field(
         default_factory=SeedThresholdConfig,
         description="Seed quality threshold configuration (Story 4.7)",
+    )
+    critical_paths: list[str] = Field(
+        default_factory=lambda: ["orchestrator/", "gates/", "agents/"],
+        description="Path patterns that require 100% test coverage (Story 9.2)",
     )
 
     def validate_thresholds(self) -> list[str]:

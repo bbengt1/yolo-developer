@@ -44,6 +44,15 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.tea.coverage import (
+    CoverageReport,
+    CoverageResult,
+    analyze_coverage,
+    check_coverage_threshold,
+    get_coverage_threshold_from_config,
+    get_critical_paths_from_config,
+    validate_critical_paths,
+)
 from yolo_developer.agents.tea.node import tea_node
 from yolo_developer.agents.tea.types import (
     DeploymentRecommendation,
@@ -56,6 +65,8 @@ from yolo_developer.agents.tea.types import (
 )
 
 __all__ = [
+    "CoverageReport",
+    "CoverageResult",
     "DeploymentRecommendation",
     "Finding",
     "FindingCategory",
@@ -63,5 +74,10 @@ __all__ = [
     "TEAOutput",
     "ValidationResult",
     "ValidationStatus",
+    "analyze_coverage",
+    "check_coverage_threshold",
+    "get_coverage_threshold_from_config",
+    "get_critical_paths_from_config",
     "tea_node",
+    "validate_critical_paths",
 ]
