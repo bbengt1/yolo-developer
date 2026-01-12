@@ -455,9 +455,7 @@ def generate_risk_report(
     if deployment_blocked:
         for risk in categorized_risks:
             if risk.risk_level == "critical":
-                blocking_reasons.append(
-                    f"Critical risk {risk.risk_id}: {risk.impact_description}"
-                )
+                blocking_reasons.append(f"Critical risk {risk.risk_id}: {risk.impact_description}")
 
     # Generate acknowledgment requirements for high risks
     acknowledgment_required: list[str] = []

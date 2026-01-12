@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from yolo_developer.agents.tea.execution import TestExecutionResult
     from yolo_developer.agents.tea.risk import OverallRiskLevel, RiskReport
     from yolo_developer.agents.tea.scoring import ConfidenceResult
+    from yolo_developer.agents.tea.testability import TestabilityReport
 
 # =============================================================================
 # Literal Types
@@ -238,6 +239,7 @@ class TEAOutput:
         confidence_result: Detailed confidence scoring breakdown (Story 9.4)
         risk_report: Risk categorization report with severity breakdown (Story 9.5)
         overall_risk_level: Highest risk level present (critical/high/low/none) (Story 9.5)
+        testability_report: Testability audit report with patterns and score (Story 9.6)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -259,6 +261,7 @@ class TEAOutput:
     confidence_result: ConfidenceResult | None = None
     risk_report: RiskReport | None = None
     overall_risk_level: OverallRiskLevel | None = None
+    testability_report: TestabilityReport | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -280,5 +283,8 @@ class TEAOutput:
             else None,
             "risk_report": self.risk_report.to_dict() if self.risk_report else None,
             "overall_risk_level": self.overall_risk_level,
+            "testability_report": self.testability_report.to_dict()
+            if self.testability_report
+            else None,
             "created_at": self.created_at,
         }

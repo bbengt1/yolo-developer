@@ -1,4 +1,4 @@
-"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5).
+"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5, 9.6).
 
 The TEA (Test Engineering and Assurance) agent is responsible for:
 - Validating implementation artifacts from Dev agent
@@ -8,6 +8,7 @@ The TEA (Test Engineering and Assurance) agent is responsible for:
 - Executing tests and reporting results (Story 9.3)
 - Categorizing risks by severity (Critical/High/Low) with appropriate responses (Story 9.5)
 - Generating risk reports with deployment blocking for critical risks (Story 9.5)
+- Auditing code for testability anti-patterns (Story 9.6)
 
 Example:
     >>> from yolo_developer.agents.tea import (
@@ -87,6 +88,19 @@ from yolo_developer.agents.tea.scoring import (
     get_default_weights,
     validate_weights,
 )
+from yolo_developer.agents.tea.testability import (
+    TestabilityIssue,
+    TestabilityMetrics,
+    TestabilityPattern,
+    TestabilityReport,
+    TestabilityScore,
+    TestabilitySeverity,
+    audit_testability,
+    calculate_testability_score,
+    collect_testability_metrics,
+    convert_testability_issues_to_findings,
+    generate_testability_recommendations,
+)
 from yolo_developer.agents.tea.types import (
     DeploymentRecommendation,
     Finding,
@@ -116,20 +130,31 @@ __all__ = [
     "TEAOutput",
     "TestExecutionResult",
     "TestFailure",
+    "TestabilityIssue",
+    "TestabilityMetrics",
+    "TestabilityPattern",
+    "TestabilityReport",
+    "TestabilityScore",
+    "TestabilitySeverity",
     "ValidationResult",
     "ValidationStatus",
     "analyze_coverage",
+    "audit_testability",
     "calculate_confidence_score",
+    "calculate_testability_score",
     "categorize_finding",
     "categorize_risks",
     "check_coverage_threshold",
     "check_deployment_threshold",
     "check_risk_deployment_blocking",
+    "collect_testability_metrics",
+    "convert_testability_issues_to_findings",
     "detect_test_issues",
     "discover_tests",
     "execute_tests",
     "generate_risk_report",
     "generate_test_findings",
+    "generate_testability_recommendations",
     "get_acknowledgment_requirements",
     "get_coverage_threshold_from_config",
     "get_critical_paths_from_config",

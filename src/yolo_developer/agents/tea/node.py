@@ -494,6 +494,11 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         generate_risk_report,
     )
     from yolo_developer.agents.tea.scoring import calculate_confidence_score
+    from yolo_developer.agents.tea.testability import (
+        TestabilityReport,
+        audit_testability,
+        convert_testability_issues_to_findings,
+    )
 
     # Prepare code and test files for coverage analysis
     code_artifacts = [a for a in artifacts if a.get("type") == "code_file"]
@@ -510,11 +515,53 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
     if code_files:
         coverage_report = analyze_coverage(code_files, test_files_for_coverage)
 
+    # Testability audit (Story 9.6)
+    testability_report: TestabilityReport | None = None
+    testability_findings: list[Finding] = []
+
+    if code_files:
+        testability_report = audit_testability(code_files)
+        testability_findings = list(
+            convert_testability_issues_to_findings(testability_report.issues)
+        )
+
+        logger.info(
+            "testability_audit_complete",
+            score=testability_report.score.score,
+            issue_count=testability_report.metrics.total_issues,
+            files_with_issues=testability_report.metrics.files_with_issues,
+        )
+
+    # Add testability findings as a validation result (Story 9.6)
+    if testability_findings:
+        testability_validation_status: ValidationStatus = "passed"
+        if any(f.severity == "critical" for f in testability_findings):
+            testability_validation_status = "failed"
+        elif any(f.severity in ("high", "medium") for f in testability_findings):
+            testability_validation_status = "warning"
+
+        testability_validation_result = ValidationResult(
+            artifact_id="testability_audit",
+            validation_status=testability_validation_status,
+            findings=tuple(testability_findings),
+            recommendations=testability_report.recommendations if testability_report else (),
+            score=testability_report.score.score if testability_report else 100,
+        )
+        validation_results.append(testability_validation_result)
+
+        logger.debug(
+            "testability_findings_added_to_validation",
+            finding_count=len(testability_findings),
+            validation_status=testability_validation_status,
+        )
+
     # Calculate comprehensive confidence score using Story 9.4 system
+    # Pass testability score to factor it into confidence (Story 9.6 AC6)
     confidence_result = calculate_confidence_score(
         validation_results=tuple(validation_results),
         coverage_report=coverage_report,
         test_execution_result=test_execution_result,
+        testability_score=testability_report.score.score if testability_report else None,
     )
 
     # Use new confidence scoring for overall confidence (backward compatible)
@@ -581,14 +628,22 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         f"{risk_report.high_count} high, {risk_report.low_count} low."
     )
 
+    # Include testability summary in processing notes (Story 9.6)
+    testability_summary = ""
+    if testability_report:
+        testability_summary = (
+            f" Testability: score={testability_report.score.score}, "
+            f"issues={testability_report.metrics.total_issues}."
+        )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
-        f"Total findings: {total_findings + len(test_findings)}.{test_stats} "
-        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}"
+        f"Total findings: {total_findings + len(test_findings) + len(testability_findings)}.{test_stats} "
+        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}{testability_summary}"
     )
 
-    # Create TEA output with test execution, confidence, and risk results (Story 9.3, 9.4, 9.5)
+    # Create TEA output with test execution, confidence, risk, and testability results (Story 9.3, 9.4, 9.5, 9.6)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
@@ -598,6 +653,7 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         confidence_result=confidence_result,
         risk_report=risk_report,
         overall_risk_level=risk_report.overall_risk_level,
+        testability_report=testability_report,
     )
 
     # Create decision record with TEA attribution (AC6)

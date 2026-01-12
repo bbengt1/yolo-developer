@@ -508,7 +508,9 @@ def _calculate_validation_score(
             penalty = min(count * per_finding, max_penalty)
             total_penalty += penalty
             capped_note = " (capped)" if count * per_finding > max_penalty else ""
-            penalty_descriptions.append(f"-{penalty} for {count} {severity} finding(s){capped_note}")
+            penalty_descriptions.append(
+                f"-{penalty} for {count} {severity} finding(s){capped_note}"
+            )
 
     score = max(0.0, 100.0 - total_penalty)
 
@@ -527,25 +529,29 @@ def _apply_score_modifiers(
     base_score: float,
     breakdown: ConfidenceBreakdown,
     perfect_tests: bool = False,
+    testability_score: int | None = None,
 ) -> tuple[float, list[str]]:
     """Apply score modifiers (bonuses and penalties).
 
     Currently applies:
     - +5 bonus for perfect test pass rate (all tests pass)
-
-    Additional modifiers can be added here as needed.
+    - Testability modifiers based on testability audit score (Story 9.6 AC6):
+      - +3 bonus if testability score is 100 (perfectly testable code)
+      - -3 penalty if testability score is below 70 (moderate issues)
+      - -5 penalty if testability score is below 50 (significant issues)
 
     Args:
         base_score: Score before modifiers.
         breakdown: ConfidenceBreakdown for context.
         perfect_tests: Whether all tests passed perfectly.
+        testability_score: Testability score from audit (0-100), or None if not available.
 
     Returns:
         Tuple of (modified_score, list_of_reasons).
 
     Example:
-        >>> _apply_score_modifiers(95.0, breakdown, perfect_tests=True)
-        (100.0, ["+5 for perfect test pass rate"])
+        >>> _apply_score_modifiers(95.0, breakdown, perfect_tests=True, testability_score=100)
+        (100.0, ["+5 for perfect test pass rate", "+3 for perfect testability"])
     """
     score = base_score
     reasons: list[str] = []
@@ -555,6 +561,29 @@ def _apply_score_modifiers(
         score += 5.0
         reasons.append("+5 for perfect test pass rate")
         logger.debug("score_modifier_perfect_tests_bonus", bonus=5.0)
+
+    # Testability score modifiers (Story 9.6 AC6)
+    if testability_score is not None:
+        if testability_score == 100:
+            score += 3.0
+            reasons.append("+3 for perfect testability")
+            logger.debug("score_modifier_testability_bonus", bonus=3.0, testability_score=100)
+        elif testability_score < 50:
+            score -= 5.0
+            reasons.append(f"-5 for low testability score ({testability_score})")
+            logger.debug(
+                "score_modifier_testability_penalty",
+                penalty=5.0,
+                testability_score=testability_score,
+            )
+        elif testability_score < 70:
+            score -= 3.0
+            reasons.append(f"-3 for moderate testability score ({testability_score})")
+            logger.debug(
+                "score_modifier_testability_penalty",
+                penalty=3.0,
+                testability_score=testability_score,
+            )
 
     # Clamp to 0-100
     score = max(0.0, min(100.0, score))
@@ -642,11 +671,13 @@ def calculate_confidence_score(
     test_execution_result: TestExecutionResult | None = None,
     weights: ConfidenceWeight | None = None,
     threshold: int = 90,
+    testability_score: int | None = None,
 ) -> ConfidenceResult:
     """Calculate comprehensive confidence score.
 
     Combines coverage, test execution, and validation scores using
-    weighted factors to produce a final confidence score.
+    weighted factors to produce a final confidence score. Testability
+    score applies modifiers to the final score (Story 9.6 AC6).
 
     Formula:
         weighted_score = (
@@ -654,6 +685,7 @@ def calculate_confidence_score(
             test_execution_score * test_execution_weight +
             validation_score * validation_weight
         )
+        + testability_modifiers
 
     Args:
         validation_results: Tuple of ValidationResult from TEA validation.
@@ -661,6 +693,7 @@ def calculate_confidence_score(
         test_execution_result: TestExecutionResult from execute_tests (optional).
         weights: ConfidenceWeight to use (uses defaults if None).
         threshold: Deployment threshold score (default 90).
+        testability_score: Testability score from audit (0-100), applies modifiers.
 
     Returns:
         ConfidenceResult with score, breakdown, and recommendation.
@@ -670,6 +703,7 @@ def calculate_confidence_score(
         ...     validation_results=(validation_result,),
         ...     coverage_report=coverage_report,
         ...     test_execution_result=test_result,
+        ...     testability_score=85,
         ... )
         >>> result.score
         85
@@ -718,9 +752,12 @@ def calculate_confidence_score(
         final_score=int(base_score),  # Placeholder, updated after modifiers
     )
 
-    # Apply modifiers
+    # Apply modifiers (including testability score per Story 9.6 AC6)
     final_score_float, modifier_reasons = _apply_score_modifiers(
-        base_score, initial_breakdown, perfect_tests=perfect_tests
+        base_score,
+        initial_breakdown,
+        perfect_tests=perfect_tests,
+        testability_score=testability_score,
     )
     final_score = int(final_score_float)
 
