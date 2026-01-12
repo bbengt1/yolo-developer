@@ -1,4 +1,4 @@
-"""TEA agent node for LangGraph orchestration (Story 9.1).
+"""TEA agent node for LangGraph orchestration (Story 9.1, 9.3).
 
 This module provides the tea_node function that integrates with the
 LangGraph orchestration workflow. The TEA (Test Engineering and Assurance)
@@ -10,6 +10,7 @@ Key Concepts:
 - **Async I/O**: All LLM calls use async/await
 - **Structured Logging**: Uses structlog for audit trail
 - **Confidence Scoring**: Calculates deployment readiness scores
+- **Test Execution**: Executes tests and adjusts confidence based on results (Story 9.3)
 
 Example:
     >>> from yolo_developer.agents.tea import tea_node
@@ -246,7 +247,9 @@ def _validate_artifact(
 
         # Coverage analysis (Story 9.2)
         code_files = [{"artifact_id": artifact_id, "content": content}]
-        test_files = [{"artifact_id": "tests/combined.py", "content": test_content}] if test_content else []
+        test_files = (
+            [{"artifact_id": "tests/combined.py", "content": test_content}] if test_content else []
+        )
 
         coverage_report = analyze_coverage(code_files, test_files)
 
@@ -418,9 +421,37 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
     test_artifacts = [a for a in artifacts if a.get("type") == "test_file"]
 
     # Combine all test content for coverage heuristics
-    combined_test_content = "\n".join(
-        a.get("content", "") for a in test_artifacts
+    combined_test_content = "\n".join(a.get("content", "") for a in test_artifacts)
+
+    # Execute tests and get results (Story 9.3)
+    from yolo_developer.agents.tea.execution import (
+        TestExecutionResult,
+        execute_tests,
+        generate_test_findings,
     )
+
+    test_execution_result: TestExecutionResult | None = None
+    test_findings: list[Finding] = []
+
+    if test_artifacts:
+        # Prepare test files for execution
+        test_files = [
+            {"artifact_id": a.get("artifact_id", "unknown"), "content": a.get("content", "")}
+            for a in test_artifacts
+        ]
+        test_execution_result = execute_tests(test_files)
+        test_findings = generate_test_findings(test_execution_result)
+
+        logger.info(
+            "test_execution_complete",
+            test_count=test_execution_result.passed_count
+            + test_execution_result.failed_count
+            + test_execution_result.error_count,
+            passed=test_execution_result.passed_count,
+            failed=test_execution_result.failed_count,
+            errors=test_execution_result.error_count,
+            status=test_execution_result.status,
+        )
 
     # Validate each artifact (AC3)
     validation_results: list[ValidationResult] = []
@@ -432,10 +463,74 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             result = _validate_artifact(artifact)
         validation_results.append(result)
 
+    # Add test execution findings as a validation result (Story 9.3 AC6)
+    if test_findings:
+        test_validation_status: ValidationStatus = "passed"
+        if any(f.severity == "critical" for f in test_findings):
+            test_validation_status = "failed"
+        elif any(f.severity in ("high", "medium") for f in test_findings):
+            test_validation_status = "warning"
+
+        test_validation_result = ValidationResult(
+            artifact_id="test_execution",
+            validation_status=test_validation_status,
+            findings=tuple(test_findings),
+            recommendations=("Review and fix test issues before deployment.",),
+            score=max(0, 100 - len(test_findings) * 10),
+        )
+        validation_results.append(test_validation_result)
+
+        logger.debug(
+            "test_findings_added_to_validation",
+            finding_count=len(test_findings),
+            validation_status=test_validation_status,
+        )
+
     # Calculate overall confidence (AC3, AC5)
     overall_confidence, deployment_recommendation = _calculate_overall_confidence(
         validation_results
     )
+
+    # Adjust confidence based on test execution results (Story 9.3)
+    if test_execution_result:
+        total_tests = (
+            test_execution_result.passed_count
+            + test_execution_result.failed_count
+            + test_execution_result.error_count
+        )
+        if total_tests > 0:
+            # Capture original before adjustment for logging
+            original_confidence = overall_confidence
+
+            pass_rate = test_execution_result.passed_count / total_tests
+            # Test results can adjust confidence by up to 30%
+            test_confidence_weight = 0.3
+            test_confidence_adjustment = pass_rate * test_confidence_weight
+
+            # Error penalty: -10% per error
+            error_penalty = test_execution_result.error_count * 0.1
+
+            # Apply adjustment
+            adjusted_confidence = (
+                original_confidence * (1 - test_confidence_weight)
+                + test_confidence_adjustment
+                - error_penalty
+            )
+            overall_confidence = max(0.0, min(1.0, adjusted_confidence))
+
+            logger.debug(
+                "confidence_adjusted_for_tests",
+                pass_rate=pass_rate,
+                original_confidence=original_confidence,
+                adjusted_confidence=overall_confidence,
+                test_confidence_weight=test_confidence_weight,
+            )
+
+            # Update deployment recommendation if tests have issues
+            if test_execution_result.error_count > 0:
+                deployment_recommendation = "block"
+            elif test_execution_result.failed_count > 0 and deployment_recommendation == "deploy":
+                deployment_recommendation = "deploy_with_warnings"
 
     # Build processing notes
     total_findings = sum(len(r.findings) for r in validation_results)
@@ -443,19 +538,29 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
     warning_count = sum(1 for r in validation_results if r.validation_status == "warning")
     passed_count = sum(1 for r in validation_results if r.validation_status == "passed")
 
+    # Include test execution stats in processing notes
+    test_stats = ""
+    if test_execution_result:
+        test_stats = (
+            f" Test execution: {test_execution_result.passed_count} passed, "
+            f"{test_execution_result.failed_count} failed, "
+            f"{test_execution_result.error_count} errors."
+        )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
-        f"Total findings: {total_findings}. "
+        f"Total findings: {total_findings + len(test_findings)}.{test_stats} "
         f"Overall confidence: {overall_confidence:.2%}."
     )
 
-    # Create TEA output
+    # Create TEA output with test execution result (Story 9.3)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
         overall_confidence=overall_confidence,
         deployment_recommendation=deployment_recommendation,
+        test_execution_result=test_execution_result,
     )
 
     # Create decision record with TEA attribution (AC6)

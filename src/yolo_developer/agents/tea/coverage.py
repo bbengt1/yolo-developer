@@ -125,6 +125,7 @@ def get_critical_paths_from_config() -> tuple[str, ...]:
         )
         return DEFAULT_CRITICAL_PATH_PATTERNS
 
+
 # =============================================================================
 # Data Classes
 # =============================================================================
@@ -523,7 +524,9 @@ def analyze_coverage(
         lines_covered = int(lines_total * coverage_percentage / 100.0)
 
         # Detect uncovered functions
-        uncovered_ranges = _detect_uncovered_functions(content, code_functions, combined_test_content)
+        uncovered_ranges = _detect_uncovered_functions(
+            content, code_functions, combined_test_content
+        )
 
         result = CoverageResult(
             file_path=file_path,

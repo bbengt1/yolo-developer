@@ -1,4 +1,4 @@
-"""Type definitions for TEA agent (Story 9.1).
+"""Type definitions for TEA agent (Story 9.1, 9.3).
 
 This module provides the data types used by the TEA (Test Engineering and Assurance) agent:
 
@@ -7,7 +7,7 @@ This module provides the data types used by the TEA (Test Engineering and Assura
 - FindingCategory: Literal type for finding categories
 - Finding: A validation finding with severity and remediation
 - ValidationResult: Complete validation result for an artifact
-- TEAOutput: Complete output from TEA processing
+- TEAOutput: Complete output from TEA processing (includes test execution results)
 
 All types are frozen dataclasses (immutable) per ADR-001 for internal state.
 
@@ -38,7 +38,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from yolo_developer.agents.tea.execution import TestExecutionResult
 
 # =============================================================================
 # Literal Types
@@ -229,6 +232,7 @@ class TEAOutput:
         processing_notes: Notes about the processing (stats, issues, etc.)
         overall_confidence: Weighted confidence score from 0.0 to 1.0
         deployment_recommendation: Recommendation for deployment decision
+        test_execution_result: Test execution results (Story 9.3)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -246,6 +250,7 @@ class TEAOutput:
     processing_notes: str = ""
     overall_confidence: float = 1.0
     deployment_recommendation: DeploymentRecommendation = "deploy"
+    test_execution_result: TestExecutionResult | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -259,5 +264,8 @@ class TEAOutput:
             "processing_notes": self.processing_notes,
             "overall_confidence": self.overall_confidence,
             "deployment_recommendation": self.deployment_recommendation,
+            "test_execution_result": self.test_execution_result.to_dict()
+            if self.test_execution_result
+            else None,
             "created_at": self.created_at,
         }
