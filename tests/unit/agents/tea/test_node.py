@@ -180,12 +180,19 @@ class TestTeaNodeEmptyState:
         assert "tea_output" in result
 
     @pytest.mark.asyncio
-    async def test_empty_state_confidence_is_full(self, empty_state: YoloState) -> None:
-        """Test that empty state results in full confidence."""
+    async def test_empty_state_confidence_is_neutral(self, empty_state: YoloState) -> None:
+        """Test that empty state results in neutral confidence (Story 9.4).
+
+        With the new confidence scoring system (Story 9.4), empty state returns
+        neutral scores: coverage=50, test_exec=50, validation=100.
+        Weighted: 50*0.4 + 50*0.3 + 100*0.3 = 20 + 15 + 30 = 65 -> 0.65
+        """
         result = await tea_node(empty_state)
         tea_output = result["tea_output"]
-        assert tea_output["overall_confidence"] == 1.0
-        assert tea_output["deployment_recommendation"] == "deploy"
+        # Story 9.4: Neutral confidence is 65% (not 100%)
+        assert tea_output["overall_confidence"] == 0.65
+        # Deployment blocked due to low confidence
+        assert tea_output["deployment_recommendation"] == "block"
 
 
 class TestValidateArtifact:

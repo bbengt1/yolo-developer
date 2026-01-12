@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from yolo_developer.agents.tea.execution import TestExecutionResult
+    from yolo_developer.agents.tea.scoring import ConfidenceResult
 
 # =============================================================================
 # Literal Types
@@ -251,6 +252,7 @@ class TEAOutput:
     overall_confidence: float = 1.0
     deployment_recommendation: DeploymentRecommendation = "deploy"
     test_execution_result: TestExecutionResult | None = None
+    confidence_result: ConfidenceResult | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -266,6 +268,9 @@ class TEAOutput:
             "deployment_recommendation": self.deployment_recommendation,
             "test_execution_result": self.test_execution_result.to_dict()
             if self.test_execution_result
+            else None,
+            "confidence_result": self.confidence_result.to_dict()
+            if self.confidence_result
             else None,
             "created_at": self.created_at,
         }

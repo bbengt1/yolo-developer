@@ -65,6 +65,15 @@ from yolo_developer.agents.tea.execution import (
     generate_test_findings,
 )
 from yolo_developer.agents.tea.node import tea_node
+from yolo_developer.agents.tea.scoring import (
+    ConfidenceBreakdown,
+    ConfidenceResult,
+    ConfidenceWeight,
+    calculate_confidence_score,
+    check_deployment_threshold,
+    get_default_weights,
+    validate_weights,
+)
 from yolo_developer.agents.tea.types import (
     DeploymentRecommendation,
     Finding,
@@ -76,6 +85,9 @@ from yolo_developer.agents.tea.types import (
 )
 
 __all__ = [
+    "ConfidenceBreakdown",
+    "ConfidenceResult",
+    "ConfidenceWeight",
     "CoverageReport",
     "CoverageResult",
     "DeploymentRecommendation",
@@ -90,13 +102,17 @@ __all__ = [
     "ValidationResult",
     "ValidationStatus",
     "analyze_coverage",
+    "calculate_confidence_score",
     "check_coverage_threshold",
+    "check_deployment_threshold",
     "detect_test_issues",
     "discover_tests",
     "execute_tests",
     "generate_test_findings",
     "get_coverage_threshold_from_config",
     "get_critical_paths_from_config",
+    "get_default_weights",
     "tea_node",
     "validate_critical_paths",
+    "validate_weights",
 ]

@@ -486,51 +486,42 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             validation_status=test_validation_status,
         )
 
-    # Calculate overall confidence (AC3, AC5)
-    overall_confidence, deployment_recommendation = _calculate_overall_confidence(
-        validation_results
+    # Calculate coverage report for confidence scoring (Story 9.4)
+    from yolo_developer.agents.tea.coverage import analyze_coverage
+    from yolo_developer.agents.tea.scoring import calculate_confidence_score
+
+    # Prepare code and test files for coverage analysis
+    code_artifacts = [a for a in artifacts if a.get("type") == "code_file"]
+    code_files = [
+        {"artifact_id": a.get("artifact_id", "unknown"), "content": a.get("content", "")}
+        for a in code_artifacts
+    ]
+    test_files_for_coverage = [
+        {"artifact_id": a.get("artifact_id", "unknown"), "content": a.get("content", "")}
+        for a in test_artifacts
+    ]
+
+    coverage_report = None
+    if code_files:
+        coverage_report = analyze_coverage(code_files, test_files_for_coverage)
+
+    # Calculate comprehensive confidence score using Story 9.4 system
+    confidence_result = calculate_confidence_score(
+        validation_results=tuple(validation_results),
+        coverage_report=coverage_report,
+        test_execution_result=test_execution_result,
     )
 
-    # Adjust confidence based on test execution results (Story 9.3)
-    if test_execution_result:
-        total_tests = (
-            test_execution_result.passed_count
-            + test_execution_result.failed_count
-            + test_execution_result.error_count
-        )
-        if total_tests > 0:
-            # Capture original before adjustment for logging
-            original_confidence = overall_confidence
+    # Use new confidence scoring for overall confidence (backward compatible)
+    overall_confidence = confidence_result.score / 100.0  # Convert 0-100 to 0-1
+    deployment_recommendation = confidence_result.deployment_recommendation
 
-            pass_rate = test_execution_result.passed_count / total_tests
-            # Test results can adjust confidence by up to 30%
-            test_confidence_weight = 0.3
-            test_confidence_adjustment = pass_rate * test_confidence_weight
-
-            # Error penalty: -10% per error
-            error_penalty = test_execution_result.error_count * 0.1
-
-            # Apply adjustment
-            adjusted_confidence = (
-                original_confidence * (1 - test_confidence_weight)
-                + test_confidence_adjustment
-                - error_penalty
-            )
-            overall_confidence = max(0.0, min(1.0, adjusted_confidence))
-
-            logger.debug(
-                "confidence_adjusted_for_tests",
-                pass_rate=pass_rate,
-                original_confidence=original_confidence,
-                adjusted_confidence=overall_confidence,
-                test_confidence_weight=test_confidence_weight,
-            )
-
-            # Update deployment recommendation if tests have issues
-            if test_execution_result.error_count > 0:
-                deployment_recommendation = "block"
-            elif test_execution_result.failed_count > 0 and deployment_recommendation == "deploy":
-                deployment_recommendation = "deploy_with_warnings"
+    logger.debug(
+        "confidence_score_calculated",
+        score=confidence_result.score,
+        passed_threshold=confidence_result.passed_threshold,
+        recommendation=deployment_recommendation,
+    )
 
     # Build processing notes
     total_findings = sum(len(r.findings) for r in validation_results)
@@ -547,20 +538,29 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             f"{test_execution_result.error_count} errors."
         )
 
+    # Include confidence breakdown summary in processing notes
+    confidence_summary = (
+        f" Confidence breakdown: "
+        f"coverage={confidence_result.breakdown.coverage_score:.1f}, "
+        f"tests={confidence_result.breakdown.test_execution_score:.1f}, "
+        f"validation={confidence_result.breakdown.validation_score:.1f}."
+    )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
         f"Total findings: {total_findings + len(test_findings)}.{test_stats} "
-        f"Overall confidence: {overall_confidence:.2%}."
+        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}"
     )
 
-    # Create TEA output with test execution result (Story 9.3)
+    # Create TEA output with test execution and confidence results (Story 9.3, 9.4)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
         overall_confidence=overall_confidence,
         deployment_recommendation=deployment_recommendation,
         test_execution_result=test_execution_result,
+        confidence_result=confidence_result,
     )
 
     # Create decision record with TEA attribution (AC6)
