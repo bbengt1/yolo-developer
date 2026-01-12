@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from yolo_developer.agents.tea.blocking import DeploymentDecisionReport
     from yolo_developer.agents.tea.execution import TestExecutionResult
+    from yolo_developer.agents.tea.gap_analysis import GapAnalysisReport
     from yolo_developer.agents.tea.risk import OverallRiskLevel, RiskReport
     from yolo_developer.agents.tea.scoring import ConfidenceResult
     from yolo_developer.agents.tea.testability import TestabilityReport
@@ -242,6 +243,7 @@ class TEAOutput:
         overall_risk_level: Highest risk level present (critical/high/low/none) (Story 9.5)
         testability_report: Testability audit report with patterns and score (Story 9.6)
         deployment_decision_report: Complete deployment decision report (Story 9.7)
+        gap_analysis_report: Test gap analysis report with suggestions (Story 9.8)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -265,6 +267,7 @@ class TEAOutput:
     overall_risk_level: OverallRiskLevel | None = None
     testability_report: TestabilityReport | None = None
     deployment_decision_report: DeploymentDecisionReport | None = None
+    gap_analysis_report: GapAnalysisReport | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -291,6 +294,9 @@ class TEAOutput:
             else None,
             "deployment_decision_report": self.deployment_decision_report.to_dict()
             if self.deployment_decision_report
+            else None,
+            "gap_analysis_report": self.gap_analysis_report.to_dict()
+            if self.gap_analysis_report
             else None,
             "created_at": self.created_at,
         }

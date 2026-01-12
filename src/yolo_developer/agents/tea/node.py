@@ -624,6 +624,25 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             remediation_step_count=len(deployment_decision_report.remediation_steps),
         )
 
+    # Generate gap analysis report (Story 9.8)
+    from yolo_developer.agents.tea.gap_analysis import (
+        GapAnalysisReport,
+        generate_gap_analysis_report,
+    )
+
+    gap_analysis_report: GapAnalysisReport | None = None
+    if coverage_report:
+        gap_analysis_report = generate_gap_analysis_report(
+            coverage_report=coverage_report,
+        )
+
+        logger.info(
+            "gap_analysis_complete",
+            gap_count=len(gap_analysis_report.gaps),
+            suggestion_count=len(gap_analysis_report.suggestions),
+            projected_coverage=gap_analysis_report.projected_coverage,
+        )
+
     # Build processing notes
     total_findings = sum(len(r.findings) for r in validation_results)
     failed_count = sum(1 for r in validation_results if r.validation_status == "failed")
@@ -669,14 +688,22 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             f" ({len(deployment_decision_report.blocking_reasons)} blocking reasons)."
         )
 
+    # Include gap analysis summary in processing notes (Story 9.8)
+    gap_summary = ""
+    if gap_analysis_report:
+        gap_summary = (
+            f" Gap analysis: {gap_analysis_report.summary.total_gaps} gaps, "
+            f"{gap_analysis_report.summary.total_suggestions} suggestions."
+        )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
         f"Total findings: {total_findings + len(test_findings) + len(testability_findings)}.{test_stats} "
-        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}{testability_summary}{deployment_summary}"
+        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}{testability_summary}{deployment_summary}{gap_summary}"
     )
 
-    # Create TEA output with test execution, confidence, risk, testability, and deployment decision (Story 9.3, 9.4, 9.5, 9.6, 9.7)
+    # Create TEA output with test execution, confidence, risk, testability, deployment decision, and gap analysis (Story 9.3-9.8)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
@@ -688,6 +715,7 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         overall_risk_level=risk_report.overall_risk_level,
         testability_report=testability_report,
         deployment_decision_report=deployment_decision_report,
+        gap_analysis_report=gap_analysis_report,
     )
 
     # Create decision record with TEA attribution (AC6)

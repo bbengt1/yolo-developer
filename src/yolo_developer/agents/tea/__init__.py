@@ -1,4 +1,4 @@
-"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5, 9.6, 9.7).
+"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5, 9.6, 9.7, 9.8).
 
 The TEA (Test Engineering and Assurance) agent is responsible for:
 - Validating implementation artifacts from Dev agent
@@ -10,6 +10,7 @@ The TEA (Test Engineering and Assurance) agent is responsible for:
 - Generating risk reports with deployment blocking for critical risks (Story 9.5)
 - Auditing code for testability anti-patterns (Story 9.6)
 - Deployment blocking with blocking reasons and remediation guidance (Story 9.7)
+- Gap analysis reports with prioritized test suggestions (Story 9.8)
 
 Example:
     >>> from yolo_developer.agents.tea import (
@@ -85,6 +86,24 @@ from yolo_developer.agents.tea.execution import (
     execute_tests,
     generate_test_findings,
 )
+from yolo_developer.agents.tea.gap_analysis import (
+    GapAnalysisReport,
+    GapAnalysisSummary,
+    GapPriority,
+    GapSeverity,
+    GapType,
+    SuggestionTestType,
+    TestGap,
+    TestSuggestion,
+    export_to_csv,
+    export_to_json,
+    export_to_markdown,
+    generate_gap_analysis_report,
+    generate_summary,
+    generate_test_suggestions,
+    identify_gaps,
+    prioritize_gaps,
+)
 from yolo_developer.agents.tea.node import tea_node
 from yolo_developer.agents.tea.risk import (
     CategorizedRisk,
@@ -147,13 +166,21 @@ __all__ = [
     "Finding",
     "FindingCategory",
     "FindingSeverity",
+    "GapAnalysisReport",
+    "GapAnalysisSummary",
+    "GapPriority",
+    "GapSeverity",
+    "GapType",
     "OverallRiskLevel",
     "RemediationStep",
     "RiskLevel",
     "RiskReport",
+    "SuggestionTestType",
     "TEAOutput",
     "TestExecutionResult",
     "TestFailure",
+    "TestGap",
+    "TestSuggestion",
     "TestabilityIssue",
     "TestabilityMetrics",
     "TestabilityPattern",
@@ -178,11 +205,17 @@ __all__ = [
     "discover_tests",
     "evaluate_deployment_decision",
     "execute_tests",
+    "export_to_csv",
+    "export_to_json",
+    "export_to_markdown",
     "generate_blocking_reasons",
     "generate_deployment_decision_report",
+    "generate_gap_analysis_report",
     "generate_remediation_steps",
     "generate_risk_report",
+    "generate_summary",
     "generate_test_findings",
+    "generate_test_suggestions",
     "generate_testability_recommendations",
     "get_acknowledgment_requirements",
     "get_coverage_threshold_from_config",
@@ -190,7 +223,9 @@ __all__ = [
     "get_default_weights",
     "get_deployment_threshold",
     "get_high_risk_count_threshold",
+    "identify_gaps",
     "is_deployment_blocking_enabled",
+    "prioritize_gaps",
     "tea_node",
     "validate_critical_paths",
     "validate_override",
