@@ -1,4 +1,4 @@
-"""TEA agent module for validation and quality assurance (Story 9.1, 9.3).
+"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5).
 
 The TEA (Test Engineering and Assurance) agent is responsible for:
 - Validating implementation artifacts from Dev agent
@@ -6,6 +6,8 @@ The TEA (Test Engineering and Assurance) agent is responsible for:
 - Identifying quality issues and providing remediation guidance
 - Blocking deployment when thresholds are not met
 - Executing tests and reporting results (Story 9.3)
+- Categorizing risks by severity (Critical/High/Low) with appropriate responses (Story 9.5)
+- Generating risk reports with deployment blocking for critical risks (Story 9.5)
 
 Example:
     >>> from yolo_developer.agents.tea import (
@@ -65,6 +67,17 @@ from yolo_developer.agents.tea.execution import (
     generate_test_findings,
 )
 from yolo_developer.agents.tea.node import tea_node
+from yolo_developer.agents.tea.risk import (
+    CategorizedRisk,
+    OverallRiskLevel,
+    RiskLevel,
+    RiskReport,
+    categorize_finding,
+    categorize_risks,
+    check_risk_deployment_blocking,
+    generate_risk_report,
+    get_acknowledgment_requirements,
+)
 from yolo_developer.agents.tea.scoring import (
     ConfidenceBreakdown,
     ConfidenceResult,
@@ -85,6 +98,7 @@ from yolo_developer.agents.tea.types import (
 )
 
 __all__ = [
+    "CategorizedRisk",
     "ConfidenceBreakdown",
     "ConfidenceResult",
     "ConfidenceWeight",
@@ -96,6 +110,9 @@ __all__ = [
     "Finding",
     "FindingCategory",
     "FindingSeverity",
+    "OverallRiskLevel",
+    "RiskLevel",
+    "RiskReport",
     "TEAOutput",
     "TestExecutionResult",
     "TestFailure",
@@ -103,12 +120,17 @@ __all__ = [
     "ValidationStatus",
     "analyze_coverage",
     "calculate_confidence_score",
+    "categorize_finding",
+    "categorize_risks",
     "check_coverage_threshold",
     "check_deployment_threshold",
+    "check_risk_deployment_blocking",
     "detect_test_issues",
     "discover_tests",
     "execute_tests",
+    "generate_risk_report",
     "generate_test_findings",
+    "get_acknowledgment_requirements",
     "get_coverage_threshold_from_config",
     "get_critical_paths_from_config",
     "get_default_weights",

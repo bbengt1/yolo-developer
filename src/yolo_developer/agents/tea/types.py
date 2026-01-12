@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from yolo_developer.agents.tea.execution import TestExecutionResult
+    from yolo_developer.agents.tea.risk import OverallRiskLevel, RiskReport
     from yolo_developer.agents.tea.scoring import ConfidenceResult
 
 # =============================================================================
@@ -226,7 +227,7 @@ class TEAOutput:
     """Complete output from TEA agent processing.
 
     Contains all validation results generated during tea_node execution,
-    plus overall confidence score and deployment recommendation.
+    plus overall confidence score, deployment recommendation, and risk report.
 
     Attributes:
         validation_results: Tuple of validation results per artifact
@@ -234,6 +235,9 @@ class TEAOutput:
         overall_confidence: Weighted confidence score from 0.0 to 1.0
         deployment_recommendation: Recommendation for deployment decision
         test_execution_result: Test execution results (Story 9.3)
+        confidence_result: Detailed confidence scoring breakdown (Story 9.4)
+        risk_report: Risk categorization report with severity breakdown (Story 9.5)
+        overall_risk_level: Highest risk level present (critical/high/low/none) (Story 9.5)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -253,6 +257,8 @@ class TEAOutput:
     deployment_recommendation: DeploymentRecommendation = "deploy"
     test_execution_result: TestExecutionResult | None = None
     confidence_result: ConfidenceResult | None = None
+    risk_report: RiskReport | None = None
+    overall_risk_level: OverallRiskLevel | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -272,5 +278,7 @@ class TEAOutput:
             "confidence_result": self.confidence_result.to_dict()
             if self.confidence_result
             else None,
+            "risk_report": self.risk_report.to_dict() if self.risk_report else None,
+            "overall_risk_level": self.overall_risk_level,
             "created_at": self.created_at,
         }

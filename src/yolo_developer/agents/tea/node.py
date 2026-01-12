@@ -488,6 +488,11 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
 
     # Calculate coverage report for confidence scoring (Story 9.4)
     from yolo_developer.agents.tea.coverage import analyze_coverage
+    from yolo_developer.agents.tea.risk import (
+        categorize_risks,
+        check_risk_deployment_blocking,
+        generate_risk_report,
+    )
     from yolo_developer.agents.tea.scoring import calculate_confidence_score
 
     # Prepare code and test files for coverage analysis
@@ -523,6 +528,30 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         recommendation=deployment_recommendation,
     )
 
+    # Risk categorization (Story 9.5)
+    categorized_risks = categorize_risks(tuple(validation_results))
+    risk_report = generate_risk_report(categorized_risks)
+
+    # Check if risk should block deployment (in addition to confidence score)
+    risk_blocked, risk_blocking_reasons = check_risk_deployment_blocking(risk_report)
+
+    # Update deployment recommendation if risk blocks
+    if risk_blocked and deployment_recommendation != "block":
+        deployment_recommendation = "block"
+        logger.warning(
+            "deployment_blocked_by_risk",
+            risk_blocking_reasons=risk_blocking_reasons,
+        )
+
+    logger.info(
+        "risk_categorization_complete",
+        critical_count=risk_report.critical_count,
+        high_count=risk_report.high_count,
+        low_count=risk_report.low_count,
+        overall_risk_level=risk_report.overall_risk_level,
+        deployment_blocked=risk_report.deployment_blocked,
+    )
+
     # Build processing notes
     total_findings = sum(len(r.findings) for r in validation_results)
     failed_count = sum(1 for r in validation_results if r.validation_status == "failed")
@@ -546,14 +575,20 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         f"validation={confidence_result.breakdown.validation_score:.1f}."
     )
 
+    # Include risk summary in processing notes (Story 9.5)
+    risk_summary = (
+        f" Risk: {risk_report.critical_count} critical, "
+        f"{risk_report.high_count} high, {risk_report.low_count} low."
+    )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
         f"Total findings: {total_findings + len(test_findings)}.{test_stats} "
-        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}"
+        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}"
     )
 
-    # Create TEA output with test execution and confidence results (Story 9.3, 9.4)
+    # Create TEA output with test execution, confidence, and risk results (Story 9.3, 9.4, 9.5)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
@@ -561,6 +596,8 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         deployment_recommendation=deployment_recommendation,
         test_execution_result=test_execution_result,
         confidence_result=confidence_result,
+        risk_report=risk_report,
+        overall_risk_level=risk_report.overall_risk_level,
     )
 
     # Create decision record with TEA attribution (AC6)

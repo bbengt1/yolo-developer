@@ -139,7 +139,7 @@ development_status:
   9-2-coverage-validation: done
   9-3-test-suite-execution: done
   9-4-confidence-scoring: done
-  9-5-risk-categorization: backlog
+  9-5-risk-categorization: done
   9-6-testability-audit: backlog
   9-7-deployment-blocking: backlog
   9-8-gap-analysis-reports: backlog
