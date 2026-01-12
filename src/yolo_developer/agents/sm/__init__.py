@@ -9,6 +9,7 @@ Key Responsibilities:
 - Escalation handling: Triggers human intervention when needed
 - Gate-blocked recovery: Routes to appropriate agent for recovery
 - Sprint planning: Plan sprints by prioritizing and sequencing stories (Story 10.3)
+- Task delegation: Delegate tasks to appropriate specialized agents (Story 10.4)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -17,6 +18,8 @@ Example:
     ...     AgentExchange,
     ...     plan_sprint,
     ...     SprintPlan,
+    ...     delegate_task,
+    ...     DelegationResult,
     ... )
     >>>
     >>> # Run the SM node
@@ -29,6 +32,11 @@ Example:
     >>> plan = await plan_sprint(stories)
     >>> plan.sprint_id
     'sprint-20260112'
+    >>>
+    >>> # Delegate a task (Story 10.4)
+    >>> result = await delegate_task(state, "implementation", "Implement feature")
+    >>> result.request.target_agent
+    'dev'
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -51,6 +59,22 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.sm.delegation import (
+    delegate_task,
+    routing_to_task_type,
+)
+from yolo_developer.agents.sm.delegation_types import (
+    AGENT_EXPERTISE,
+    DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS,
+    DEFAULT_MAX_RETRY_ATTEMPTS,
+    TASK_TO_AGENT,
+    VALID_TASK_TYPES,
+    DelegationConfig,
+    DelegationRequest,
+    DelegationResult,
+    Priority,
+    TaskType,
+)
 from yolo_developer.agents.sm.node import sm_node
 from yolo_developer.agents.sm.planning import (
     CircularDependencyError,
@@ -78,23 +102,35 @@ from yolo_developer.agents.sm.types import (
 )
 
 __all__ = [
+    "AGENT_EXPERTISE",
     "CIRCULAR_LOGIC_THRESHOLD",
+    "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
     "DEFAULT_DEPENDENCY_WEIGHT",
     "DEFAULT_MAX_POINTS",
+    "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
     "DEFAULT_TECH_DEBT_WEIGHT",
     "DEFAULT_VALUE_WEIGHT",
     "DEFAULT_VELOCITY_WEIGHT",
     "NATURAL_SUCCESSOR",
+    "TASK_TO_AGENT",
     "VALID_AGENTS",
+    "VALID_TASK_TYPES",
     "AgentExchange",
     "CircularDependencyError",
+    "DelegationConfig",
+    "DelegationRequest",
+    "DelegationResult",
     "EscalationReason",
     "PlanningConfig",
+    "Priority",
     "RoutingDecision",
     "SMOutput",
     "SprintPlan",
     "SprintStory",
+    "TaskType",
+    "delegate_task",
     "plan_sprint",
+    "routing_to_task_type",
     "sm_node",
 ]

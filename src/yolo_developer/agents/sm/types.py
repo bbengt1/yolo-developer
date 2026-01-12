@@ -148,6 +148,7 @@ class SMOutput:
         recovery_agent: Agent to route to for recovery (if gate_blocked)
         processing_notes: Additional notes about the decision process
         sprint_plan: Optional sprint plan when SM is in planning mode (Story 10.3)
+        delegation_result: Optional delegation result when task delegated (Story 10.4)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -172,6 +173,7 @@ class SMOutput:
     recovery_agent: str | None = None
     processing_notes: str = ""
     sprint_plan: dict[str, Any] | None = None
+    delegation_result: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -192,6 +194,7 @@ class SMOutput:
             "recovery_agent": self.recovery_agent,
             "processing_notes": self.processing_notes,
             "sprint_plan": self.sprint_plan,
+            "delegation_result": self.delegation_result,
             "created_at": self.created_at,
         }
 

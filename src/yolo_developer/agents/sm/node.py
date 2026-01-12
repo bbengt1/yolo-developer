@@ -40,6 +40,7 @@ from typing import Any
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -471,7 +472,30 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
     gate_blocked = analysis.get("gate_blocked", False)
     recovery_agent = _get_recovery_agent(state) if gate_blocked else None
 
-    # Step 6: Create processing notes
+    # Step 6: Delegate task to target agent (Story 10.4 - FR10)
+    delegation_result = None
+    handoff_context = None
+    if routing_decision not in ("escalate", "sm"):
+        # Convert routing decision to task type for delegation
+        task_type = routing_to_task_type(routing_decision)
+        if task_type is not None:
+            delegation_result = await delegate_task(
+                state=state,
+                task_type=task_type,
+                task_description=base_rationale,
+            )
+            if delegation_result.success:
+                handoff_context = delegation_result.handoff_context
+
+            logger.debug(
+                "delegation_completed",
+                target_agent=routing_decision,
+                task_type=task_type,
+                success=delegation_result.success,
+                acknowledged=delegation_result.acknowledged,
+            )
+
+    # Step 7: Create processing notes
     processing_notes = (
         f"Analyzed state with {analysis['message_count']} messages, "
         f"{analysis['decision_count']} decisions. "
@@ -479,6 +503,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         f"Circular: {is_circular}. "
         f"Gate blocked: {gate_blocked}."
     )
+    if delegation_result:
+        processing_notes += f" Delegation to {routing_decision}: {'success' if delegation_result.success else 'failed'}."
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -492,14 +518,18 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         gate_blocked=gate_blocked,
         recovery_agent=recovery_agent,
         processing_notes=processing_notes,
+        delegation_result=delegation_result.to_dict() if delegation_result else None,
     )
 
-    # Create decision record
+    # Create decision record (includes delegation info for audit trail - Task 4.2)
+    delegation_summary = ""
+    if delegation_result:
+        delegation_summary = f" Delegated {delegation_result.request.task_type} task."
     decision = Decision(
         agent="sm",
-        summary=f"Routing to {routing_decision}",
+        summary=f"Routing to {routing_decision}.{delegation_summary}",
         rationale=routing_rationale,
-        related_artifacts=(),
+        related_artifacts=("delegation",) if delegation_result else (),
     )
 
     # Create output message
@@ -515,12 +545,15 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         circular_detected=is_circular,
         escalation_triggered=should_escalate,
         exchange_count=exchange_count,
+        delegation_success=delegation_result.success if delegation_result else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
+    # Includes handoff_context for state updates (Task 7.4)
     return {
         "messages": [message],
         "decisions": [decision],
         "sm_output": output.to_dict(),
         "routing_decision": routing_decision,  # Convenience key for routing
+        "handoff_context": handoff_context,  # From delegation (Story 10.4)
     }

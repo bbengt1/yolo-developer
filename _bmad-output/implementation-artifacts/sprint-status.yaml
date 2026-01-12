@@ -150,7 +150,7 @@ development_status:
   10-1-create-langgraph-workflow: done
   10-2-sm-agent-node-implementation: done
   10-3-sprint-planning: done
-  10-4-task-delegation: backlog
+  10-4-task-delegation: done
   10-5-health-monitoring: backlog
   10-6-circular-logic-detection: backlog
   10-7-conflict-mediation: backlog
