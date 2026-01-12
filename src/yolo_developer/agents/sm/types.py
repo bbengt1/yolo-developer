@@ -216,7 +216,8 @@ VALID_AGENTS: frozenset[str] = frozenset(
 """Set of valid agent names for routing decisions."""
 
 # Natural successor mapping for standard workflow flow
-NATURAL_SUCCESSOR: dict[str, str] = {
+# Values are RoutingDecision literals to ensure type safety
+NATURAL_SUCCESSOR: dict[str, RoutingDecision] = {
     "analyst": "pm",
     "pm": "architect",
     "architect": "dev",

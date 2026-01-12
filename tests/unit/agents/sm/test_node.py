@@ -11,7 +11,6 @@ Tests the sm_node function and its helper functions:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -112,7 +111,7 @@ class TestCountRecentExchanges:
             create_agent_message("Message 2", "analyst"),
         ]
         state = create_test_state(messages=messages)
-        count, exchanges = _count_recent_exchanges(state)
+        count, _exchanges = _count_recent_exchanges(state)
 
         assert count == 0  # No handoffs between different agents
 
@@ -219,7 +218,7 @@ class TestCheckForCircularLogic:
             create_agent_message("Nope", "tea"),
         ]
         state = create_test_state(messages=messages)
-        is_circular, exchanges = _check_for_circular_logic(state)
+        is_circular, _exchanges = _check_for_circular_logic(state)
 
         # Should have detected circular pattern
         assert is_circular is True
@@ -576,3 +575,35 @@ class TestSMNodeIntegration:
         result = await sm_node(state)
 
         assert result["routing_decision"] == "dev"
+
+    @pytest.mark.asyncio
+    async def test_circular_logic_triggers_escalation_via_sm_node(self) -> None:
+        """Test that circular logic detection triggers escalation through sm_node (AC #4).
+
+        This integration test verifies the full path from ping-pong messages
+        through sm_node to escalation routing decision.
+        """
+        # Create ping-pong messages between dev and tea (>3 exchanges)
+        messages = [
+            create_agent_message("Implementation attempt 1", "dev"),
+            create_agent_message("Tests failing", "tea"),
+            create_agent_message("Implementation attempt 2", "dev"),
+            create_agent_message("Tests still failing", "tea"),
+            create_agent_message("Implementation attempt 3", "dev"),
+            create_agent_message("Tests still failing", "tea"),
+            create_agent_message("Implementation attempt 4", "dev"),
+            create_agent_message("Tests still failing", "tea"),
+        ]
+        state = create_test_state(
+            messages=messages,
+            current_agent="tea",
+        )
+
+        result = await sm_node(state)
+
+        # Should escalate due to circular logic
+        assert result["routing_decision"] == "escalate"
+        sm_output = result["sm_output"]
+        assert sm_output["circular_logic_detected"] is True
+        assert sm_output["escalation_triggered"] is True
+        assert sm_output["escalation_reason"] == "circular_logic"

@@ -148,7 +148,7 @@ development_status:
   # Epic 10: Orchestration & SM Agent (16 stories)
   epic-10: in-progress
   10-1-create-langgraph-workflow: done
-  10-2-sm-agent-node-implementation: review
+  10-2-sm-agent-node-implementation: done
   10-3-sprint-planning: backlog
   10-4-task-delegation: backlog
   10-5-health-monitoring: backlog

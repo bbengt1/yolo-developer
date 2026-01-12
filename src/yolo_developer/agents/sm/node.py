@@ -115,6 +115,7 @@ def _count_recent_exchanges(state: YoloState) -> tuple[int, list[AgentExchange]]
     """
     messages = state.get("messages", [])
     exchanges: list[AgentExchange] = []
+    skipped_count = 0
 
     prev_agent: str | None = None
     for msg in messages:
@@ -130,6 +131,15 @@ def _count_recent_exchanges(state: YoloState) -> tuple[int, list[AgentExchange]]
                 )
                 exchanges.append(exchange)
             prev_agent = agent
+        else:
+            skipped_count += 1
+
+    if skipped_count > 0:
+        logger.debug(
+            "exchange_tracking_skipped_messages",
+            skipped_count=skipped_count,
+            total_messages=len(messages),
+        )
 
     return len(exchanges), exchanges
 
@@ -235,7 +245,7 @@ def _check_for_circular_logic(state: YoloState) -> tuple[bool, list[AgentExchang
     return is_circular, exchanges
 
 
-def _get_recovery_agent(state: YoloState) -> str:
+def _get_recovery_agent(state: YoloState) -> RoutingDecision:
     """Determine which agent should handle recovery when gate is blocked.
 
     Analyzes state to determine the appropriate agent to route to
@@ -245,7 +255,7 @@ def _get_recovery_agent(state: YoloState) -> str:
         state: Current orchestration state with gate_blocked=True.
 
     Returns:
-        Agent name to route to for recovery.
+        Agent name to route to for recovery (guaranteed valid RoutingDecision).
 
     Example:
         >>> recovery_agent = _get_recovery_agent(state)
@@ -266,7 +276,7 @@ def _get_recovery_agent(state: YoloState) -> str:
     return "analyst"
 
 
-def _get_natural_successor(current_agent: str, state: YoloState) -> str:
+def _get_natural_successor(current_agent: str, state: YoloState) -> RoutingDecision:
     """Get the natural successor agent in the workflow.
 
     Uses standard workflow progression with state-aware overrides.
@@ -276,7 +286,7 @@ def _get_natural_successor(current_agent: str, state: YoloState) -> str:
         state: Current orchestration state.
 
     Returns:
-        Next agent in natural workflow progression.
+        Next agent in natural workflow progression (guaranteed valid RoutingDecision).
 
     Example:
         >>> _get_natural_successor("analyst", state)
@@ -288,7 +298,7 @@ def _get_natural_successor(current_agent: str, state: YoloState) -> str:
             return "architect"
         return "dev"  # Skip architect if not needed
 
-    # Use standard succession
+    # Use standard succession - NATURAL_SUCCESSOR is typed as dict[str, RoutingDecision]
     return NATURAL_SUCCESSOR.get(current_agent, "analyst")
 
 
@@ -327,7 +337,7 @@ def _get_next_agent(state: YoloState) -> tuple[RoutingDecision, str]:
     # Priority 3: Check for blocked gates
     if state.get("gate_blocked", False):
         recovery = _get_recovery_agent(state)
-        return recovery, f"Gate blocked, routing to {recovery} for recovery"  # type: ignore[return-value]
+        return recovery, f"Gate blocked, routing to {recovery} for recovery"
 
     # Priority 4: Normal flow based on current agent
     current = state.get("current_agent", "")
@@ -341,7 +351,7 @@ def _get_next_agent(state: YoloState) -> tuple[RoutingDecision, str]:
     next_agent = _get_natural_successor(current, state)
     rationale = f"Natural workflow progression from {current} to {next_agent}"
 
-    return next_agent, rationale  # type: ignore[return-value]
+    return next_agent, rationale
 
 
 def _get_routing_rationale(

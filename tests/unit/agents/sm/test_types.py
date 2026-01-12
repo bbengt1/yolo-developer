@@ -214,6 +214,8 @@ class TestConstants:
 
         # All agents except escalate should have a natural successor
         assert "escalate" not in agents_with_successors
+        # Verify all expected agents have successors defined
+        assert agents_with_successors == expected_agents
 
 
 class TestRoutingDecisionType:
