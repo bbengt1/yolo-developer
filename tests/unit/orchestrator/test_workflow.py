@@ -76,7 +76,7 @@ class TestAgentNodeRegistry:
         from yolo_developer.orchestrator.workflow import get_default_agent_nodes
 
         nodes = get_default_agent_nodes()
-        expected_agents = {"analyst", "pm", "architect", "dev", "tea"}
+        expected_agents = {"analyst", "pm", "architect", "dev", "tea", "sm"}
         assert set(nodes.keys()) == expected_agents
 
     def test_get_default_agent_nodes_values_are_callable(self) -> None:

@@ -1,4 +1,4 @@
-"""Agents package for YOLO Developer (Story 5.1+, 6.1+, 7.1+, 8.1+, 9.1+).
+"""Agents package for YOLO Developer (Story 5.1+, 6.1+, 7.1+, 8.1+, 9.1+, 10.2).
 
 This package contains the agent implementations for the multi-agent
 orchestration system. Each agent is implemented as a LangGraph node
@@ -13,6 +13,7 @@ Available Agents:
     architect_node: Design decisions and ADR generation
     dev_node: Code implementation and test generation
     tea_node: Validation and quality assurance
+    sm_node: Orchestration control plane and routing decisions
 
 Types:
     CrystallizedRequirement: A refined requirement with category and testability
@@ -50,7 +51,7 @@ Architecture:
 
 from __future__ import annotations
 
-from yolo_developer.agents import architect, dev, tea
+from yolo_developer.agents import architect, dev, sm, tea
 from yolo_developer.agents.analyst import (
     AnalystOutput,
     CrystallizedRequirement,
@@ -77,6 +78,13 @@ from yolo_developer.agents.pm import (
     StoryStatus,
     pm_node,
 )
+from yolo_developer.agents.sm import (
+    AgentExchange,
+    EscalationReason,
+    RoutingDecision,
+    SMOutput,
+    sm_node,
+)
 from yolo_developer.agents.tea import (
     DeploymentRecommendation,
     Finding,
@@ -91,6 +99,7 @@ from yolo_developer.agents.tea import (
 __all__ = [
     "ADR",
     "AcceptanceCriterion",
+    "AgentExchange",
     "AnalystOutput",
     "ArchitectOutput",
     "CodeFile",
@@ -98,11 +107,14 @@ __all__ = [
     "DeploymentRecommendation",
     "DesignDecision",
     "DevOutput",
+    "EscalationReason",
     "Finding",
     "FindingCategory",
     "FindingSeverity",
     "ImplementationArtifact",
     "PMOutput",
+    "RoutingDecision",
+    "SMOutput",
     "Story",
     "StoryPriority",
     "StoryStatus",
@@ -116,6 +128,8 @@ __all__ = [
     "dev",
     "dev_node",
     "pm_node",
+    "sm",
+    "sm_node",
     "tea",
     "tea_node",
 ]

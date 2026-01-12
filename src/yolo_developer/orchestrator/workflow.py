@@ -73,7 +73,7 @@ def get_default_agent_nodes() -> dict[str, AgentNode]:
     """Get the default set of agent nodes for the workflow.
 
     Returns a dictionary mapping agent names to their node functions.
-    All required agents (analyst, pm, architect, dev, tea) are included.
+    All required agents (analyst, pm, architect, dev, tea, sm) are included.
 
     Returns:
         Dict mapping agent name to async node function.
@@ -81,6 +81,7 @@ def get_default_agent_nodes() -> dict[str, AgentNode]:
     Example:
         >>> nodes = get_default_agent_nodes()
         >>> assert "analyst" in nodes
+        >>> assert "sm" in nodes
         >>> assert callable(nodes["analyst"])
     """
     from yolo_developer.agents import (
@@ -88,6 +89,7 @@ def get_default_agent_nodes() -> dict[str, AgentNode]:
         architect_node,
         dev_node,
         pm_node,
+        sm_node,
         tea_node,
     )
 
@@ -97,6 +99,7 @@ def get_default_agent_nodes() -> dict[str, AgentNode]:
         "architect": architect_node,
         "dev": dev_node,
         "tea": tea_node,
+        "sm": sm_node,
     }
 
 
