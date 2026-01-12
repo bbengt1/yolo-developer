@@ -1,6 +1,6 @@
 # Story 9.6: Testability Audit
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
