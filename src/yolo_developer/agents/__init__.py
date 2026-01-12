@@ -1,4 +1,4 @@
-"""Agents package for YOLO Developer (Story 5.1+, 6.1+, 7.1+, 8.1+).
+"""Agents package for YOLO Developer (Story 5.1+, 6.1+, 7.1+, 8.1+, 9.1+).
 
 This package contains the agent implementations for the multi-agent
 orchestration system. Each agent is implemented as a LangGraph node
@@ -12,6 +12,7 @@ Available Agents:
     pm_node: Story transformation and acceptance criteria generation
     architect_node: Design decisions and ADR generation
     dev_node: Code implementation and test generation
+    tea_node: Validation and quality assurance
 
 Types:
     CrystallizedRequirement: A refined requirement with category and testability
@@ -25,6 +26,9 @@ Types:
     TestFile: A test file generated during implementation
     ImplementationArtifact: Complete implementation output for a story
     DevOutput: Complete output from dev processing
+    Finding: A validation finding with severity and remediation
+    ValidationResult: Complete validation result for an artifact
+    TEAOutput: Complete output from TEA processing
 
 Example:
     >>> from yolo_developer.agents import analyst_node, pm_node, architect_node, dev_node
@@ -46,7 +50,7 @@ Architecture:
 
 from __future__ import annotations
 
-from yolo_developer.agents import architect, dev
+from yolo_developer.agents import architect, dev, tea
 from yolo_developer.agents.analyst import (
     AnalystOutput,
     CrystallizedRequirement,
@@ -73,6 +77,16 @@ from yolo_developer.agents.pm import (
     StoryStatus,
     pm_node,
 )
+from yolo_developer.agents.tea import (
+    DeploymentRecommendation,
+    Finding,
+    FindingCategory,
+    FindingSeverity,
+    TEAOutput,
+    ValidationResult,
+    ValidationStatus,
+    tea_node,
+)
 
 __all__ = [
     "ADR",
@@ -81,18 +95,27 @@ __all__ = [
     "ArchitectOutput",
     "CodeFile",
     "CrystallizedRequirement",
+    "DeploymentRecommendation",
     "DesignDecision",
     "DevOutput",
+    "Finding",
+    "FindingCategory",
+    "FindingSeverity",
     "ImplementationArtifact",
     "PMOutput",
     "Story",
     "StoryPriority",
     "StoryStatus",
+    "TEAOutput",
     "TestFile",
+    "ValidationResult",
+    "ValidationStatus",
     "analyst_node",
     "architect",
     "architect_node",
     "dev",
     "dev_node",
     "pm_node",
+    "tea",
+    "tea_node",
 ]
