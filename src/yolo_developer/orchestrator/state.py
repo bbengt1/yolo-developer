@@ -40,13 +40,13 @@ Architecture Note:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.graph.message import add_messages
 
-if TYPE_CHECKING:
-    from yolo_developer.orchestrator.context import Decision, HandoffContext
+# Import at runtime - LangGraph needs these types for StateGraph introspection
+from yolo_developer.orchestrator.context import Decision, HandoffContext
 
 
 class YoloState(TypedDict):

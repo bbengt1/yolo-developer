@@ -142,12 +142,12 @@ development_status:
   9-5-risk-categorization: done
   9-6-testability-audit: done
   9-7-deployment-blocking: done
-  9-8-gap-analysis-reports: backlog
+  9-8-gap-analysis-reports: done
   epic-9-retrospective: optional
 
   # Epic 10: Orchestration & SM Agent (16 stories)
-  epic-10: backlog
-  10-1-create-langgraph-workflow: backlog
+  epic-10: in-progress
+  10-1-create-langgraph-workflow: done
   10-2-sm-agent-node-implementation: backlog
   10-3-sprint-planning: backlog
   10-4-task-delegation: backlog
