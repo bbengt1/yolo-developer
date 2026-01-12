@@ -599,6 +599,31 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         deployment_blocked=risk_report.deployment_blocked,
     )
 
+    # Generate deployment decision report (Story 9.7)
+    from yolo_developer.agents.tea.blocking import (
+        DeploymentDecisionReport,
+        generate_deployment_decision_report,
+    )
+
+    deployment_decision_report: DeploymentDecisionReport | None = None
+    if confidence_result and risk_report:
+        deployment_decision_report = generate_deployment_decision_report(
+            confidence_result=confidence_result,
+            risk_report=risk_report,
+            validation_results=tuple(validation_results),
+        )
+
+        # Update deployment_recommendation to match decision (ensure consistency)
+        if deployment_decision_report.decision.is_blocked:
+            deployment_recommendation = "block"
+
+        logger.info(
+            "deployment_decision_complete",
+            is_blocked=deployment_decision_report.decision.is_blocked,
+            blocking_reason_count=len(deployment_decision_report.blocking_reasons),
+            remediation_step_count=len(deployment_decision_report.remediation_steps),
+        )
+
     # Build processing notes
     total_findings = sum(len(r.findings) for r in validation_results)
     failed_count = sum(1 for r in validation_results if r.validation_status == "failed")
@@ -636,14 +661,22 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
             f"issues={testability_report.metrics.total_issues}."
         )
 
+    # Include deployment decision summary in processing notes (Story 9.7)
+    deployment_summary = ""
+    if deployment_decision_report:
+        deployment_summary = (
+            f" Deployment: {'BLOCKED' if deployment_decision_report.decision.is_blocked else 'ALLOWED'}"
+            f" ({len(deployment_decision_report.blocking_reasons)} blocking reasons)."
+        )
+
     processing_notes = (
         f"Validated {len(artifacts)} artifacts. "
         f"Results: {passed_count} passed, {warning_count} warnings, {failed_count} failed. "
         f"Total findings: {total_findings + len(test_findings) + len(testability_findings)}.{test_stats} "
-        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}{testability_summary}"
+        f"Overall confidence: {overall_confidence:.2%}.{confidence_summary}{risk_summary}{testability_summary}{deployment_summary}"
     )
 
-    # Create TEA output with test execution, confidence, risk, and testability results (Story 9.3, 9.4, 9.5, 9.6)
+    # Create TEA output with test execution, confidence, risk, testability, and deployment decision (Story 9.3, 9.4, 9.5, 9.6, 9.7)
     output = TEAOutput(
         validation_results=tuple(validation_results),
         processing_notes=processing_notes,
@@ -654,6 +687,7 @@ async def tea_node(state: YoloState) -> dict[str, Any]:
         risk_report=risk_report,
         overall_risk_level=risk_report.overall_risk_level,
         testability_report=testability_report,
+        deployment_decision_report=deployment_decision_report,
     )
 
     # Create decision record with TEA attribution (AC6)

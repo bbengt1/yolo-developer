@@ -1,4 +1,4 @@
-"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5, 9.6).
+"""TEA agent module for validation and quality assurance (Story 9.1, 9.3, 9.5, 9.6, 9.7).
 
 The TEA (Test Engineering and Assurance) agent is responsible for:
 - Validating implementation artifacts from Dev agent
@@ -9,6 +9,7 @@ The TEA (Test Engineering and Assurance) agent is responsible for:
 - Categorizing risks by severity (Critical/High/Low) with appropriate responses (Story 9.5)
 - Generating risk reports with deployment blocking for critical risks (Story 9.5)
 - Auditing code for testability anti-patterns (Story 9.6)
+- Deployment blocking with blocking reasons and remediation guidance (Story 9.7)
 
 Example:
     >>> from yolo_developer.agents.tea import (
@@ -48,6 +49,23 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.tea.blocking import (
+    BlockingReason,
+    BlockingReasonType,
+    DeploymentDecision,
+    DeploymentDecisionReport,
+    DeploymentOverride,
+    RemediationStep,
+    create_override,
+    evaluate_deployment_decision,
+    generate_blocking_reasons,
+    generate_deployment_decision_report,
+    generate_remediation_steps,
+    get_deployment_threshold,
+    get_high_risk_count_threshold,
+    is_deployment_blocking_enabled,
+    validate_override,
+)
 from yolo_developer.agents.tea.coverage import (
     CoverageReport,
     CoverageResult,
@@ -112,12 +130,17 @@ from yolo_developer.agents.tea.types import (
 )
 
 __all__ = [
+    "BlockingReason",
+    "BlockingReasonType",
     "CategorizedRisk",
     "ConfidenceBreakdown",
     "ConfidenceResult",
     "ConfidenceWeight",
     "CoverageReport",
     "CoverageResult",
+    "DeploymentDecision",
+    "DeploymentDecisionReport",
+    "DeploymentOverride",
     "DeploymentRecommendation",
     "ExecutionStatus",
     "FailureType",
@@ -125,6 +148,7 @@ __all__ = [
     "FindingCategory",
     "FindingSeverity",
     "OverallRiskLevel",
+    "RemediationStep",
     "RiskLevel",
     "RiskReport",
     "TEAOutput",
@@ -149,9 +173,14 @@ __all__ = [
     "check_risk_deployment_blocking",
     "collect_testability_metrics",
     "convert_testability_issues_to_findings",
+    "create_override",
     "detect_test_issues",
     "discover_tests",
+    "evaluate_deployment_decision",
     "execute_tests",
+    "generate_blocking_reasons",
+    "generate_deployment_decision_report",
+    "generate_remediation_steps",
     "generate_risk_report",
     "generate_test_findings",
     "generate_testability_recommendations",
@@ -159,7 +188,11 @@ __all__ = [
     "get_coverage_threshold_from_config",
     "get_critical_paths_from_config",
     "get_default_weights",
+    "get_deployment_threshold",
+    "get_high_risk_count_threshold",
+    "is_deployment_blocking_enabled",
     "tea_node",
     "validate_critical_paths",
+    "validate_override",
     "validate_weights",
 ]

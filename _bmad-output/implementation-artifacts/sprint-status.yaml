@@ -141,7 +141,7 @@ development_status:
   9-4-confidence-scoring: done
   9-5-risk-categorization: done
   9-6-testability-audit: done
-  9-7-deployment-blocking: backlog
+  9-7-deployment-blocking: done
   9-8-gap-analysis-reports: backlog
   epic-9-retrospective: optional
 
