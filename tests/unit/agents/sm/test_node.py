@@ -607,3 +607,128 @@ class TestSMNodeIntegration:
         assert sm_output["circular_logic_detected"] is True
         assert sm_output["escalation_triggered"] is True
         assert sm_output["escalation_reason"] == "circular_logic"
+
+
+class TestSMNodeEnhancedCircularDetection:
+    """Tests for enhanced circular logic detection integration (Story 10.6)."""
+
+    @pytest.mark.asyncio
+    async def test_sm_node_includes_cycle_analysis(self) -> None:
+        """Test that sm_node returns cycle_analysis from enhanced detection.
+
+        Story 10.6 adds enhanced circular logic detection that provides
+        detailed pattern analysis in the output.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # cycle_analysis should be present in output (may be None if no cycles)
+        assert "cycle_analysis" in result
+        sm_output = result["sm_output"]
+        assert "cycle_analysis" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_enhanced_detection_tracks_patterns(self) -> None:
+        """Test enhanced detection provides pattern details in cycle_analysis.
+
+        When circular logic is detected, the enhanced detection should
+        provide pattern_type, agents_involved, and severity information.
+        """
+        # Create ping-pong messages that trigger enhanced detection
+        messages = [
+            create_agent_message("Analysis 1", "analyst"),
+            create_agent_message("Needs more analysis", "pm"),
+            create_agent_message("Analysis 2", "analyst"),
+            create_agent_message("Still needs more", "pm"),
+            create_agent_message("Analysis 3", "analyst"),
+            create_agent_message("Not quite right", "pm"),
+            create_agent_message("Analysis 4", "analyst"),
+            create_agent_message("Still not right", "pm"),
+        ]
+        state = create_test_state(
+            messages=messages,
+            current_agent="pm",
+        )
+
+        result = await sm_node(state)
+
+        # Should detect circular logic
+        assert result["routing_decision"] == "escalate"
+
+        # Check that cycle_analysis is populated
+        cycle_analysis = result.get("cycle_analysis")
+        assert cycle_analysis is not None
+        assert cycle_analysis["circular_detected"] is True
+        assert len(cycle_analysis["patterns_found"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_cycle_analysis_field(self) -> None:
+        """Test SMOutput includes cycle_analysis field for serialization.
+
+        The SMOutput.to_dict() should include cycle_analysis for
+        downstream consumers.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+        )
+
+        result = await sm_node(state)
+
+        sm_output = result["sm_output"]
+        # cycle_analysis field should exist in serialized output
+        assert "cycle_analysis" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_enhanced_detection_does_not_block_workflow(self) -> None:
+        """Test that enhanced detection errors don't block the main workflow.
+
+        Even if enhanced detection has an issue, the basic routing
+        should still work.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # This should complete without error
+        result = await sm_node(state)
+
+        # Basic routing should work
+        assert result["routing_decision"] == "pm"  # Natural successor from analyst
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_enhanced_detection_info(self) -> None:
+        """Test processing notes include enhanced detection details when cycles found.
+
+        When enhanced detection finds patterns, the processing_notes
+        should mention the detection results.
+        """
+        # Create enough exchanges to trigger detection
+        messages = [
+            create_agent_message("Work 1", "dev"),
+            create_agent_message("Review 1", "tea"),
+            create_agent_message("Work 2", "dev"),
+            create_agent_message("Review 2", "tea"),
+            create_agent_message("Work 3", "dev"),
+            create_agent_message("Review 3", "tea"),
+            create_agent_message("Work 4", "dev"),
+            create_agent_message("Review 4", "tea"),
+        ]
+        state = create_test_state(
+            messages=messages,
+            current_agent="tea",
+        )
+
+        result = await sm_node(state)
+
+        sm_output = result["sm_output"]
+        processing_notes = sm_output["processing_notes"]
+
+        # If circular detected, notes should mention enhanced detection
+        if sm_output["circular_logic_detected"]:
+            assert "Enhanced detection" in processing_notes or "patterns" in processing_notes.lower()

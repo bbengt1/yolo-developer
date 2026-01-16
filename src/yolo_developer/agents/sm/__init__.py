@@ -6,6 +6,7 @@ providing centralized routing logic for the multi-agent workflow.
 Key Responsibilities:
 - Routing decisions: Determines next agent based on state analysis (Story 10.2)
 - Circular logic detection: Detects agent ping-pong patterns (>3 exchanges per FR12)
+- Enhanced circular detection: Topic-aware, multi-agent cycle detection (Story 10.6)
 - Escalation handling: Triggers human intervention when needed
 - Gate-blocked recovery: Routes to appropriate agent for recovery
 - Sprint planning: Plan sprints by prioritizing and sequencing stories (Story 10.3)
@@ -68,6 +69,21 @@ References:
 
 from __future__ import annotations
 
+from yolo_developer.agents.sm.circular_detection import detect_circular_logic
+from yolo_developer.agents.sm.circular_detection_types import (
+    DEFAULT_EXCHANGE_THRESHOLD,
+    DEFAULT_TIME_WINDOW_SECONDS,
+    VALID_CYCLE_SEVERITIES,
+    VALID_INTERVENTION_STRATEGIES,
+    VALID_PATTERN_TYPES,
+    CircularLogicConfig,
+    CircularPattern,
+    CycleAnalysis,
+    CycleLog,
+    CycleSeverity,
+    InterventionStrategy,
+    PatternType,
+)
 from yolo_developer.agents.sm.delegation import (
     delegate_task,
     routing_to_task_type,
@@ -130,52 +146,66 @@ from yolo_developer.agents.sm.types import (
 __all__ = [
     # Delegation (Story 10.4)
     "AGENT_EXPERTISE",
+    # Core Types (Story 10.2)
+    "CIRCULAR_LOGIC_THRESHOLD",
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
-    "DEFAULT_MAX_RETRY_ATTEMPTS",
-    "TASK_TO_AGENT",
-    "VALID_TASK_TYPES",
-    "DelegationConfig",
-    "DelegationRequest",
-    "DelegationResult",
-    "Priority",
-    "TaskType",
-    "delegate_task",
-    "routing_to_task_type",
+    # Planning (Story 10.3)
+    "DEFAULT_DEPENDENCY_WEIGHT",
+    # Circular Detection (Story 10.6)
+    "DEFAULT_EXCHANGE_THRESHOLD",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
     "DEFAULT_MAX_CYCLE_TIME_SECONDS",
     "DEFAULT_MAX_IDLE_TIME_SECONDS",
+    "DEFAULT_MAX_POINTS",
+    "DEFAULT_MAX_RETRY_ATTEMPTS",
+    "DEFAULT_MAX_STORIES",
+    "DEFAULT_TECH_DEBT_WEIGHT",
+    "DEFAULT_TIME_WINDOW_SECONDS",
+    "DEFAULT_VALUE_WEIGHT",
+    "DEFAULT_VELOCITY_WEIGHT",
     "DEFAULT_WARNING_THRESHOLD_RATIO",
+    "NATURAL_SUCCESSOR",
+    "TASK_TO_AGENT",
+    "VALID_AGENTS",
     "VALID_AGENTS_FOR_HEALTH",
     "VALID_ALERT_SEVERITIES",
+    "VALID_CYCLE_SEVERITIES",
     "VALID_HEALTH_SEVERITIES",
+    "VALID_INTERVENTION_STRATEGIES",
+    "VALID_PATTERN_TYPES",
+    "VALID_TASK_TYPES",
+    "AgentExchange",
     "AgentHealthSnapshot",
     "AlertSeverity",
+    "CircularDependencyError",
+    "CircularLogicConfig",
+    "CircularPattern",
+    "CycleAnalysis",
+    "CycleLog",
+    "CycleSeverity",
+    "DelegationConfig",
+    "DelegationRequest",
+    "DelegationResult",
+    "EscalationReason",
     "HealthAlert",
     "HealthConfig",
     "HealthMetrics",
     "HealthSeverity",
     "HealthStatus",
-    "monitor_health",
-    # Planning (Story 10.3)
-    "DEFAULT_DEPENDENCY_WEIGHT",
-    "DEFAULT_MAX_POINTS",
-    "DEFAULT_MAX_STORIES",
-    "DEFAULT_TECH_DEBT_WEIGHT",
-    "DEFAULT_VALUE_WEIGHT",
-    "DEFAULT_VELOCITY_WEIGHT",
-    "CircularDependencyError",
+    "InterventionStrategy",
+    "PatternType",
     "PlanningConfig",
-    "SprintPlan",
-    "SprintStory",
-    "plan_sprint",
-    # Core Types (Story 10.2)
-    "CIRCULAR_LOGIC_THRESHOLD",
-    "NATURAL_SUCCESSOR",
-    "VALID_AGENTS",
-    "AgentExchange",
-    "EscalationReason",
+    "Priority",
     "RoutingDecision",
     "SMOutput",
+    "SprintPlan",
+    "SprintStory",
+    "TaskType",
+    "delegate_task",
+    "detect_circular_logic",
+    "monitor_health",
+    "plan_sprint",
+    "routing_to_task_type",
     "sm_node",
 ]

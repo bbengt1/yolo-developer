@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -11,6 +11,7 @@ Key Concepts:
 - **Structured Logging**: Uses structlog for audit trail
 - **Routing Decisions**: Determines next agent based on state analysis
 - **Circular Logic Detection**: Detects agent ping-pong patterns (>3 exchanges)
+- **Enhanced Circular Detection**: Topic-aware, multi-agent cycle detection (Story 10.6)
 - **Escalation Handling**: Triggers human intervention when needed
 
 Example:
@@ -40,6 +41,8 @@ from typing import Any
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.agents.sm.circular_detection import detect_circular_logic
+from yolo_developer.agents.sm.circular_detection_types import CycleAnalysis
 from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
 from yolo_developer.agents.sm.health import monitor_health
 from yolo_developer.agents.sm.health_types import HealthStatus
@@ -455,14 +458,36 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
     logger.debug("state_analysis", **analysis)
 
     # Step 2: Check for circular logic (AC #4)
+    # First do basic check for backward compatibility
     is_circular, exchanges = _check_for_circular_logic(state)
     exchange_count = len(exchanges)
+
+    # Step 2b: Enhanced circular logic detection (Story 10.6 - FR12, FR70)
+    cycle_analysis: CycleAnalysis | None = None
+    try:
+        cycle_analysis = await detect_circular_logic(state)
+        if cycle_analysis.circular_detected:
+            is_circular = True
+            logger.info(
+                "enhanced_circular_detection",
+                patterns_found=len(cycle_analysis.patterns_found),
+                intervention_strategy=cycle_analysis.intervention_strategy,
+                escalation_triggered=cycle_analysis.escalation_triggered,
+            )
+    except Exception as e:
+        # Enhanced detection should never block the main workflow
+        logger.error("enhanced_circular_detection_failed", error=str(e))
 
     # Step 3: Check for escalation (AC #4)
     should_escalate, escalation_reason = _check_for_escalation(state)
 
-    # Override escalation if circular logic detected
+    # Override escalation if circular logic detected (either basic or enhanced)
     if is_circular and not should_escalate:
+        should_escalate = True
+        escalation_reason = "circular_logic"
+
+    # Further override if enhanced detection triggered escalation
+    if cycle_analysis and cycle_analysis.escalation_triggered and not should_escalate:
         should_escalate = True
         escalation_reason = "circular_logic"
 
@@ -519,6 +544,11 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         f"Circular: {is_circular}. "
         f"Gate blocked: {gate_blocked}."
     )
+    if cycle_analysis and cycle_analysis.circular_detected:
+        processing_notes += (
+            f" Enhanced detection: {len(cycle_analysis.patterns_found)} patterns, "
+            f"intervention={cycle_analysis.intervention_strategy}."
+        )
     if delegation_result:
         processing_notes += f" Delegation to {routing_decision}: {'success' if delegation_result.success else 'failed'}."
     if health_status:
@@ -538,6 +568,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         processing_notes=processing_notes,
         delegation_result=delegation_result.to_dict() if delegation_result else None,
         health_status=health_status.to_dict() if health_status else None,
+        cycle_analysis=cycle_analysis.to_dict() if cycle_analysis else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -566,6 +597,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         exchange_count=exchange_count,
         delegation_success=delegation_result.success if delegation_result else None,
         health_status=health_status.status if health_status else None,
+        cycle_patterns_found=len(cycle_analysis.patterns_found) if cycle_analysis else 0,
+        cycle_intervention=cycle_analysis.intervention_strategy if cycle_analysis else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -594,4 +627,5 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "handoff_context": handoff_context,  # From delegation (Story 10.4)
         "health_status": health_status.to_dict() if health_status else None,  # Current snapshot (Story 10.5)
         "health_history": [health_snapshot] if health_snapshot else [],  # For trend analysis (Task 7.4)
+        "cycle_analysis": cycle_analysis.to_dict() if cycle_analysis else None,  # Enhanced detection (Story 10.6)
     }
