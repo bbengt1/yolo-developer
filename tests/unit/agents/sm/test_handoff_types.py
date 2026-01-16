@@ -11,8 +11,7 @@ Tests all type definitions for the agent handoff management system:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, get_args
+from typing import get_args
 
 import pytest
 

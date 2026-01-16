@@ -1,4 +1,4 @@
-"""Tests for SM agent node (Story 10.2, 10.6, 10.7, 10.8).
+"""Tests for SM agent node (Story 10.2, 10.6, 10.7, 10.8, 10.9).
 
 Tests the sm_node function and its helper functions:
 - _analyze_current_state
@@ -11,6 +11,7 @@ Also tests integration with:
 - Enhanced circular logic detection (Story 10.6)
 - Conflict mediation (Story 10.7)
 - Handoff management (Story 10.8)
+- Sprint progress tracking (Story 10.9)
 """
 
 from __future__ import annotations
@@ -1260,3 +1261,292 @@ class TestSMNodeHandoffManagement:
             assert result["routing_decision"] == "pm"
         # And handoff should have been attempted
         assert "handoff_result" in result
+
+
+class TestSMNodeSprintProgressTracking:
+    """Tests for sprint progress tracking integration (Story 10.9)."""
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_sprint_progress_key(self) -> None:
+        """Test that sm_node always includes sprint_progress key in result.
+
+        Per Story 10.9, the sm_node should return sprint_progress in its
+        state update dict, even if None when no sprint_plan exists.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        assert "sprint_progress" in result
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_none_without_sprint_plan(self) -> None:
+        """Test that sprint_progress is None when no sprint_plan in state.
+
+        Progress tracking requires an active sprint_plan to track against.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        assert result["sprint_progress"] is None
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_tracked_with_sprint_plan(self) -> None:
+        """Test that sprint_progress is populated when sprint_plan exists.
+
+        When sprint_plan is in state, progress should be tracked and returned.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-20260116",
+            "stories": [
+                {
+                    "story_id": "1-1-auth",
+                    "title": "User Authentication",
+                    "status": "completed",
+                    "started_at": "2026-01-16T10:00:00+00:00",
+                    "completed_at": "2026-01-16T11:00:00+00:00",
+                },
+                {
+                    "story_id": "1-2-profile",
+                    "title": "User Profile",
+                    "status": "in_progress",
+                    "started_at": "2026-01-16T11:30:00+00:00",
+                },
+                {
+                    "story_id": "1-3-settings",
+                    "title": "Settings Page",
+                    "status": "backlog",
+                },
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        assert result["sprint_progress"] is not None
+        progress = result["sprint_progress"]
+
+        # Check snapshot fields
+        assert "snapshot" in progress
+        snapshot = progress["snapshot"]
+        assert snapshot["sprint_id"] == "sprint-20260116"
+        assert snapshot["total_stories"] == 3
+        assert snapshot["stories_completed"] == 1
+        assert snapshot["stories_in_progress"] == 1
+        assert snapshot["stories_remaining"] == 1
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_includes_percentage(self) -> None:
+        """Test that sprint progress includes progress_percentage.
+
+        The snapshot should contain the calculated progress percentage.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-test",
+            "stories": [
+                {"story_id": "s1", "title": "Story 1", "status": "completed"},
+                {"story_id": "s2", "title": "Story 2", "status": "completed"},
+                {"story_id": "s3", "title": "Story 3", "status": "backlog"},
+                {"story_id": "s4", "title": "Story 4", "status": "backlog"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        assert result["sprint_progress"] is not None
+        snapshot = result["sprint_progress"]["snapshot"]
+        assert snapshot["progress_percentage"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_sprint_progress_field(self) -> None:
+        """Test that SMOutput includes sprint_progress when available.
+
+        The sm_output dict should contain the sprint_progress data.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-output-test",
+            "stories": [
+                {"story_id": "s1", "title": "Story 1", "status": "completed"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        sm_output = result["sm_output"]
+        assert "sprint_progress" in sm_output
+        assert sm_output["sprint_progress"] is not None
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_does_not_block_workflow(self) -> None:
+        """Test that progress tracking failures don't block the workflow.
+
+        Progress tracking is non-blocking - errors should be logged but
+        not prevent routing decisions.
+        """
+        # Invalid sprint_plan structure shouldn't block
+        sprint_plan = {
+            "sprint_id": "sprint-test",
+            "stories": "not a list",  # Invalid
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            sprint_plan=sprint_plan,
+        )
+
+        # Should not raise, should complete with routing decision
+        result = await sm_node(state)
+
+        assert "routing_decision" in result
+        assert result["routing_decision"] is not None
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_sprint_info(self) -> None:
+        """Test that processing_notes includes sprint progress info.
+
+        When sprint progress is tracked, notes should include % completion.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-notes-test",
+            "stories": [
+                {"story_id": "s1", "title": "Story 1", "status": "completed"},
+                {"story_id": "s2", "title": "Story 2", "status": "backlog"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        processing_notes = result["sm_output"]["processing_notes"]
+        if result["sprint_progress"] is not None:
+            assert "Sprint:" in processing_notes
+            assert "%" in processing_notes
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_with_blocked_stories(self) -> None:
+        """Test that sprint progress tracks blocked stories.
+
+        Blocked stories should be counted separately in the snapshot.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-blocked",
+            "stories": [
+                {"story_id": "s1", "title": "Story 1", "status": "completed"},
+                {"story_id": "s2", "title": "Story 2", "status": "blocked"},
+                {"story_id": "s3", "title": "Story 3", "status": "backlog"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        assert result["sprint_progress"] is not None
+        snapshot = result["sprint_progress"]["snapshot"]
+        assert snapshot["stories_blocked"] == 1
+
+    @pytest.mark.asyncio
+    async def test_sprint_progress_estimate_when_data_available(self) -> None:
+        """Test that completion estimate is generated when data is available.
+
+        With completed stories having duration data, estimates should be generated.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-estimate",
+            "stories": [
+                {
+                    "story_id": "s1",
+                    "title": "Story 1",
+                    "status": "completed",
+                    "started_at": "2026-01-16T10:00:00+00:00",
+                    "completed_at": "2026-01-16T11:00:00+00:00",
+                },
+                {
+                    "story_id": "s2",
+                    "title": "Story 2",
+                    "status": "completed",
+                    "started_at": "2026-01-16T11:00:00+00:00",
+                    "completed_at": "2026-01-16T12:00:00+00:00",
+                },
+                {"story_id": "s3", "title": "Story 3", "status": "backlog"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        assert result["sprint_progress"] is not None
+        progress = result["sprint_progress"]
+
+        # Should have completion estimate
+        assert "completion_estimate" in progress
+        if progress["completion_estimate"] is not None:
+            assert "confidence" in progress["completion_estimate"]
+            assert "factors" in progress["completion_estimate"]
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_with_progress(self) -> None:
+        """Test that routing still works correctly with sprint progress.
+
+        Sprint progress tracking should not affect routing decisions.
+        """
+        sprint_plan = {
+            "sprint_id": "sprint-routing",
+            "stories": [
+                {"story_id": "s1", "title": "Story 1", "status": "in_progress"},
+            ],
+        }
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            sprint_plan=sprint_plan,
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should still occur (analyst -> pm)
+        if not result["sm_output"]["escalation_triggered"]:
+            assert result["routing_decision"] == "pm"
+
+        # And sprint progress should be tracked
+        assert result["sprint_progress"] is not None

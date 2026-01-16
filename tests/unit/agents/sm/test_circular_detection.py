@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -28,7 +28,6 @@ from yolo_developer.agents.sm.circular_detection_types import (
     CycleLog,
 )
 from yolo_developer.agents.sm.types import AgentExchange
-
 
 # =============================================================================
 # Fixtures

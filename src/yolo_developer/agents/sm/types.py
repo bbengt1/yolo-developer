@@ -153,6 +153,7 @@ class SMOutput:
         cycle_analysis: Optional enhanced cycle analysis result (Story 10.6)
         mediation_result: Optional conflict mediation result (Story 10.7)
         handoff_result: Optional handoff management result (Story 10.8)
+        sprint_progress: Optional sprint progress tracking result (Story 10.9)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -182,6 +183,7 @@ class SMOutput:
     cycle_analysis: dict[str, Any] | None = None
     mediation_result: dict[str, Any] | None = None
     handoff_result: dict[str, Any] | None = None
+    sprint_progress: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -207,6 +209,7 @@ class SMOutput:
             "cycle_analysis": self.cycle_analysis,
             "mediation_result": self.mediation_result,
             "handoff_result": self.handoff_result,
+            "sprint_progress": self.sprint_progress,
             "created_at": self.created_at,
         }
 

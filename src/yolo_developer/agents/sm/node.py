@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -14,6 +14,7 @@ Key Concepts:
 - **Enhanced Circular Detection**: Topic-aware, multi-agent cycle detection (Story 10.6)
 - **Conflict Mediation**: Mediates conflicts between agents (Story 10.7)
 - **Handoff Management**: Manages agent handoffs with context preservation (Story 10.8)
+- **Sprint Progress Tracking**: Tracks sprint progress and completion estimates (Story 10.9)
 - **Escalation Handling**: Triggers human intervention when needed
 
 Example:
@@ -52,6 +53,8 @@ from yolo_developer.agents.sm.handoff import manage_handoff
 from yolo_developer.agents.sm.handoff_types import HandoffResult
 from yolo_developer.agents.sm.health import monitor_health
 from yolo_developer.agents.sm.health_types import HealthStatus
+from yolo_developer.agents.sm.progress import track_progress
+from yolo_developer.agents.sm.progress_types import SprintProgress
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -598,6 +601,28 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             # Handoff management should never block the main workflow
             logger.error("handoff_management_failed", error=str(e))
 
+    # Step 6e: Sprint progress tracking (Story 10.9 - FR16, FR66)
+    sprint_progress: SprintProgress | None = None
+    sprint_plan_dict = state.get("sprint_plan")
+    # Ensure sprint_plan is a dict for type safety
+    if sprint_plan_dict is not None and isinstance(sprint_plan_dict, dict):
+        try:
+            sprint_progress = await track_progress(
+                state=state,
+                sprint_plan=sprint_plan_dict,
+            )
+            logger.debug(
+                "sprint_progress_tracked",
+                sprint_id=sprint_progress.snapshot.sprint_id,
+                progress_percentage=sprint_progress.snapshot.progress_percentage,
+                stories_completed=sprint_progress.snapshot.stories_completed,
+                total_stories=sprint_progress.snapshot.total_stories,
+                estimated_completion=sprint_progress.completion_estimate.estimated_completion_time if sprint_progress.completion_estimate else None,
+            )
+        except Exception as e:
+            # Progress tracking should never block the main workflow
+            logger.error("sprint_progress_tracking_failed", error=str(e))
+
     # Step 7: Create processing notes
     processing_notes = (
         f"Analyzed state with {analysis['message_count']} messages, "
@@ -627,6 +652,11 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             f"{'success' if handoff_result.success else 'failed'}, "
             f"validated={handoff_result.context_validated}."
         )
+    if sprint_progress:
+        processing_notes += (
+            f" Sprint: {sprint_progress.snapshot.progress_percentage:.1f}% complete "
+            f"({sprint_progress.snapshot.stories_completed}/{sprint_progress.snapshot.total_stories} stories)."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -645,6 +675,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         cycle_analysis=cycle_analysis.to_dict() if cycle_analysis else None,
         mediation_result=mediation_result.to_dict() if mediation_result else None,
         handoff_result=handoff_result.to_dict() if handoff_result else None,
+        sprint_progress=sprint_progress.to_dict() if sprint_progress else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -679,6 +710,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         mediation_success=mediation_result.success if mediation_result else None,
         handoff_success=handoff_result.success if handoff_result else None,
         handoff_validated=handoff_result.context_validated if handoff_result else None,
+        sprint_progress_percentage=sprint_progress.snapshot.progress_percentage if sprint_progress else None,
+        sprint_stories_completed=sprint_progress.snapshot.stories_completed if sprint_progress else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -710,4 +743,5 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "cycle_analysis": cycle_analysis.to_dict() if cycle_analysis else None,  # Enhanced detection (Story 10.6)
         "mediation_result": mediation_result.to_dict() if mediation_result else None,  # Conflict mediation (Story 10.7)
         "handoff_result": handoff_result.to_dict() if handoff_result else None,  # Handoff management (Story 10.8)
+        "sprint_progress": sprint_progress.to_dict() if sprint_progress else None,  # Sprint progress tracking (Story 10.9)
     }

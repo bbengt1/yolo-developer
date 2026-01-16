@@ -14,6 +14,7 @@ Key Responsibilities:
 - Health monitoring: Monitor agent activity, idle time, cycle time, churn rate (Story 10.5)
 - Conflict mediation: Mediate conflicts between agents with different recommendations (Story 10.7)
 - Handoff management: Manage agent handoffs with context preservation (Story 10.8)
+- Sprint progress tracking: Track sprint progress and completion estimates (Story 10.9)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -62,6 +63,11 @@ Example:
     >>> result = await manage_handoff(state, "analyst", "pm")
     >>> result.success
     True
+    >>>
+    >>> # Track progress (Story 10.9)
+    >>> progress = await track_progress(state, sprint_plan)
+    >>> progress.snapshot.progress_percentage
+    50.0
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -81,7 +87,9 @@ References:
     - FR13: Conflict mediation
     - FR14: System can execute agents in defined sequence
     - FR15: System can handle agent handoffs with context preservation
+    - FR16: System can track sprint progress and completion status
     - FR65: SM Agent can calculate weighted priority scores for story selection
+    - FR66: SM Agent can track burn-down velocity and cycle time metrics
     - FR67: SM Agent can detect agent churn rate and idle time
 """
 
@@ -178,6 +186,22 @@ from yolo_developer.agents.sm.planning_types import (
     SprintPlan,
     SprintStory,
 )
+from yolo_developer.agents.sm.progress import (
+    get_progress_for_display,
+    get_progress_summary,
+    get_stories_by_status,
+    track_progress,
+)
+from yolo_developer.agents.sm.progress_types import (
+    DEFAULT_ESTIMATE_CONFIDENCE_THRESHOLD,
+    VALID_STORY_STATUSES,
+    CompletionEstimate,
+    ProgressConfig,
+    SprintProgress,
+    SprintProgressSnapshot,
+    StoryProgress,
+    StoryStatus,
+)
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -196,6 +220,8 @@ __all__ = [
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
     # Planning (Story 10.3)
     "DEFAULT_DEPENDENCY_WEIGHT",
+    # Progress Tracking (Story 10.9)
+    "DEFAULT_ESTIMATE_CONFIDENCE_THRESHOLD",
     # Circular Detection (Story 10.6)
     "DEFAULT_EXCHANGE_THRESHOLD",
     # Health Monitoring (Story 10.5)
@@ -229,6 +255,7 @@ __all__ = [
     "VALID_INTERVENTION_STRATEGIES",
     "VALID_PATTERN_TYPES",
     "VALID_RESOLUTION_STRATEGIES",
+    "VALID_STORY_STATUSES",
     "VALID_TASK_TYPES",
     "AgentExchange",
     "AgentHealthSnapshot",
@@ -236,6 +263,7 @@ __all__ = [
     "CircularDependencyError",
     "CircularLogicConfig",
     "CircularPattern",
+    "CompletionEstimate",
     "Conflict",
     "ConflictMediationConfig",
     "ConflictParty",
@@ -264,18 +292,27 @@ __all__ = [
     "PatternType",
     "PlanningConfig",
     "Priority",
+    "ProgressConfig",
     "ResolutionStrategy",
     "RoutingDecision",
     "SMOutput",
     "SprintPlan",
+    "SprintProgress",
+    "SprintProgressSnapshot",
     "SprintStory",
+    "StoryProgress",
+    "StoryStatus",
     "TaskType",
     "delegate_task",
     "detect_circular_logic",
+    "get_progress_for_display",
+    "get_progress_summary",
+    "get_stories_by_status",
     "manage_handoff",
     "mediate_conflicts",
     "monitor_health",
     "plan_sprint",
     "routing_to_task_type",
     "sm_node",
+    "track_progress",
 ]

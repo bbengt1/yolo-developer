@@ -11,7 +11,7 @@ All types are frozen dataclasses per ADR-001.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 

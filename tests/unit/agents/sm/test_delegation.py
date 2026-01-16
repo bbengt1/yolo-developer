@@ -13,9 +13,9 @@ All async tests use pytest-asyncio.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from yolo_developer.agents.sm.delegation import (
     _analyze_task,
@@ -31,9 +31,7 @@ from yolo_developer.agents.sm.delegation import (
 )
 from yolo_developer.agents.sm.delegation_types import (
     DelegationConfig,
-    TaskType,
 )
-
 
 # =============================================================================
 # Test Fixtures

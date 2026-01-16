@@ -14,7 +14,7 @@ Tests for all type definitions in conflict_types.py:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
@@ -31,7 +31,6 @@ from yolo_developer.agents.sm.conflict_types import (
     ConflictResolution,
     MediationResult,
 )
-
 
 # =============================================================================
 # Constants Tests
