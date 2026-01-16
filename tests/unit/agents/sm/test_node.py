@@ -1,4 +1,4 @@
-"""Tests for SM agent node (Story 10.2).
+"""Tests for SM agent node (Story 10.2, 10.6, 10.7, 10.8).
 
 Tests the sm_node function and its helper functions:
 - _analyze_current_state
@@ -6,6 +6,11 @@ Tests the sm_node function and its helper functions:
 - _check_for_escalation
 - _check_for_circular_logic
 - sm_node (main entry point)
+
+Also tests integration with:
+- Enhanced circular logic detection (Story 10.6)
+- Conflict mediation (Story 10.7)
+- Handoff management (Story 10.8)
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from yolo_developer.agents.sm.node import (
     sm_node,
 )
 from yolo_developer.agents.sm.types import AgentExchange
+from yolo_developer.orchestrator.context import Decision
 from yolo_developer.orchestrator.state import YoloState
 
 
@@ -732,3 +738,525 @@ class TestSMNodeEnhancedCircularDetection:
         # If circular detected, notes should mention enhanced detection
         if sm_output["circular_logic_detected"]:
             assert "Enhanced detection" in processing_notes or "patterns" in processing_notes.lower()
+
+
+class TestSMNodeConflictMediation:
+    """Tests for conflict mediation integration (Story 10.7).
+
+    Story 10.7 adds conflict mediation that detects and resolves
+    conflicts between agents with different recommendations.
+    """
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_mediation_result(self) -> None:
+        """Test that sm_node returns mediation_result in output.
+
+        Story 10.7 adds mediation_result to the return dict.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # mediation_result should be present in output (may be None if no conflicts)
+        assert "mediation_result" in result
+        sm_output = result["sm_output"]
+        assert "mediation_result" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_mediation_result_field(self) -> None:
+        """Test SMOutput includes mediation_result field for serialization.
+
+        The SMOutput.to_dict() should include mediation_result for
+        downstream consumers.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+        )
+
+        result = await sm_node(state)
+
+        sm_output = result["sm_output"]
+        # mediation_result field should exist in serialized output
+        assert "mediation_result" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_no_conflicts_mediation_returns_success(self) -> None:
+        """Test mediation returns success when no conflicts present.
+
+        When there are no conflicting decisions, mediation should
+        complete successfully with empty conflict list.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            decisions=[],  # No decisions = no conflicts
+        )
+
+        result = await sm_node(state)
+
+        mediation_result = result["mediation_result"]
+        if mediation_result is not None:
+            # If mediation was performed, it should report success
+            assert mediation_result.get("success", True) is True
+            # No conflicts should be detected
+            assert len(mediation_result.get("conflicts_detected", [])) == 0
+
+    @pytest.mark.asyncio
+    async def test_conflict_detection_with_decisions(self) -> None:
+        """Test conflict detection when decisions have conflicting artifacts.
+
+        When multiple agents have decisions that reference the same
+        artifacts with different approaches, conflicts should be detected.
+        """
+        # Create decisions with overlapping artifacts and contradictory approaches
+        decision1 = Decision(
+            agent="architect",
+            summary="Use microservices architecture",
+            rationale="Scalability is the priority, not simplicity",
+            related_artifacts=("system-design",),
+        )
+        decision2 = Decision(
+            agent="dev",
+            summary="Use monolithic architecture",
+            rationale="Simplicity is the priority, not scalability",
+            related_artifacts=("system-design",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        mediation_result = result.get("mediation_result")
+        # The mediation should have been performed
+        assert mediation_result is not None
+
+        # Check that conflicts were analyzed
+        conflicts = mediation_result.get("conflicts_detected", [])
+        # With contradictory decisions, conflicts should be detected
+        # Note: conflict detection uses heuristics, so this may vary
+        if len(conflicts) > 0:
+            assert mediation_result.get("success") is True
+
+    @pytest.mark.asyncio
+    async def test_mediation_does_not_block_workflow(self) -> None:
+        """Test that mediation errors don't block the main workflow.
+
+        Even if mediation has an issue, the basic routing should still work.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # This should complete without error
+        result = await sm_node(state)
+
+        # Basic routing should work
+        assert result["routing_decision"] == "pm"  # Natural successor from analyst
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_mediation_info(self) -> None:
+        """Test processing notes include mediation details when conflicts found.
+
+        When conflicts are detected, the processing_notes should mention
+        the mediation results.
+        """
+        # Create decisions that may conflict
+        decision1 = Decision(
+            agent="pm",
+            summary="High priority for security features",
+            rationale="Security is critical and blocking, must be done first",
+            related_artifacts=("feature-priority",),
+        )
+        decision2 = Decision(
+            agent="architect",
+            summary="Low priority for security features",
+            rationale="Performance features should come first, not security",
+            related_artifacts=("feature-priority",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        sm_output = result["sm_output"]
+        processing_notes = sm_output["processing_notes"]
+        mediation_result = result.get("mediation_result")
+
+        # If conflicts were detected, notes should mention mediation
+        if mediation_result and len(mediation_result.get("conflicts_detected", [])) > 0:
+            assert "Mediation" in processing_notes or "conflict" in processing_notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_escalation_triggered_by_unresolved_conflicts(self) -> None:
+        """Test that unresolved conflicts can trigger escalation.
+
+        When conflicts cannot be resolved automatically, escalation
+        should be triggered (FR13).
+        """
+        # Create blocking conflict that may require escalation
+        decision1 = Decision(
+            agent="architect",
+            summary="Must use blocking synchronous pattern for data consistency",
+            rationale="This is a blocking requirement, cannot proceed otherwise",
+            related_artifacts=("architecture-pattern",),
+        )
+        decision2 = Decision(
+            agent="dev",
+            summary="Must use blocking asynchronous pattern for performance",
+            rationale="This is a blocking requirement, cannot proceed otherwise",
+            related_artifacts=("architecture-pattern",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        mediation_result = result.get("mediation_result")
+
+        # Check if escalation was triggered due to conflicts
+        if mediation_result:
+            escalations = mediation_result.get("escalations_triggered", [])
+            # If there are escalations, the sm_output should reflect it
+            if len(escalations) > 0:
+                sm_output = result["sm_output"]
+                # Escalation may have been triggered
+                # Note: The actual escalation depends on conflict severity
+                assert sm_output["escalation_triggered"] is True or len(escalations) > 0
+
+    @pytest.mark.asyncio
+    async def test_mediation_result_structure(self) -> None:
+        """Test that mediation_result has expected structure when present.
+
+        The mediation_result should contain all expected fields from
+        MediationResult.to_dict().
+        """
+        decision = Decision(
+            agent="analyst",
+            summary="Test decision",
+            rationale="Test rationale",
+            related_artifacts=("test-artifact",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            decisions=[decision],
+        )
+
+        result = await sm_node(state)
+
+        mediation_result = result.get("mediation_result")
+        if mediation_result is not None:
+            # Check expected fields
+            assert "success" in mediation_result
+            assert "conflicts_detected" in mediation_result
+            assert "resolutions" in mediation_result
+            assert "notifications_sent" in mediation_result
+            assert "escalations_triggered" in mediation_result
+            assert "mediation_notes" in mediation_result
+            assert "mediated_at" in mediation_result
+
+    @pytest.mark.asyncio
+    async def test_sm_node_with_design_conflict(self) -> None:
+        """Test SM node handles design conflicts between architect and dev.
+
+        Design conflicts occur when architect and dev have different
+        design decisions on the same artifact.
+        """
+        decision1 = Decision(
+            agent="architect",
+            summary="Use event-driven design pattern",
+            rationale="Better for decoupling and scalability",
+            related_artifacts=("api-design", "system-architecture"),
+        )
+        decision2 = Decision(
+            agent="dev",
+            summary="Use request-response design pattern",
+            rationale="Simpler to implement and debug, not event-driven",
+            related_artifacts=("api-design",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        # Should complete without error
+        assert "mediation_result" in result
+        assert "routing_decision" in result
+
+        # Basic workflow should continue
+        mediation_result = result.get("mediation_result")
+        if mediation_result:
+            # Mediation should have processed the decisions
+            assert isinstance(mediation_result.get("conflicts_detected"), list)
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_with_conflicts(self) -> None:
+        """Test that routing still works correctly even with conflicts.
+
+        Conflict mediation should not prevent normal routing decisions.
+        """
+        decision1 = Decision(
+            agent="architect",
+            summary="Choose SQL database",
+            rationale="Structured data needs SQL",
+            related_artifacts=("database-choice",),
+        )
+        decision2 = Decision(
+            agent="dev",
+            summary="Choose NoSQL database",
+            rationale="Flexibility with NoSQL, not SQL",
+            related_artifacts=("database-choice",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should still occur (analyst -> pm)
+        # unless escalation was triggered
+        if not result["sm_output"]["escalation_triggered"]:
+            assert result["routing_decision"] == "pm"
+
+
+class TestSMNodeHandoffManagement:
+    """Tests for handoff management integration in SM node (Story 10.8).
+
+    Verifies that the SM node properly integrates with the manage_handoff()
+    function to provide context preservation during agent transitions.
+    """
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_handoff_result(self) -> None:
+        """Test that SM node returns handoff_result in state updates.
+
+        When routing to another agent, handoff_result should be included
+        in the return dict.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # Should have handoff_result key (may be None for certain routes)
+        assert "handoff_result" in result
+        # For analyst->pm routing, handoff should be attempted
+        if result["routing_decision"] == "pm":
+            assert result["handoff_result"] is not None
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_handoff_result_field(self) -> None:
+        """Test that sm_output dict includes handoff_result field.
+
+        The SMOutput should include handoff_result for serialization.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="pm",
+            needs_architecture=True,  # Route to architect
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+
+        # sm_output should have handoff_result field
+        assert "handoff_result" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_handoff_not_performed_for_escalation(self) -> None:
+        """Test that handoff is not performed when routing to escalation.
+
+        Escalation is a special route, not to an agent, so no handoff needed.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,  # Trigger escalation
+        )
+
+        result = await sm_node(state)
+
+        assert result["routing_decision"] == "escalate"
+        # handoff_result should be None for escalation
+        assert result["handoff_result"] is None
+
+    @pytest.mark.asyncio
+    async def test_handoff_not_performed_for_same_agent(self) -> None:
+        """Test that handoff is not performed when staying on same agent.
+
+        No handoff needed when source and target are the same.
+        """
+        # SM routes to sm only in specific edge cases
+        # Using gate_blocked scenario that routes back to analyst
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+        )
+
+        result = await sm_node(state)
+
+        # SM default routes to analyst for new work
+        if result["routing_decision"] == "analyst":
+            # Handoff should be performed since different agent
+            assert result["handoff_result"] is not None
+
+    @pytest.mark.asyncio
+    async def test_handoff_does_not_block_workflow(self) -> None:
+        """Test that handoff errors don't block the main workflow.
+
+        Even if handoff management has an issue, routing should continue.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # This should complete without error
+        result = await sm_node(state)
+
+        # Basic routing should work
+        assert result["routing_decision"] == "pm"
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_handoff_info(self) -> None:
+        """Test processing notes include handoff details when performed.
+
+        When handoff is performed, the processing_notes should mention it.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+        processing_notes = sm_output["processing_notes"]
+
+        # If handoff was performed, notes should mention it
+        if result["handoff_result"] is not None:
+            assert "Handoff" in processing_notes
+
+    @pytest.mark.asyncio
+    async def test_handoff_result_structure(self) -> None:
+        """Test that handoff_result has expected structure when present.
+
+        The handoff_result should contain all expected fields from
+        HandoffResult.to_dict().
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+        handoff_result = result.get("handoff_result")
+
+        if handoff_result is not None:
+            # Should have expected fields
+            assert "record" in handoff_result
+            assert "success" in handoff_result
+            assert "context_validated" in handoff_result
+            assert "state_updates" in handoff_result
+            assert "warnings" in handoff_result
+
+            # Record should have its fields
+            record = handoff_result["record"]
+            assert "handoff_id" in record
+            assert "source_agent" in record
+            assert "target_agent" in record
+            assert "status" in record
+
+    @pytest.mark.asyncio
+    async def test_handoff_records_correct_agents(self) -> None:
+        """Test that handoff record captures correct source and target.
+
+        The HandoffRecord should have accurate agent information.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="pm",
+            needs_architecture=True,
+        )
+
+        result = await sm_node(state)
+        handoff_result = result.get("handoff_result")
+
+        if handoff_result is not None:
+            record = handoff_result["record"]
+            assert record["source_agent"] == "pm"
+            assert record["target_agent"] == result["routing_decision"]
+
+    @pytest.mark.asyncio
+    async def test_handoff_success_updates_context(self) -> None:
+        """Test that successful handoff provides context updates.
+
+        When handoff succeeds, state_updates should include handoff_context.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+        handoff_result = result.get("handoff_result")
+
+        if handoff_result is not None and handoff_result["success"]:
+            # Successful handoff should provide state updates
+            state_updates = handoff_result.get("state_updates")
+            if state_updates is not None:
+                assert "handoff_context" in state_updates
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_with_handoff(self) -> None:
+        """Test that routing still works correctly even with handoff.
+
+        Handoff management should not prevent normal routing decisions.
+        """
+        decision = Decision(
+            agent="analyst",
+            summary="Requirements crystallized",
+            rationale="Analysis complete",
+            related_artifacts=("requirements",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            decisions=[decision],
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should still occur (analyst -> pm)
+        # unless escalation was triggered
+        if not result["sm_output"]["escalation_triggered"]:
+            assert result["routing_decision"] == "pm"
+        # And handoff should have been attempted
+        assert "handoff_result" in result

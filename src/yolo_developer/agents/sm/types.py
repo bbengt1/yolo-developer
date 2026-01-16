@@ -151,6 +151,8 @@ class SMOutput:
         delegation_result: Optional delegation result when task delegated (Story 10.4)
         health_status: Optional health status when monitoring is enabled (Story 10.5)
         cycle_analysis: Optional enhanced cycle analysis result (Story 10.6)
+        mediation_result: Optional conflict mediation result (Story 10.7)
+        handoff_result: Optional handoff management result (Story 10.8)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -178,6 +180,8 @@ class SMOutput:
     delegation_result: dict[str, Any] | None = None
     health_status: dict[str, Any] | None = None
     cycle_analysis: dict[str, Any] | None = None
+    mediation_result: dict[str, Any] | None = None
+    handoff_result: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -201,6 +205,8 @@ class SMOutput:
             "delegation_result": self.delegation_result,
             "health_status": self.health_status,
             "cycle_analysis": self.cycle_analysis,
+            "mediation_result": self.mediation_result,
+            "handoff_result": self.handoff_result,
             "created_at": self.created_at,
         }
 

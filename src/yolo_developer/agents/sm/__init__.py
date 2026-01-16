@@ -12,6 +12,8 @@ Key Responsibilities:
 - Sprint planning: Plan sprints by prioritizing and sequencing stories (Story 10.3)
 - Task delegation: Delegate tasks to appropriate specialized agents (Story 10.4)
 - Health monitoring: Monitor agent activity, idle time, cycle time, churn rate (Story 10.5)
+- Conflict mediation: Mediate conflicts between agents with different recommendations (Story 10.7)
+- Handoff management: Manage agent handoffs with context preservation (Story 10.8)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -24,6 +26,10 @@ Example:
     ...     DelegationResult,
     ...     monitor_health,
     ...     HealthStatus,
+    ...     mediate_conflicts,
+    ...     MediationResult,
+    ...     manage_handoff,
+    ...     HandoffResult,
     ... )
     >>>
     >>> # Run the SM node
@@ -46,6 +52,16 @@ Example:
     >>> status = await monitor_health(state)
     >>> status.is_healthy
     True
+    >>>
+    >>> # Mediate conflicts (Story 10.7)
+    >>> mediation = await mediate_conflicts(state)
+    >>> mediation.success
+    True
+    >>>
+    >>> # Manage handoffs (Story 10.8)
+    >>> result = await manage_handoff(state, "analyst", "pm")
+    >>> result.success
+    True
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -63,6 +79,8 @@ References:
     - FR11: Health monitoring
     - FR12: Circular logic detection (>3 exchanges)
     - FR13: Conflict mediation
+    - FR14: System can execute agents in defined sequence
+    - FR15: System can handle agent handoffs with context preservation
     - FR65: SM Agent can calculate weighted priority scores for story selection
     - FR67: SM Agent can detect agent churn rate and idle time
 """
@@ -84,6 +102,22 @@ from yolo_developer.agents.sm.circular_detection_types import (
     InterventionStrategy,
     PatternType,
 )
+from yolo_developer.agents.sm.conflict_mediation import mediate_conflicts
+from yolo_developer.agents.sm.conflict_types import (
+    DEFAULT_PRINCIPLES_HIERARCHY,
+    RESOLUTION_PRINCIPLES,
+    VALID_CONFLICT_SEVERITIES,
+    VALID_CONFLICT_TYPES,
+    VALID_RESOLUTION_STRATEGIES,
+    Conflict,
+    ConflictMediationConfig,
+    ConflictParty,
+    ConflictResolution,
+    ConflictSeverity,
+    ConflictType,
+    MediationResult,
+    ResolutionStrategy,
+)
 from yolo_developer.agents.sm.delegation import (
     delegate_task,
     routing_to_task_type,
@@ -99,6 +133,17 @@ from yolo_developer.agents.sm.delegation_types import (
     DelegationResult,
     Priority,
     TaskType,
+)
+from yolo_developer.agents.sm.handoff import manage_handoff
+from yolo_developer.agents.sm.handoff_types import (
+    DEFAULT_MAX_CONTEXT_SIZE,
+    DEFAULT_TIMEOUT_SECONDS,
+    VALID_HANDOFF_STATUSES,
+    HandoffConfig,
+    HandoffMetrics,
+    HandoffRecord,
+    HandoffResult,
+    HandoffStatus,
 )
 from yolo_developer.agents.sm.health import monitor_health
 from yolo_developer.agents.sm.health_types import (
@@ -155,25 +200,35 @@ __all__ = [
     "DEFAULT_EXCHANGE_THRESHOLD",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
+    "DEFAULT_MAX_CONTEXT_SIZE",
     "DEFAULT_MAX_CYCLE_TIME_SECONDS",
     "DEFAULT_MAX_IDLE_TIME_SECONDS",
     "DEFAULT_MAX_POINTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
+    # Conflict Mediation (Story 10.7)
+    "DEFAULT_PRINCIPLES_HIERARCHY",
     "DEFAULT_TECH_DEBT_WEIGHT",
+    # Handoff Management (Story 10.8)
+    "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_TIME_WINDOW_SECONDS",
     "DEFAULT_VALUE_WEIGHT",
     "DEFAULT_VELOCITY_WEIGHT",
     "DEFAULT_WARNING_THRESHOLD_RATIO",
     "NATURAL_SUCCESSOR",
+    "RESOLUTION_PRINCIPLES",
     "TASK_TO_AGENT",
     "VALID_AGENTS",
     "VALID_AGENTS_FOR_HEALTH",
     "VALID_ALERT_SEVERITIES",
+    "VALID_CONFLICT_SEVERITIES",
+    "VALID_CONFLICT_TYPES",
     "VALID_CYCLE_SEVERITIES",
+    "VALID_HANDOFF_STATUSES",
     "VALID_HEALTH_SEVERITIES",
     "VALID_INTERVENTION_STRATEGIES",
     "VALID_PATTERN_TYPES",
+    "VALID_RESOLUTION_STRATEGIES",
     "VALID_TASK_TYPES",
     "AgentExchange",
     "AgentHealthSnapshot",
@@ -181,6 +236,12 @@ __all__ = [
     "CircularDependencyError",
     "CircularLogicConfig",
     "CircularPattern",
+    "Conflict",
+    "ConflictMediationConfig",
+    "ConflictParty",
+    "ConflictResolution",
+    "ConflictSeverity",
+    "ConflictType",
     "CycleAnalysis",
     "CycleLog",
     "CycleSeverity",
@@ -188,15 +249,22 @@ __all__ = [
     "DelegationRequest",
     "DelegationResult",
     "EscalationReason",
+    "HandoffConfig",
+    "HandoffMetrics",
+    "HandoffRecord",
+    "HandoffResult",
+    "HandoffStatus",
     "HealthAlert",
     "HealthConfig",
     "HealthMetrics",
     "HealthSeverity",
     "HealthStatus",
     "InterventionStrategy",
+    "MediationResult",
     "PatternType",
     "PlanningConfig",
     "Priority",
+    "ResolutionStrategy",
     "RoutingDecision",
     "SMOutput",
     "SprintPlan",
@@ -204,6 +272,8 @@ __all__ = [
     "TaskType",
     "delegate_task",
     "detect_circular_logic",
+    "manage_handoff",
+    "mediate_conflicts",
     "monitor_health",
     "plan_sprint",
     "routing_to_task_type",

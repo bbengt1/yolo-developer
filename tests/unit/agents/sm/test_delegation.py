@@ -557,16 +557,24 @@ class TestSmNodeDelegationIntegration:
     async def test_sm_node_includes_handoff_context(
         self, analyst_state: dict[str, Any]
     ) -> None:
-        """sm_node should include handoff_context in return dict."""
+        """sm_node should include handoff_context in return dict.
+
+        Note: With Story 10.8 integration, handoff_context is now a
+        HandoffContext object, not a plain dict.
+        """
         from yolo_developer.agents.sm.node import sm_node
+        from yolo_developer.orchestrator.context import HandoffContext
 
         result = await sm_node(analyst_state)
 
         # Should include handoff_context
         assert "handoff_context" in result
-        assert result["handoff_context"] is not None
-        assert result["handoff_context"]["source_agent"] == "analyst"
-        assert result["handoff_context"]["target_agent"] == "pm"
+        handoff_context = result["handoff_context"]
+        assert handoff_context is not None
+        # handoff_context is now a HandoffContext object (Story 10.8)
+        assert isinstance(handoff_context, HandoffContext)
+        assert handoff_context.source_agent == "analyst"
+        assert handoff_context.target_agent == "pm"
 
     @pytest.mark.asyncio
     async def test_sm_node_decision_includes_delegation(

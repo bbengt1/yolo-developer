@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -12,6 +12,8 @@ Key Concepts:
 - **Routing Decisions**: Determines next agent based on state analysis
 - **Circular Logic Detection**: Detects agent ping-pong patterns (>3 exchanges)
 - **Enhanced Circular Detection**: Topic-aware, multi-agent cycle detection (Story 10.6)
+- **Conflict Mediation**: Mediates conflicts between agents (Story 10.7)
+- **Handoff Management**: Manages agent handoffs with context preservation (Story 10.8)
 - **Escalation Handling**: Triggers human intervention when needed
 
 Example:
@@ -36,14 +38,18 @@ Architecture Note:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.sm.circular_detection import detect_circular_logic
 from yolo_developer.agents.sm.circular_detection_types import CycleAnalysis
+from yolo_developer.agents.sm.conflict_mediation import mediate_conflicts
+from yolo_developer.agents.sm.conflict_types import MediationResult
 from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
+from yolo_developer.agents.sm.handoff import manage_handoff
+from yolo_developer.agents.sm.handoff_types import HandoffResult
 from yolo_developer.agents.sm.health import monitor_health
 from yolo_developer.agents.sm.health_types import HealthStatus
 from yolo_developer.agents.sm.types import (
@@ -536,6 +542,62 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         # Health monitoring should never block the main workflow
         logger.error("health_monitoring_failed", error=str(e))
 
+    # Step 6c: Conflict mediation (Story 10.7 - FR13)
+    mediation_result: MediationResult | None = None
+    try:
+        mediation_result = await mediate_conflicts(state)
+        if mediation_result.conflicts_detected:
+            logger.info(
+                "conflicts_detected",
+                conflict_count=len(mediation_result.conflicts_detected),
+                resolved_count=len(mediation_result.resolutions),
+                escalation_count=len(mediation_result.escalations_triggered),
+                success=mediation_result.success,
+            )
+
+            # Check if escalation needed due to unresolved conflicts
+            if mediation_result.escalations_triggered and not should_escalate:
+                should_escalate = True
+                escalation_reason = "conflict_unresolved"
+    except Exception as e:
+        # Conflict mediation should never block the main workflow
+        logger.error("conflict_mediation_failed", error=str(e))
+
+    # Step 6d: Managed handoff (Story 10.8 - FR14, FR15)
+    # Replaces direct handoff_context setting with managed handoff that:
+    # - Validates context completeness for target agent
+    # - Calculates and logs handoff metrics
+    # - Provides audit trail via HandoffRecord
+    handoff_result: HandoffResult | None = None
+    current_agent = state.get("current_agent", "sm")
+    if routing_decision not in ("escalate", "sm") and routing_decision != current_agent:
+        try:
+            handoff_result = await manage_handoff(
+                state=cast(dict[str, Any], state),
+                source_agent=current_agent,
+                target_agent=routing_decision,
+            )
+            if handoff_result.success:
+                # Use handoff_context from managed handoff instead of delegation
+                handoff_context = handoff_result.state_updates.get("handoff_context") if handoff_result.state_updates else None
+                logger.debug(
+                    "managed_handoff_completed",
+                    source_agent=current_agent,
+                    target_agent=routing_decision,
+                    context_validated=handoff_result.context_validated,
+                    warnings=handoff_result.warnings,
+                )
+            else:
+                logger.warning(
+                    "managed_handoff_failed",
+                    source_agent=current_agent,
+                    target_agent=routing_decision,
+                    error=handoff_result.record.error_message,
+                )
+        except Exception as e:
+            # Handoff management should never block the main workflow
+            logger.error("handoff_management_failed", error=str(e))
+
     # Step 7: Create processing notes
     processing_notes = (
         f"Analyzed state with {analysis['message_count']} messages, "
@@ -553,6 +615,18 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         processing_notes += f" Delegation to {routing_decision}: {'success' if delegation_result.success else 'failed'}."
     if health_status:
         processing_notes += f" Health: {health_status.status} ({len(health_status.alerts)} alerts)."
+    if mediation_result and mediation_result.conflicts_detected:
+        processing_notes += (
+            f" Mediation: {len(mediation_result.conflicts_detected)} conflicts, "
+            f"{len(mediation_result.resolutions)} resolved, "
+            f"{len(mediation_result.escalations_triggered)} escalated."
+        )
+    if handoff_result:
+        processing_notes += (
+            f" Handoff {current_agent}->{routing_decision}: "
+            f"{'success' if handoff_result.success else 'failed'}, "
+            f"validated={handoff_result.context_validated}."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -569,6 +643,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         delegation_result=delegation_result.to_dict() if delegation_result else None,
         health_status=health_status.to_dict() if health_status else None,
         cycle_analysis=cycle_analysis.to_dict() if cycle_analysis else None,
+        mediation_result=mediation_result.to_dict() if mediation_result else None,
+        handoff_result=handoff_result.to_dict() if handoff_result else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -599,6 +675,10 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         health_status=health_status.status if health_status else None,
         cycle_patterns_found=len(cycle_analysis.patterns_found) if cycle_analysis else 0,
         cycle_intervention=cycle_analysis.intervention_strategy if cycle_analysis else None,
+        conflicts_detected=len(mediation_result.conflicts_detected) if mediation_result else 0,
+        mediation_success=mediation_result.success if mediation_result else None,
+        handoff_success=handoff_result.success if handoff_result else None,
+        handoff_validated=handoff_result.context_validated if handoff_result else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -628,4 +708,6 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "health_status": health_status.to_dict() if health_status else None,  # Current snapshot (Story 10.5)
         "health_history": [health_snapshot] if health_snapshot else [],  # For trend analysis (Task 7.4)
         "cycle_analysis": cycle_analysis.to_dict() if cycle_analysis else None,  # Enhanced detection (Story 10.6)
+        "mediation_result": mediation_result.to_dict() if mediation_result else None,  # Conflict mediation (Story 10.7)
+        "handoff_result": handoff_result.to_dict() if handoff_result else None,  # Handoff management (Story 10.8)
     }

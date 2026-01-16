@@ -153,8 +153,8 @@ development_status:
   10-4-task-delegation: done
   10-5-health-monitoring: done
   10-6-circular-logic-detection: done
-  10-7-conflict-mediation: backlog
-  10-8-agent-handoff-management: backlog
+  10-7-conflict-mediation: done
+  10-8-agent-handoff-management: done
   10-9-sprint-progress-tracking: backlog
   10-10-emergency-protocols: backlog
   10-11-priority-scoring: backlog
