@@ -11,7 +11,21 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Generator
+
+
+@pytest.fixture(autouse=True)
+def clear_checkpoint_store() -> Generator[None, None, None]:
+    """Clear the checkpoint store before and after each test.
+
+    This fixture prevents test pollution from checkpoints persisting
+    across test runs. It runs automatically for all tests in this module.
+    """
+    from yolo_developer.agents.sm.emergency import _clear_checkpoint_store
+
+    _clear_checkpoint_store()
+    yield
+    _clear_checkpoint_store()
 
 
 def make_state(

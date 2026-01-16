@@ -408,6 +408,19 @@ def _retrieve_checkpoint(checkpoint_id: str) -> Checkpoint | None:
     return _checkpoint_store.get(checkpoint_id)
 
 
+def _clear_checkpoint_store() -> None:
+    """Clear the in-memory checkpoint store.
+
+    This function is intended for testing purposes to prevent test pollution
+    from checkpoints persisting across test runs.
+
+    Note:
+        This is a testing utility and should not be used in production code.
+    """
+    _checkpoint_store.clear()
+    logger.debug("checkpoint_store_cleared")
+
+
 async def checkpoint_state(
     state: dict[str, Any],
     trigger_type: EmergencyType,

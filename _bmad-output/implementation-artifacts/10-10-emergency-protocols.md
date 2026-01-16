@@ -1,6 +1,6 @@
 # Story 10.10: Emergency Protocols
 
-Status: complete
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -66,7 +66,7 @@ So that failures are handled gracefully.
   - [x] 4.3: Implement `_evaluate_skip_option()` assessing skip viability
   - [x] 4.4: Implement `_evaluate_escalate_option()` when human intervention needed
   - [x] 4.5: Implement `_evaluate_terminate_option()` for graceful termination
-  - [x] 4.6: Implement `_calculate_recovery_confidence()` based on history and context
+  - [x] 4.6: ~~Implement `_calculate_recovery_confidence()`~~ (REMOVED: confidence calculation integrated into individual `_evaluate_*_option()` functions during code review)
   - [x] 4.7: Implement `_generate_recovery_options()` combining all evaluations
   - [x] 4.8: Implement `_select_best_recovery()` auto-selecting highest confidence option
 
@@ -690,9 +690,9 @@ Story 10.10 Emergency Protocols has been fully implemented with all tasks comple
    - EmergencyTrigger, Checkpoint, RecoveryOption, EmergencyProtocol, EmergencyConfig frozen dataclasses
    - Constants: DEFAULT_MAX_RECOVERY_ATTEMPTS, DEFAULT_ESCALATION_THRESHOLD, VALID_* frozensets
 
-2. **`src/yolo_developer/agents/sm/emergency.py`** (922 lines)
+2. **`src/yolo_developer/agents/sm/emergency.py`** (900 lines)
    - Detection functions: `_check_health_degradation()`, `_check_circular_logic()`, `_check_gate_blocked()`, `_check_agent_stuck()`, `_check_system_error()`, `_detect_emergency()`, `_create_emergency_trigger()`
-   - Checkpointing: `_capture_state_snapshot()`, `_create_checkpoint()`, `_store_checkpoint()`, `_retrieve_checkpoint()`, `checkpoint_state()`
+   - Checkpointing: `_capture_state_snapshot()`, `_create_checkpoint()`, `_store_checkpoint()`, `_retrieve_checkpoint()`, `checkpoint_state()`, `_clear_checkpoint_store()`
    - Recovery evaluation: `_evaluate_retry_option()`, `_evaluate_rollback_option()`, `_evaluate_skip_option()`, `_evaluate_escalate_option()`, `_evaluate_terminate_option()`, `_generate_recovery_options()`, `_select_best_recovery()`
    - Escalation: `_should_escalate()`, `escalate_emergency()`
    - Main entry: `trigger_emergency_protocol()`
@@ -700,7 +700,7 @@ Story 10.10 Emergency Protocols has been fully implemented with all tasks comple
 3. **`tests/unit/agents/sm/test_emergency_types.py`** (28 tests)
    - Tests all type definitions, constants, and serialization
 
-4. **`tests/unit/agents/sm/test_emergency.py`** (47 tests)
+4. **`tests/unit/agents/sm/test_emergency.py`** (48 tests)
    - Tests detection, checkpointing, recovery evaluation, escalation, and main protocol flow
 
 ### Files Modified
@@ -720,8 +720,8 @@ Story 10.10 Emergency Protocols has been fully implemented with all tasks comple
 
 ### Test Results
 
-- **75 emergency tests passing** (28 types + 47 emergency)
-- **683 total SM module tests passing**
+- **76 emergency tests passing** (28 types + 48 emergency)
+- **692 total SM module tests passing**
 - **mypy**: No issues
 - **ruff**: All checks passed
 

@@ -78,12 +78,17 @@ ProtocolStatus = Literal[
 """Current status of the emergency protocol.
 
 Values:
-    pending: Emergency detected, protocol not yet started
+    pending: Emergency detected, protocol not yet started (reserved for future use)
     active: Protocol actively executing
     checkpointed: State has been checkpointed
     recovering: Recovery action in progress
-    resolved: Emergency resolved successfully
+    resolved: Emergency resolved successfully (MVP: not yet implemented)
     escalated: Escalated to human intervention
+
+Note:
+    MVP Implementation: Currently only "active", "checkpointed", "recovering",
+    and "escalated" are used. "pending" and "resolved" are reserved for future
+    implementation of full protocol lifecycle tracking.
 """
 
 RecoveryAction = Literal["retry", "rollback", "skip", "escalate", "terminate"]
@@ -102,7 +107,13 @@ Values:
 # =============================================================================
 
 DEFAULT_MAX_RECOVERY_ATTEMPTS: int = 3
-"""Maximum automatic recovery attempts before escalation."""
+"""Maximum automatic recovery attempts before escalation.
+
+Note:
+    MVP Implementation: This limit is defined but not currently enforced.
+    Recovery attempt tracking will be implemented in a future iteration.
+    For MVP, escalation is based on confidence threshold only.
+"""
 
 DEFAULT_ESCALATION_THRESHOLD: float = 0.5
 """Confidence threshold below which to escalate (0.0-1.0)."""
@@ -323,6 +334,7 @@ class EmergencyProtocol:
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     resolved_at: str | None = None
+    """ISO timestamp when protocol resolved (MVP: always None, reserved for future use)."""
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
