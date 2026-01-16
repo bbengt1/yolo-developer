@@ -149,6 +149,7 @@ class SMOutput:
         processing_notes: Additional notes about the decision process
         sprint_plan: Optional sprint plan when SM is in planning mode (Story 10.3)
         delegation_result: Optional delegation result when task delegated (Story 10.4)
+        health_status: Optional health status when monitoring is enabled (Story 10.5)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -174,6 +175,7 @@ class SMOutput:
     processing_notes: str = ""
     sprint_plan: dict[str, Any] | None = None
     delegation_result: dict[str, Any] | None = None
+    health_status: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -195,6 +197,7 @@ class SMOutput:
             "processing_notes": self.processing_notes,
             "sprint_plan": self.sprint_plan,
             "delegation_result": self.delegation_result,
+            "health_status": self.health_status,
             "created_at": self.created_at,
         }
 

@@ -10,6 +10,7 @@ Key Responsibilities:
 - Gate-blocked recovery: Routes to appropriate agent for recovery
 - Sprint planning: Plan sprints by prioritizing and sequencing stories (Story 10.3)
 - Task delegation: Delegate tasks to appropriate specialized agents (Story 10.4)
+- Health monitoring: Monitor agent activity, idle time, cycle time, churn rate (Story 10.5)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -20,6 +21,8 @@ Example:
     ...     SprintPlan,
     ...     delegate_task,
     ...     DelegationResult,
+    ...     monitor_health,
+    ...     HealthStatus,
     ... )
     >>>
     >>> # Run the SM node
@@ -37,6 +40,11 @@ Example:
     >>> result = await delegate_task(state, "implementation", "Implement feature")
     >>> result.request.target_agent
     'dev'
+    >>>
+    >>> # Monitor health (Story 10.5)
+    >>> status = await monitor_health(state)
+    >>> status.is_healthy
+    True
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -55,6 +63,7 @@ References:
     - FR12: Circular logic detection (>3 exchanges)
     - FR13: Conflict mediation
     - FR65: SM Agent can calculate weighted priority scores for story selection
+    - FR67: SM Agent can detect agent churn rate and idle time
 """
 
 from __future__ import annotations
@@ -74,6 +83,23 @@ from yolo_developer.agents.sm.delegation_types import (
     DelegationResult,
     Priority,
     TaskType,
+)
+from yolo_developer.agents.sm.health import monitor_health
+from yolo_developer.agents.sm.health_types import (
+    DEFAULT_MAX_CHURN_RATE,
+    DEFAULT_MAX_CYCLE_TIME_SECONDS,
+    DEFAULT_MAX_IDLE_TIME_SECONDS,
+    DEFAULT_WARNING_THRESHOLD_RATIO,
+    VALID_AGENTS_FOR_HEALTH,
+    VALID_ALERT_SEVERITIES,
+    VALID_HEALTH_SEVERITIES,
+    AgentHealthSnapshot,
+    AlertSeverity,
+    HealthAlert,
+    HealthConfig,
+    HealthMetrics,
+    HealthSeverity,
+    HealthStatus,
 )
 from yolo_developer.agents.sm.node import sm_node
 from yolo_developer.agents.sm.planning import (
@@ -102,35 +128,54 @@ from yolo_developer.agents.sm.types import (
 )
 
 __all__ = [
+    # Delegation (Story 10.4)
     "AGENT_EXPERTISE",
-    "CIRCULAR_LOGIC_THRESHOLD",
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
+    "DEFAULT_MAX_RETRY_ATTEMPTS",
+    "TASK_TO_AGENT",
+    "VALID_TASK_TYPES",
+    "DelegationConfig",
+    "DelegationRequest",
+    "DelegationResult",
+    "Priority",
+    "TaskType",
+    "delegate_task",
+    "routing_to_task_type",
+    # Health Monitoring (Story 10.5)
+    "DEFAULT_MAX_CHURN_RATE",
+    "DEFAULT_MAX_CYCLE_TIME_SECONDS",
+    "DEFAULT_MAX_IDLE_TIME_SECONDS",
+    "DEFAULT_WARNING_THRESHOLD_RATIO",
+    "VALID_AGENTS_FOR_HEALTH",
+    "VALID_ALERT_SEVERITIES",
+    "VALID_HEALTH_SEVERITIES",
+    "AgentHealthSnapshot",
+    "AlertSeverity",
+    "HealthAlert",
+    "HealthConfig",
+    "HealthMetrics",
+    "HealthSeverity",
+    "HealthStatus",
+    "monitor_health",
+    # Planning (Story 10.3)
     "DEFAULT_DEPENDENCY_WEIGHT",
     "DEFAULT_MAX_POINTS",
-    "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
     "DEFAULT_TECH_DEBT_WEIGHT",
     "DEFAULT_VALUE_WEIGHT",
     "DEFAULT_VELOCITY_WEIGHT",
-    "NATURAL_SUCCESSOR",
-    "TASK_TO_AGENT",
-    "VALID_AGENTS",
-    "VALID_TASK_TYPES",
-    "AgentExchange",
     "CircularDependencyError",
-    "DelegationConfig",
-    "DelegationRequest",
-    "DelegationResult",
-    "EscalationReason",
     "PlanningConfig",
-    "Priority",
-    "RoutingDecision",
-    "SMOutput",
     "SprintPlan",
     "SprintStory",
-    "TaskType",
-    "delegate_task",
     "plan_sprint",
-    "routing_to_task_type",
+    # Core Types (Story 10.2)
+    "CIRCULAR_LOGIC_THRESHOLD",
+    "NATURAL_SUCCESSOR",
+    "VALID_AGENTS",
+    "AgentExchange",
+    "EscalationReason",
+    "RoutingDecision",
+    "SMOutput",
     "sm_node",
 ]

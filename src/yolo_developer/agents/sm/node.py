@@ -41,6 +41,8 @@ import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
+from yolo_developer.agents.sm.health import monitor_health
+from yolo_developer.agents.sm.health_types import HealthStatus
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -495,6 +497,20 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
                 acknowledged=delegation_result.acknowledged,
             )
 
+    # Step 6b: Monitor health (Story 10.5 - FR11, FR67)
+    health_status: HealthStatus | None = None
+    try:
+        health_status = await monitor_health(state)
+        if not health_status.is_healthy:
+            logger.warning(
+                "health_degraded",
+                status=health_status.status,
+                alert_count=len(health_status.alerts),
+            )
+    except Exception as e:
+        # Health monitoring should never block the main workflow
+        logger.error("health_monitoring_failed", error=str(e))
+
     # Step 7: Create processing notes
     processing_notes = (
         f"Analyzed state with {analysis['message_count']} messages, "
@@ -505,6 +521,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
     )
     if delegation_result:
         processing_notes += f" Delegation to {routing_decision}: {'success' if delegation_result.success else 'failed'}."
+    if health_status:
+        processing_notes += f" Health: {health_status.status} ({len(health_status.alerts)} alerts)."
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -519,6 +537,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         recovery_agent=recovery_agent,
         processing_notes=processing_notes,
         delegation_result=delegation_result.to_dict() if delegation_result else None,
+        health_status=health_status.to_dict() if health_status else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -546,14 +565,33 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         escalation_triggered=should_escalate,
         exchange_count=exchange_count,
         delegation_success=delegation_result.success if delegation_result else None,
+        health_status=health_status.status if health_status else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
     # Includes handoff_context for state updates (Task 7.4)
+    # Includes health_status for current snapshot (Story 10.5)
+    # Includes health_history for trend analysis (Story 10.5 Task 7.4)
+    # health_history accumulates snapshots over time for trend analysis
+    health_snapshot = None
+    if health_status:
+        health_snapshot = {
+            "status": health_status.status,
+            "is_healthy": health_status.is_healthy,
+            "alert_count": len(health_status.alerts),
+            "overall_churn_rate": health_status.metrics.overall_churn_rate,
+            "unproductive_churn_rate": health_status.metrics.unproductive_churn_rate,
+            "cycle_time_percentiles": health_status.metrics.cycle_time_percentiles,
+            "agent_idle_times": health_status.metrics.agent_idle_times,
+            "evaluated_at": health_status.evaluated_at,
+        }
+
     return {
         "messages": [message],
         "decisions": [decision],
         "sm_output": output.to_dict(),
         "routing_decision": routing_decision,  # Convenience key for routing
         "handoff_context": handoff_context,  # From delegation (Story 10.4)
+        "health_status": health_status.to_dict() if health_status else None,  # Current snapshot (Story 10.5)
+        "health_history": [health_snapshot] if health_snapshot else [],  # For trend analysis (Task 7.4)
     }
