@@ -16,6 +16,7 @@ Key Responsibilities:
 - Handoff management: Manage agent handoffs with context preservation (Story 10.8)
 - Sprint progress tracking: Track sprint progress and completion estimates (Story 10.9)
 - Emergency protocols: Trigger emergency protocols when health degrades (Story 10.10)
+- Priority scoring: Calculate weighted priority scores for story selection (Story 10.11)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -34,6 +35,10 @@ Example:
     ...     HandoffResult,
     ...     trigger_emergency_protocol,
     ...     EmergencyProtocol,
+    ...     calculate_priority_score,
+    ...     score_stories,
+    ...     PriorityFactors,
+    ...     PriorityResult,
     ... )
     >>>
     >>> # Run the SM node
@@ -76,6 +81,12 @@ Example:
     >>> protocol = await trigger_emergency_protocol(state, health_status)
     >>> protocol.status
     'resolved'
+    >>>
+    >>> # Calculate priority scores (Story 10.11)
+    >>> factors = PriorityFactors(story_id="1-1", value_score=0.9)
+    >>> result = calculate_priority_score(factors, PriorityScoringConfig())
+    >>> result.priority_score  # 0.9*0.4 + 0.0*0.3 + 0.5*0.2 + 0.0*0.1 = 0.46
+    0.46
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -217,6 +228,25 @@ from yolo_developer.agents.sm.planning_types import (
     SprintPlan,
     SprintStory,
 )
+from yolo_developer.agents.sm.priority import (
+    calculate_dependency_score,
+    calculate_dependency_scores,
+    calculate_priority_score,
+    normalize_results,
+    normalize_scores,
+    score_stories,
+    update_stories_with_scores,
+)
+from yolo_developer.agents.sm.priority_types import (
+    DEFAULT_INCLUDE_EXPLANATION,
+    DEFAULT_MIN_SCORE_THRESHOLD,
+    DEFAULT_NORMALIZE_SCORES,
+    MAX_SCORE,
+    MIN_SCORE,
+    PriorityFactors,
+    PriorityResult,
+    PriorityScoringConfig,
+)
 from yolo_developer.agents.sm.progress import (
     get_progress_for_display,
     get_progress_summary,
@@ -257,6 +287,8 @@ __all__ = [
     "DEFAULT_ESTIMATE_CONFIDENCE_THRESHOLD",
     # Circular Detection (Story 10.6)
     "DEFAULT_EXCHANGE_THRESHOLD",
+    # Priority Scoring (Story 10.11)
+    "DEFAULT_INCLUDE_EXPLANATION",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
     "DEFAULT_MAX_CONTEXT_SIZE",
@@ -266,6 +298,8 @@ __all__ = [
     "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
+    "DEFAULT_MIN_SCORE_THRESHOLD",
+    "DEFAULT_NORMALIZE_SCORES",
     # Conflict Mediation (Story 10.7)
     "DEFAULT_PRINCIPLES_HIERARCHY",
     "DEFAULT_TECH_DEBT_WEIGHT",
@@ -275,6 +309,8 @@ __all__ = [
     "DEFAULT_VALUE_WEIGHT",
     "DEFAULT_VELOCITY_WEIGHT",
     "DEFAULT_WARNING_THRESHOLD_RATIO",
+    "MAX_SCORE",
+    "MIN_SCORE",
     "NATURAL_SUCCESSOR",
     "RESOLUTION_PRINCIPLES",
     "TASK_TO_AGENT",
@@ -334,6 +370,9 @@ __all__ = [
     "PatternType",
     "PlanningConfig",
     "Priority",
+    "PriorityFactors",
+    "PriorityResult",
+    "PriorityScoringConfig",
     "ProgressConfig",
     "ProtocolStatus",
     "RecoveryAction",
@@ -348,6 +387,9 @@ __all__ = [
     "StoryProgress",
     "StoryStatus",
     "TaskType",
+    "calculate_dependency_score",
+    "calculate_dependency_scores",
+    "calculate_priority_score",
     "checkpoint_state",
     "delegate_task",
     "detect_circular_logic",
@@ -358,9 +400,13 @@ __all__ = [
     "manage_handoff",
     "mediate_conflicts",
     "monitor_health",
+    "normalize_results",
+    "normalize_scores",
     "plan_sprint",
     "routing_to_task_type",
+    "score_stories",
     "sm_node",
     "track_progress",
     "trigger_emergency_protocol",
+    "update_stories_with_scores",
 ]

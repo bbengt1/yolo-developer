@@ -55,6 +55,13 @@ from yolo_developer.agents.sm.planning_types import (
     SprintPlan,
     SprintStory,
 )
+from yolo_developer.agents.sm.priority import (
+    calculate_dependency_scores,
+)
+from yolo_developer.agents.sm.priority_types import (
+    PriorityFactors,
+    PriorityScoringConfig,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -82,6 +89,11 @@ def _calculate_priority_score(story: SprintStory, config: PlanningConfig) -> flo
     - Velocity impact (default 20%): Expected effect on team velocity
     - Tech debt score (default 10%): Tech debt reduction
 
+    Note:
+        This function delegates to the priority module (Story 10.11) for
+        consistency. For more advanced features like normalization and
+        explanations, use the priority module directly.
+
     Args:
         story: The story to calculate priority for.
         config: Planning configuration with weights.
@@ -95,12 +107,21 @@ def _calculate_priority_score(story: SprintStory, config: PlanningConfig) -> flo
         >>> _calculate_priority_score(story, config)
         0.61
     """
-    return (
-        story.value_score * config.value_weight
-        + story.dependency_score * config.dependency_weight
-        + story.velocity_impact * config.velocity_weight
-        + story.tech_debt_score * config.tech_debt_weight
+    # Delegate to priority module for consistent scoring (Story 10.11)
+    from yolo_developer.agents.sm.priority import calculate_priority_score
+
+    factors = PriorityFactors(
+        story_id=story.story_id,
+        value_score=story.value_score,
+        dependency_score=story.dependency_score,
+        velocity_impact=story.velocity_impact,
+        tech_debt_score=story.tech_debt_score,
     )
+    scoring_config = PriorityScoringConfig.from_planning_config(
+        config, include_explanation=False
+    )
+    result = calculate_priority_score(factors, scoring_config)
+    return result.priority_score
 
 
 # =============================================================================
@@ -446,15 +467,26 @@ async def plan_sprint(
     # Step 1: Convert to SprintStory objects
     sprint_stories = [_dict_to_sprint_story(s) for s in stories]
 
-    # Step 2: Calculate priority scores
+    # Step 2a: Calculate dependency scores for all stories (Story 10.11)
+    # This determines how many stories depend on each story
+    dep_scores = calculate_dependency_scores(sprint_stories)
+
+    # Step 2b: Update stories with dependency scores, then calculate priority
+    stories_with_deps = [
+        replace(story, dependency_score=dep_scores.get(story.story_id, 0.0))
+        for story in sprint_stories
+    ]
+
+    # Step 2c: Calculate priority scores using updated dependency scores
     scored_stories = [
         replace(story, priority_score=_calculate_priority_score(story, config))
-        for story in sprint_stories
+        for story in stories_with_deps
     ]
 
     logger.debug(
         "priority_scores_calculated",
         scores={s.story_id: s.priority_score for s in scored_stories},
+        dependency_scores=dep_scores,
     )
 
     # Step 3: Sort by dependencies then priority (topological sort)
