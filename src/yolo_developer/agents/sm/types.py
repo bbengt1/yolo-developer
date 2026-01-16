@@ -154,6 +154,7 @@ class SMOutput:
         mediation_result: Optional conflict mediation result (Story 10.7)
         handoff_result: Optional handoff management result (Story 10.8)
         sprint_progress: Optional sprint progress tracking result (Story 10.9)
+        emergency_protocol: Optional emergency protocol result (Story 10.10)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -184,6 +185,7 @@ class SMOutput:
     mediation_result: dict[str, Any] | None = None
     handoff_result: dict[str, Any] | None = None
     sprint_progress: dict[str, Any] | None = None
+    emergency_protocol: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -210,6 +212,7 @@ class SMOutput:
             "mediation_result": self.mediation_result,
             "handoff_result": self.handoff_result,
             "sprint_progress": self.sprint_progress,
+            "emergency_protocol": self.emergency_protocol,
             "created_at": self.created_at,
         }
 

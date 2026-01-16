@@ -15,6 +15,7 @@ Key Responsibilities:
 - Conflict mediation: Mediate conflicts between agents with different recommendations (Story 10.7)
 - Handoff management: Manage agent handoffs with context preservation (Story 10.8)
 - Sprint progress tracking: Track sprint progress and completion estimates (Story 10.9)
+- Emergency protocols: Trigger emergency protocols when health degrades (Story 10.10)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -31,6 +32,8 @@ Example:
     ...     MediationResult,
     ...     manage_handoff,
     ...     HandoffResult,
+    ...     trigger_emergency_protocol,
+    ...     EmergencyProtocol,
     ... )
     >>>
     >>> # Run the SM node
@@ -68,6 +71,11 @@ Example:
     >>> progress = await track_progress(state, sprint_plan)
     >>> progress.snapshot.progress_percentage
     50.0
+    >>>
+    >>> # Trigger emergency protocol (Story 10.10)
+    >>> protocol = await trigger_emergency_protocol(state, health_status)
+    >>> protocol.status
+    'resolved'
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -88,9 +96,12 @@ References:
     - FR14: System can execute agents in defined sequence
     - FR15: System can handle agent handoffs with context preservation
     - FR16: System can track sprint progress and completion status
+    - FR17: SM Agent can trigger emergency protocols when system health degrades
     - FR65: SM Agent can calculate weighted priority scores for story selection
     - FR66: SM Agent can track burn-down velocity and cycle time metrics
     - FR67: SM Agent can detect agent churn rate and idle time
+    - FR70: SM Agent can escalate to human when circular logic persists
+    - FR71: SM Agent can coordinate rollback operations as emergency sprints
 """
 
 from __future__ import annotations
@@ -141,6 +152,26 @@ from yolo_developer.agents.sm.delegation_types import (
     DelegationResult,
     Priority,
     TaskType,
+)
+from yolo_developer.agents.sm.emergency import (
+    checkpoint_state,
+    escalate_emergency,
+    trigger_emergency_protocol,
+)
+from yolo_developer.agents.sm.emergency_types import (
+    DEFAULT_ESCALATION_THRESHOLD,
+    DEFAULT_MAX_RECOVERY_ATTEMPTS,
+    VALID_EMERGENCY_TYPES,
+    VALID_PROTOCOL_STATUSES,
+    VALID_RECOVERY_ACTIONS,
+    Checkpoint,
+    EmergencyConfig,
+    EmergencyProtocol,
+    EmergencyTrigger,
+    EmergencyType,
+    ProtocolStatus,
+    RecoveryAction,
+    RecoveryOption,
 )
 from yolo_developer.agents.sm.handoff import manage_handoff
 from yolo_developer.agents.sm.handoff_types import (
@@ -220,6 +251,8 @@ __all__ = [
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
     # Planning (Story 10.3)
     "DEFAULT_DEPENDENCY_WEIGHT",
+    # Emergency Protocols (Story 10.10)
+    "DEFAULT_ESCALATION_THRESHOLD",
     # Progress Tracking (Story 10.9)
     "DEFAULT_ESTIMATE_CONFIDENCE_THRESHOLD",
     # Circular Detection (Story 10.6)
@@ -230,6 +263,7 @@ __all__ = [
     "DEFAULT_MAX_CYCLE_TIME_SECONDS",
     "DEFAULT_MAX_IDLE_TIME_SECONDS",
     "DEFAULT_MAX_POINTS",
+    "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
     # Conflict Mediation (Story 10.7)
@@ -250,16 +284,20 @@ __all__ = [
     "VALID_CONFLICT_SEVERITIES",
     "VALID_CONFLICT_TYPES",
     "VALID_CYCLE_SEVERITIES",
+    "VALID_EMERGENCY_TYPES",
     "VALID_HANDOFF_STATUSES",
     "VALID_HEALTH_SEVERITIES",
     "VALID_INTERVENTION_STRATEGIES",
     "VALID_PATTERN_TYPES",
+    "VALID_PROTOCOL_STATUSES",
+    "VALID_RECOVERY_ACTIONS",
     "VALID_RESOLUTION_STRATEGIES",
     "VALID_STORY_STATUSES",
     "VALID_TASK_TYPES",
     "AgentExchange",
     "AgentHealthSnapshot",
     "AlertSeverity",
+    "Checkpoint",
     "CircularDependencyError",
     "CircularLogicConfig",
     "CircularPattern",
@@ -276,6 +314,10 @@ __all__ = [
     "DelegationConfig",
     "DelegationRequest",
     "DelegationResult",
+    "EmergencyConfig",
+    "EmergencyProtocol",
+    "EmergencyTrigger",
+    "EmergencyType",
     "EscalationReason",
     "HandoffConfig",
     "HandoffMetrics",
@@ -293,6 +335,9 @@ __all__ = [
     "PlanningConfig",
     "Priority",
     "ProgressConfig",
+    "ProtocolStatus",
+    "RecoveryAction",
+    "RecoveryOption",
     "ResolutionStrategy",
     "RoutingDecision",
     "SMOutput",
@@ -303,8 +348,10 @@ __all__ = [
     "StoryProgress",
     "StoryStatus",
     "TaskType",
+    "checkpoint_state",
     "delegate_task",
     "detect_circular_logic",
+    "escalate_emergency",
     "get_progress_for_display",
     "get_progress_summary",
     "get_stories_by_status",
@@ -315,4 +362,5 @@ __all__ = [
     "routing_to_task_type",
     "sm_node",
     "track_progress",
+    "trigger_emergency_protocol",
 ]

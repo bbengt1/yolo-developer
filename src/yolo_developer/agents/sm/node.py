@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -15,6 +15,7 @@ Key Concepts:
 - **Conflict Mediation**: Mediates conflicts between agents (Story 10.7)
 - **Handoff Management**: Manages agent handoffs with context preservation (Story 10.8)
 - **Sprint Progress Tracking**: Tracks sprint progress and completion estimates (Story 10.9)
+- **Emergency Protocols**: Triggers emergency protocols when health degrades (Story 10.10)
 - **Escalation Handling**: Triggers human intervention when needed
 
 Example:
@@ -49,6 +50,8 @@ from yolo_developer.agents.sm.circular_detection_types import CycleAnalysis
 from yolo_developer.agents.sm.conflict_mediation import mediate_conflicts
 from yolo_developer.agents.sm.conflict_types import MediationResult
 from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
+from yolo_developer.agents.sm.emergency import trigger_emergency_protocol
+from yolo_developer.agents.sm.emergency_types import EmergencyConfig, EmergencyProtocol
 from yolo_developer.agents.sm.handoff import manage_handoff
 from yolo_developer.agents.sm.handoff_types import HandoffResult
 from yolo_developer.agents.sm.health import monitor_health
@@ -545,6 +548,33 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         # Health monitoring should never block the main workflow
         logger.error("health_monitoring_failed", error=str(e))
 
+    # Step 6b2: Emergency protocol (Story 10.10 - FR17, FR70, FR71)
+    # Triggers when health status is critical or other emergency conditions
+    emergency_protocol: EmergencyProtocol | None = None
+    if health_status and health_status.status == "critical":
+        try:
+            emergency_protocol = await trigger_emergency_protocol(
+                state=cast(dict[str, Any], state),
+                health_status=health_status,
+                config=EmergencyConfig(),
+            )
+            logger.warning(
+                "emergency_protocol_triggered",
+                protocol_id=emergency_protocol.protocol_id,
+                emergency_type=emergency_protocol.trigger.emergency_type,
+                status=emergency_protocol.status,
+                selected_action=emergency_protocol.selected_action,
+                escalation_reason=emergency_protocol.escalation_reason,
+            )
+
+            # Trigger escalation if emergency protocol decided to escalate
+            if emergency_protocol.status == "escalated" and not should_escalate:
+                should_escalate = True
+                escalation_reason = "agent_failure"  # Closest match for emergency escalation
+        except Exception as e:
+            # Emergency protocol should never block the main workflow
+            logger.error("emergency_protocol_failed", error=str(e))
+
     # Step 6c: Conflict mediation (Story 10.7 - FR13)
     mediation_result: MediationResult | None = None
     try:
@@ -640,6 +670,12 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         processing_notes += f" Delegation to {routing_decision}: {'success' if delegation_result.success else 'failed'}."
     if health_status:
         processing_notes += f" Health: {health_status.status} ({len(health_status.alerts)} alerts)."
+    if emergency_protocol:
+        processing_notes += (
+            f" Emergency: {emergency_protocol.trigger.emergency_type}, "
+            f"status={emergency_protocol.status}, "
+            f"action={emergency_protocol.selected_action}."
+        )
     if mediation_result and mediation_result.conflicts_detected:
         processing_notes += (
             f" Mediation: {len(mediation_result.conflicts_detected)} conflicts, "
@@ -676,6 +712,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         mediation_result=mediation_result.to_dict() if mediation_result else None,
         handoff_result=handoff_result.to_dict() if handoff_result else None,
         sprint_progress=sprint_progress.to_dict() if sprint_progress else None,
+        emergency_protocol=emergency_protocol.to_dict() if emergency_protocol else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -712,6 +749,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         handoff_validated=handoff_result.context_validated if handoff_result else None,
         sprint_progress_percentage=sprint_progress.snapshot.progress_percentage if sprint_progress else None,
         sprint_stories_completed=sprint_progress.snapshot.stories_completed if sprint_progress else None,
+        emergency_protocol_status=emergency_protocol.status if emergency_protocol else None,
+        emergency_type=emergency_protocol.trigger.emergency_type if emergency_protocol else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -744,4 +783,5 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "mediation_result": mediation_result.to_dict() if mediation_result else None,  # Conflict mediation (Story 10.7)
         "handoff_result": handoff_result.to_dict() if handoff_result else None,  # Handoff management (Story 10.8)
         "sprint_progress": sprint_progress.to_dict() if sprint_progress else None,  # Sprint progress tracking (Story 10.9)
+        "emergency_protocol": emergency_protocol.to_dict() if emergency_protocol else None,  # Emergency protocol (Story 10.10)
     }
