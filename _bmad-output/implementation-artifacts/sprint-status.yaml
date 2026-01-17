@@ -158,8 +158,8 @@ development_status:
   10-9-sprint-progress-tracking: done
   10-10-emergency-protocols: done
   10-11-priority-scoring: done
-  10-12-velocity-tracking: backlog
-  10-13-context-injection: backlog
+  10-12-velocity-tracking: done
+  10-13-context-injection: done
   10-14-human-escalation: backlog
   10-15-rollback-coordination: backlog
   10-16-health-telemetry-dashboard-data: backlog

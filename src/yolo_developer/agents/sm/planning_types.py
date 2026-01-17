@@ -81,6 +81,7 @@ class SprintStory:
         priority_score: Composite weighted score (calculated by planner)
         dependencies: Tuple of story IDs this depends on
         estimated_points: Story points estimate for capacity planning
+        story_points: Points value for velocity tracking (default 1.0)
         value_score: Business value component (0.0-1.0)
         tech_debt_score: Tech debt reduction component (0.0-1.0)
         velocity_impact: Expected velocity impact (0.0-1.0)
@@ -102,6 +103,7 @@ class SprintStory:
     priority_score: float = 0.0
     dependencies: tuple[str, ...] = field(default_factory=tuple)
     estimated_points: int = 1
+    story_points: float = 1.0
     value_score: float = 0.5
     tech_debt_score: float = 0.0
     velocity_impact: float = 0.5
@@ -120,6 +122,7 @@ class SprintStory:
             "priority_score": self.priority_score,
             "dependencies": self.dependencies,
             "estimated_points": self.estimated_points,
+            "story_points": self.story_points,
             "value_score": self.value_score,
             "tech_debt_score": self.tech_debt_score,
             "velocity_impact": self.velocity_impact,

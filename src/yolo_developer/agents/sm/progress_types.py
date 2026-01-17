@@ -107,6 +107,7 @@ class StoryProgress:
         agent_history: Tuple of agent names that have worked on this story
         duration_ms: Total duration in milliseconds (None if not completed)
         blocked_reason: Reason for blocking (None if not blocked)
+        story_points: Story points for velocity tracking (default 1.0)
 
     Example:
         >>> story = StoryProgress(
@@ -128,6 +129,7 @@ class StoryProgress:
     agent_history: tuple[str, ...] = field(default_factory=tuple)
     duration_ms: float | None = None
     blocked_reason: str | None = None
+    story_points: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -145,6 +147,7 @@ class StoryProgress:
             "agent_history": list(self.agent_history),
             "duration_ms": self.duration_ms,
             "blocked_reason": self.blocked_reason,
+            "story_points": self.story_points,
         }
 
 

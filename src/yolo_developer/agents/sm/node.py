@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.13).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -16,6 +16,7 @@ Key Concepts:
 - **Handoff Management**: Manages agent handoffs with context preservation (Story 10.8)
 - **Sprint Progress Tracking**: Tracks sprint progress and completion estimates (Story 10.9)
 - **Emergency Protocols**: Triggers emergency protocols when health degrades (Story 10.10)
+- **Context Injection**: Injects context when agents lack information (Story 10.13)
 - **Escalation Handling**: Triggers human intervention when needed
 
 Example:
@@ -49,6 +50,8 @@ from yolo_developer.agents.sm.circular_detection import detect_circular_logic
 from yolo_developer.agents.sm.circular_detection_types import CycleAnalysis
 from yolo_developer.agents.sm.conflict_mediation import mediate_conflicts
 from yolo_developer.agents.sm.conflict_types import MediationResult
+from yolo_developer.agents.sm.context_injection import manage_context_injection
+from yolo_developer.agents.sm.context_injection_types import InjectionResult
 from yolo_developer.agents.sm.delegation import delegate_task, routing_to_task_type
 from yolo_developer.agents.sm.emergency import trigger_emergency_protocol
 from yolo_developer.agents.sm.emergency_types import EmergencyConfig, EmergencyProtocol
@@ -548,7 +551,29 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         # Health monitoring should never block the main workflow
         logger.error("health_monitoring_failed", error=str(e))
 
-    # Step 6b2: Emergency protocol (Story 10.10 - FR17, FR70, FR71)
+    # Step 6b2: Context injection (Story 10.13 - FR69)
+    # Detects context gaps and injects relevant context for agents
+    injection_result: InjectionResult | None = None
+    injected_context: dict[str, Any] | None = None
+    try:
+        injection_result, injected_context = await manage_context_injection(
+            state=state,
+            memory=None,  # Memory store would be passed from orchestrator in full integration
+        )
+        if injection_result and injection_result.injected:
+            logger.info(
+                "context_injection_completed",
+                gap_id=injection_result.gap.gap_id,
+                gap_reason=injection_result.gap.reason,
+                contexts_retrieved=len(injection_result.contexts_retrieved),
+                total_context_size=injection_result.total_context_size,
+                duration_ms=injection_result.duration_ms,
+            )
+    except Exception as e:
+        # Context injection should never block the main workflow
+        logger.error("context_injection_failed", error=str(e))
+
+    # Step 6b3: Emergency protocol (Story 10.10 - FR17, FR70, FR71)
     # Triggers when health status is critical or other emergency conditions
     emergency_protocol: EmergencyProtocol | None = None
     if health_status and health_status.status == "critical":
@@ -693,6 +718,12 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             f" Sprint: {sprint_progress.snapshot.progress_percentage:.1f}% complete "
             f"({sprint_progress.snapshot.stories_completed}/{sprint_progress.snapshot.total_stories} stories)."
         )
+    if injection_result and injection_result.injected:
+        processing_notes += (
+            f" Context injection: {injection_result.gap.reason}, "
+            f"{len(injection_result.contexts_retrieved)} contexts, "
+            f"{injection_result.total_context_size} bytes."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -713,6 +744,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         handoff_result=handoff_result.to_dict() if handoff_result else None,
         sprint_progress=sprint_progress.to_dict() if sprint_progress else None,
         emergency_protocol=emergency_protocol.to_dict() if emergency_protocol else None,
+        injection_result=injection_result.to_dict() if injection_result else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -751,6 +783,8 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         sprint_stories_completed=sprint_progress.snapshot.stories_completed if sprint_progress else None,
         emergency_protocol_status=emergency_protocol.status if emergency_protocol else None,
         emergency_type=emergency_protocol.trigger.emergency_type if emergency_protocol else None,
+        context_injection_triggered=injection_result.injected if injection_result else None,
+        context_gap_reason=injection_result.gap.reason if injection_result else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -784,4 +818,6 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "handoff_result": handoff_result.to_dict() if handoff_result else None,  # Handoff management (Story 10.8)
         "sprint_progress": sprint_progress.to_dict() if sprint_progress else None,  # Sprint progress tracking (Story 10.9)
         "emergency_protocol": emergency_protocol.to_dict() if emergency_protocol else None,  # Emergency protocol (Story 10.10)
+        "injected_context": injected_context,  # Context injection payload (Story 10.13)
+        "injection_result": injection_result.to_dict() if injection_result else None,  # Context injection result (Story 10.13)
     }

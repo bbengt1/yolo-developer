@@ -17,6 +17,8 @@ Key Responsibilities:
 - Sprint progress tracking: Track sprint progress and completion estimates (Story 10.9)
 - Emergency protocols: Trigger emergency protocols when health degrades (Story 10.10)
 - Priority scoring: Calculate weighted priority scores for story selection (Story 10.11)
+- Velocity tracking: Track burn-down velocity and cycle time metrics (Story 10.12)
+- Context injection: Inject context when agents lack information (Story 10.13)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -87,6 +89,14 @@ Example:
     >>> result = calculate_priority_score(factors, PriorityScoringConfig())
     >>> result.priority_score  # 0.9*0.4 + 0.0*0.3 + 0.5*0.2 + 0.0*0.1 = 0.46
     0.46
+    >>>
+    >>> # Track velocity (Story 10.12)
+    >>> velocity = calculate_sprint_velocity(completed_stories, "sprint-20260116")
+    >>> velocity.stories_completed
+    5
+    >>> metrics = calculate_velocity_metrics([velocity])
+    >>> metrics.trend
+    'stable'
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -147,6 +157,31 @@ from yolo_developer.agents.sm.conflict_types import (
     ConflictType,
     MediationResult,
     ResolutionStrategy,
+)
+from yolo_developer.agents.sm.context_injection import (
+    detect_context_gap,
+    inject_context,
+    manage_context_injection,
+    retrieve_relevant_context,
+)
+from yolo_developer.agents.sm.context_injection_types import (
+    DEFAULT_LOG_INJECTIONS,
+    DEFAULT_MAX_CONTEXT_ITEMS,
+    DEFAULT_MAX_CONTEXT_SIZE_BYTES,
+    DEFAULT_MIN_RELEVANCE_SCORE,
+    LONG_CYCLE_TIME_MULTIPLIER,
+    MAX_CONFIDENCE,
+    MAX_RELEVANCE,
+    MIN_CONFIDENCE,
+    MIN_RELEVANCE,
+    VALID_CONTEXT_SOURCES,
+    VALID_GAP_REASONS,
+    ContextGap,
+    ContextSource,
+    GapReason,
+    InjectionConfig,
+    InjectionResult,
+    RetrievedContext,
 )
 from yolo_developer.agents.sm.delegation import (
     delegate_task,
@@ -272,12 +307,34 @@ from yolo_developer.agents.sm.types import (
     RoutingDecision,
     SMOutput,
 )
+from yolo_developer.agents.sm.velocity import (
+    calculate_sprint_velocity,
+    calculate_velocity_metrics,
+    forecast_velocity,
+    get_velocity_trend,
+    track_sprint_velocity,
+)
+from yolo_developer.agents.sm.velocity_types import (
+    CONFIDENCE_DECIMAL_PLACES,
+    DEFAULT_MIN_SPRINTS_FOR_FORECAST,
+    DEFAULT_MIN_SPRINTS_FOR_TREND,
+    DEFAULT_ROLLING_WINDOW,
+    DEFAULT_TREND_THRESHOLD,
+    VALID_TRENDS,
+    SprintVelocity,
+    VelocityConfig,
+    VelocityForecast,
+    VelocityMetrics,
+    VelocityTrend,
+)
 
 __all__ = [
     # Delegation (Story 10.4)
     "AGENT_EXPERTISE",
     # Core Types (Story 10.2)
     "CIRCULAR_LOGIC_THRESHOLD",
+    # Velocity Tracking (Story 10.12)
+    "CONFIDENCE_DECIMAL_PLACES",
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
     # Planning (Story 10.3)
     "DEFAULT_DEPENDENCY_WEIGHT",
@@ -289,27 +346,41 @@ __all__ = [
     "DEFAULT_EXCHANGE_THRESHOLD",
     # Priority Scoring (Story 10.11)
     "DEFAULT_INCLUDE_EXPLANATION",
+    # Context Injection (Story 10.13)
+    "DEFAULT_LOG_INJECTIONS",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
+    "DEFAULT_MAX_CONTEXT_ITEMS",
     "DEFAULT_MAX_CONTEXT_SIZE",
+    "DEFAULT_MAX_CONTEXT_SIZE_BYTES",
     "DEFAULT_MAX_CYCLE_TIME_SECONDS",
     "DEFAULT_MAX_IDLE_TIME_SECONDS",
     "DEFAULT_MAX_POINTS",
     "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
     "DEFAULT_MAX_STORIES",
+    "DEFAULT_MIN_RELEVANCE_SCORE",
     "DEFAULT_MIN_SCORE_THRESHOLD",
+    "DEFAULT_MIN_SPRINTS_FOR_FORECAST",
+    "DEFAULT_MIN_SPRINTS_FOR_TREND",
     "DEFAULT_NORMALIZE_SCORES",
     # Conflict Mediation (Story 10.7)
     "DEFAULT_PRINCIPLES_HIERARCHY",
+    "DEFAULT_ROLLING_WINDOW",
     "DEFAULT_TECH_DEBT_WEIGHT",
     # Handoff Management (Story 10.8)
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_TIME_WINDOW_SECONDS",
+    "DEFAULT_TREND_THRESHOLD",
     "DEFAULT_VALUE_WEIGHT",
     "DEFAULT_VELOCITY_WEIGHT",
     "DEFAULT_WARNING_THRESHOLD_RATIO",
+    "LONG_CYCLE_TIME_MULTIPLIER",
+    "MAX_CONFIDENCE",
+    "MAX_RELEVANCE",
     "MAX_SCORE",
+    "MIN_CONFIDENCE",
+    "MIN_RELEVANCE",
     "MIN_SCORE",
     "NATURAL_SUCCESSOR",
     "RESOLUTION_PRINCIPLES",
@@ -319,8 +390,10 @@ __all__ = [
     "VALID_ALERT_SEVERITIES",
     "VALID_CONFLICT_SEVERITIES",
     "VALID_CONFLICT_TYPES",
+    "VALID_CONTEXT_SOURCES",
     "VALID_CYCLE_SEVERITIES",
     "VALID_EMERGENCY_TYPES",
+    "VALID_GAP_REASONS",
     "VALID_HANDOFF_STATUSES",
     "VALID_HEALTH_SEVERITIES",
     "VALID_INTERVENTION_STRATEGIES",
@@ -330,6 +403,7 @@ __all__ = [
     "VALID_RESOLUTION_STRATEGIES",
     "VALID_STORY_STATUSES",
     "VALID_TASK_TYPES",
+    "VALID_TRENDS",
     "AgentExchange",
     "AgentHealthSnapshot",
     "AlertSeverity",
@@ -344,6 +418,8 @@ __all__ = [
     "ConflictResolution",
     "ConflictSeverity",
     "ConflictType",
+    "ContextGap",
+    "ContextSource",
     "CycleAnalysis",
     "CycleLog",
     "CycleSeverity",
@@ -355,6 +431,7 @@ __all__ = [
     "EmergencyTrigger",
     "EmergencyType",
     "EscalationReason",
+    "GapReason",
     "HandoffConfig",
     "HandoffMetrics",
     "HandoffRecord",
@@ -365,6 +442,8 @@ __all__ = [
     "HealthMetrics",
     "HealthSeverity",
     "HealthStatus",
+    "InjectionConfig",
+    "InjectionResult",
     "InterventionStrategy",
     "MediationResult",
     "PatternType",
@@ -378,35 +457,50 @@ __all__ = [
     "RecoveryAction",
     "RecoveryOption",
     "ResolutionStrategy",
+    "RetrievedContext",
     "RoutingDecision",
     "SMOutput",
     "SprintPlan",
     "SprintProgress",
     "SprintProgressSnapshot",
     "SprintStory",
+    "SprintVelocity",
     "StoryProgress",
     "StoryStatus",
     "TaskType",
+    "VelocityConfig",
+    "VelocityForecast",
+    "VelocityMetrics",
+    "VelocityTrend",
     "calculate_dependency_score",
     "calculate_dependency_scores",
     "calculate_priority_score",
+    "calculate_sprint_velocity",
+    "calculate_velocity_metrics",
     "checkpoint_state",
     "delegate_task",
     "detect_circular_logic",
+    "detect_context_gap",
     "escalate_emergency",
+    "forecast_velocity",
     "get_progress_for_display",
     "get_progress_summary",
     "get_stories_by_status",
+    "get_velocity_trend",
+    "inject_context",
+    "manage_context_injection",
     "manage_handoff",
     "mediate_conflicts",
     "monitor_health",
     "normalize_results",
     "normalize_scores",
     "plan_sprint",
+    "retrieve_relevant_context",
     "routing_to_task_type",
     "score_stories",
     "sm_node",
     "track_progress",
+    "track_sprint_velocity",
     "trigger_emergency_protocol",
     "update_stories_with_scores",
 ]
