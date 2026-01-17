@@ -134,7 +134,7 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 9: TEA Agent (8 stories)
-  epic-9: in-progress
+  epic-9: done
   9-1-create-tea-agent-node: done
   9-2-coverage-validation: done
   9-3-test-suite-execution: done
