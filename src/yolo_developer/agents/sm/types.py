@@ -158,6 +158,7 @@ class SMOutput:
         injection_result: Optional context injection result (Story 10.13)
         escalation_result: Optional human escalation result (Story 10.14)
         rollback_result: Optional rollback coordination result (Story 10.15)
+        telemetry_snapshot: Optional telemetry snapshot for dashboard (Story 10.16)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -192,6 +193,7 @@ class SMOutput:
     injection_result: dict[str, Any] | None = None
     escalation_result: dict[str, Any] | None = None
     rollback_result: dict[str, Any] | None = None
+    telemetry_snapshot: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -222,6 +224,7 @@ class SMOutput:
             "injection_result": self.injection_result,
             "escalation_result": self.escalation_result,
             "rollback_result": self.rollback_result,
+            "telemetry_snapshot": self.telemetry_snapshot,
             "created_at": self.created_at,
         }
 

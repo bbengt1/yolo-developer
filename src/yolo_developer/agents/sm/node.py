@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.13, 10.14).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.13, 10.14, 10.16).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -18,6 +18,7 @@ Key Concepts:
 - **Emergency Protocols**: Triggers emergency protocols when health degrades (Story 10.10)
 - **Context Injection**: Injects context when agents lack information (Story 10.13)
 - **Human Escalation**: Creates escalation requests for human intervention (Story 10.14)
+- **Telemetry Collection**: Collects health telemetry for dashboard display (Story 10.16)
 
 Example:
     >>> from yolo_developer.agents.sm import sm_node
@@ -65,6 +66,8 @@ from yolo_developer.agents.sm.progress import track_progress
 from yolo_developer.agents.sm.progress_types import SprintProgress
 from yolo_developer.agents.sm.rollback import coordinate_rollback
 from yolo_developer.agents.sm.rollback_types import RollbackResult
+from yolo_developer.agents.sm.telemetry import get_dashboard_telemetry
+from yolo_developer.agents.sm.telemetry_types import DashboardMetrics
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -739,6 +742,37 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             # Progress tracking should never block the main workflow
             logger.error("sprint_progress_tracking_failed", error=str(e))
 
+    # Step 6f: Telemetry collection for dashboard (Story 10.16 - FR72)
+    # Collects health telemetry data for dashboard display
+    telemetry_snapshot: DashboardMetrics | None = None
+    try:
+        # Import velocity module to get velocity metrics if available
+        from yolo_developer.agents.sm.velocity import calculate_velocity_metrics
+        from yolo_developer.agents.sm.velocity_types import VelocityMetrics
+
+        # Try to get velocity from state history or calculate from sprint progress
+        velocity_metrics: VelocityMetrics | None = None
+        velocity_history = state.get("velocity_history", [])
+        if velocity_history and isinstance(velocity_history, list):
+            # Calculate aggregate velocity from history
+            velocity_metrics = calculate_velocity_metrics(velocity_history)
+
+        telemetry_snapshot = await get_dashboard_telemetry(
+            state=state,
+            health_status=health_status,
+            velocity_metrics=velocity_metrics,
+        )
+        logger.debug(
+            "telemetry_collected",
+            velocity_display=telemetry_snapshot.velocity_display,
+            cycle_time_display=telemetry_snapshot.cycle_time_display,
+            health_summary=telemetry_snapshot.health_summary,
+            agent_count=len(telemetry_snapshot.agent_status_table),
+        )
+    except Exception as e:
+        # Telemetry collection should never block the main workflow
+        logger.error("telemetry_collection_failed", error=str(e))
+
     # Step 7: Create processing notes
     processing_notes = (
         f"Analyzed state with {analysis['message_count']} messages, "
@@ -798,6 +832,11 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             f"complete={rollback_result.rollback_complete}, "
             f"steps={rollback_result.steps_executed}/{len(rollback_result.plan.steps)}."
         )
+    if telemetry_snapshot:
+        processing_notes += (
+            f" Telemetry: {telemetry_snapshot.health_summary}, "
+            f"velocity={telemetry_snapshot.velocity_display}."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -821,6 +860,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         injection_result=injection_result.to_dict() if injection_result else None,
         escalation_result=human_escalation_result.to_dict() if human_escalation_result else None,
         rollback_result=rollback_result.to_dict() if rollback_result else None,
+        telemetry_snapshot=telemetry_snapshot.to_dict() if telemetry_snapshot else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -874,6 +914,9 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         rollback_status=rollback_result.status if rollback_result else None,
         rollback_complete=rollback_result.rollback_complete if rollback_result else None,
         rollback_steps_executed=rollback_result.steps_executed if rollback_result else None,
+        telemetry_collected=telemetry_snapshot is not None,
+        telemetry_health_summary=telemetry_snapshot.health_summary if telemetry_snapshot else None,
+        telemetry_velocity=telemetry_snapshot.velocity_display if telemetry_snapshot else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -931,4 +974,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "rollback_result": rollback_result.to_dict()
         if rollback_result
         else None,  # Rollback coordination (Story 10.15)
+        "telemetry_snapshot": telemetry_snapshot.to_dict()
+        if telemetry_snapshot
+        else None,  # Dashboard telemetry (Story 10.16)
     }

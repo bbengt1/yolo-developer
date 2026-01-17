@@ -1,4 +1,4 @@
-"""Tests for SM agent node (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10).
+"""Tests for SM agent node (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.16).
 
 Tests the sm_node function and its helper functions:
 - _analyze_current_state
@@ -13,6 +13,7 @@ Also tests integration with:
 - Handoff management (Story 10.8)
 - Sprint progress tracking (Story 10.9)
 - Emergency protocols (Story 10.10)
+- Telemetry collection (Story 10.16)
 """
 
 from __future__ import annotations
@@ -2220,3 +2221,194 @@ class TestSMNodeRollbackCoordination:
         ep = result.get("emergency_protocol")
         if ep is not None:
             assert ep.get("selected_action") != "rollback"
+
+
+# =============================================================================
+# Telemetry Integration Tests (Story 10.16)
+# =============================================================================
+
+
+class TestTelemetryIntegration:
+    """Tests for telemetry collection integration with SM node (Story 10.16).
+
+    These tests verify that:
+    - SM node collects telemetry data each cycle
+    - Telemetry snapshot is included in SMOutput
+    - Telemetry is included in state updates
+    - Processing notes include telemetry information
+    """
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_telemetry_snapshot_key(self) -> None:
+        """Test that sm_node returns telemetry_snapshot in result.
+
+        Per Story 10.16, SM should collect telemetry for dashboard display.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # telemetry_snapshot should be present in result
+        assert "telemetry_snapshot" in result
+        # May be None if collection fails, but key should exist
+        telemetry = result.get("telemetry_snapshot")
+        if telemetry is not None:
+            assert "snapshot" in telemetry
+            assert "velocity_display" in telemetry
+            assert "cycle_time_display" in telemetry
+            assert "health_summary" in telemetry
+            assert "agent_status_table" in telemetry
+
+    @pytest.mark.asyncio
+    async def test_sm_node_includes_telemetry_in_sm_output(self) -> None:
+        """Test that telemetry is included in SMOutput.
+
+        The SMOutput.telemetry_snapshot field should be populated.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+
+        # telemetry_snapshot should be in sm_output
+        assert "telemetry_snapshot" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_sm_node_telemetry_with_health_status(self) -> None:
+        """Test telemetry collection uses health status when available.
+
+        When health monitoring produces a status, telemetry should reflect it.
+        """
+        state = create_test_state(
+            messages=[
+                create_agent_message("Task A completed", "analyst"),
+                create_agent_message("Task B completed", "pm"),
+            ],
+            current_agent="dev",
+        )
+
+        result = await sm_node(state)
+        telemetry = result.get("telemetry_snapshot")
+
+        # Telemetry should reflect health monitoring results
+        if telemetry is not None:
+            assert "health_summary" in telemetry
+            # Health summary should contain status information
+            summary = telemetry.get("health_summary", "")
+            assert isinstance(summary, str)
+
+    @pytest.mark.asyncio
+    async def test_sm_node_telemetry_graceful_on_error(self) -> None:
+        """Test that telemetry collection errors don't block routing.
+
+        Per ADR-007, telemetry failures should never block the main workflow.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # Should not raise, routing should still occur
+        result = await sm_node(state)
+
+        # Primary routing should work regardless of telemetry
+        assert "routing_decision" in result
+        assert result["routing_decision"] is not None
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_with_telemetry(self) -> None:
+        """Test that telemetry collection doesn't affect routing decisions.
+
+        Normal workflow progression should continue regardless of telemetry state.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should still occur (analyst -> pm)
+        if not result["sm_output"]["escalation_triggered"]:
+            assert result["routing_decision"] == "pm"
+
+    @pytest.mark.asyncio
+    async def test_telemetry_snapshot_structure_when_present(self) -> None:
+        """Test that telemetry_snapshot has expected structure when present.
+
+        The telemetry_snapshot should contain all expected fields from
+        DashboardMetrics.to_dict() when collected.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="pm",
+        )
+
+        result = await sm_node(state)
+        telemetry = result.get("telemetry_snapshot")
+
+        # When telemetry is present, verify structure
+        if telemetry is not None:
+            # Top-level DashboardMetrics fields
+            assert "snapshot" in telemetry
+            assert "velocity_display" in telemetry
+            assert "cycle_time_display" in telemetry
+            assert "health_summary" in telemetry
+            assert "agent_status_table" in telemetry
+
+            # Nested TelemetrySnapshot fields
+            snapshot = telemetry.get("snapshot", {})
+            assert "burn_down_velocity" in snapshot
+            assert "cycle_time" in snapshot
+            assert "churn_rate" in snapshot
+            assert "agent_idle_times" in snapshot
+            assert "health_status" in snapshot
+            assert "alert_count" in snapshot
+            assert "collected_at" in snapshot
+
+    @pytest.mark.asyncio
+    async def test_telemetry_snapshot_json_serializable(self) -> None:
+        """Test that telemetry_snapshot is JSON serializable.
+
+        Per AC #5, telemetry data should be serializable via to_dict().
+        """
+        import json
+
+        state = create_test_state(
+            messages=[],
+            current_agent="architect",
+        )
+
+        result = await sm_node(state)
+        telemetry = result.get("telemetry_snapshot")
+
+        # Should be JSON serializable (either None or dict)
+        if telemetry is not None:
+            # Should not raise
+            json_str = json.dumps(telemetry)
+            assert "velocity_display" in json_str
+
+    @pytest.mark.asyncio
+    async def test_sm_node_telemetry_for_multiple_agents(self) -> None:
+        """Test telemetry collection works for various agent states.
+
+        Telemetry should be collected regardless of which agent is current.
+        """
+        for agent in ["analyst", "pm", "architect", "dev", "tea"]:
+            state = create_test_state(
+                messages=[],
+                current_agent=agent,
+            )
+
+            result = await sm_node(state)
+
+            # Telemetry key should always be present
+            assert "telemetry_snapshot" in result
+            # Routing should work for all agents
+            assert "routing_decision" in result

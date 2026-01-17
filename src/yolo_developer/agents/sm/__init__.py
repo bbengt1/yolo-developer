@@ -21,6 +21,7 @@ Key Responsibilities:
 - Context injection: Inject context when agents lack information (Story 10.13)
 - Human escalation: Create escalation requests for human intervention (Story 10.14)
 - Rollback coordination: Coordinate rollback operations as emergency sprints (Story 10.15)
+- Telemetry collection: Collect health telemetry for dashboard display (Story 10.16)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -46,6 +47,9 @@ Example:
     ...     coordinate_rollback,
     ...     RollbackConfig,
     ...     RollbackResult,
+    ...     get_dashboard_telemetry,
+    ...     DashboardMetrics,
+    ...     TelemetrySnapshot,
     ... )
     >>>
     >>> # Run the SM node
@@ -107,6 +111,11 @@ Example:
     >>> result = await coordinate_rollback(state, checkpoint, emergency_protocol)
     >>> result.status
     'completed'
+    >>>
+    >>> # Collect dashboard telemetry (Story 10.16)
+    >>> metrics = await get_dashboard_telemetry(state)
+    >>> metrics.health_summary
+    'System healthy, no alerts'
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -133,6 +142,7 @@ References:
     - FR67: SM Agent can detect agent churn rate and idle time
     - FR70: SM Agent can escalate to human when circular logic persists
     - FR71: SM Agent can coordinate rollback operations as emergency sprints
+    - FR72: SM Agent can maintain system health telemetry dashboard data
 """
 
 from __future__ import annotations
@@ -352,6 +362,27 @@ from yolo_developer.agents.sm.rollback_types import (
     RollbackStatus,
     RollbackStep,
 )
+from yolo_developer.agents.sm.telemetry import (
+    collect_telemetry,
+    format_for_dashboard,
+    get_dashboard_telemetry,
+)
+from yolo_developer.agents.sm.telemetry_types import (
+    DEFAULT_TELEMETRY_INTERVAL_SECONDS,
+    DEFAULT_TELEMETRY_RETENTION_HOURS,
+    MAX_TELEMETRY_INTERVAL_SECONDS,
+    MIN_TELEMETRY_INTERVAL_SECONDS,
+    VALID_METRIC_CATEGORIES,
+    VALID_METRIC_STATUSES,
+    VALID_METRIC_TRENDS,
+    DashboardMetrics,
+    MetricCategory,
+    MetricStatus,
+    MetricSummary,
+    MetricTrend,
+    TelemetryConfig,
+    TelemetrySnapshot,
+)
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -431,6 +462,9 @@ __all__ = [
     "DEFAULT_PRINCIPLES_HIERARCHY",
     "DEFAULT_ROLLING_WINDOW",
     "DEFAULT_TECH_DEBT_WEIGHT",
+    # Telemetry (Story 10.16)
+    "DEFAULT_TELEMETRY_INTERVAL_SECONDS",
+    "DEFAULT_TELEMETRY_RETENTION_HOURS",
     # Handoff Management (Story 10.8)
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_TIME_WINDOW_SECONDS",
@@ -443,10 +477,12 @@ __all__ = [
     "MAX_DURATION_MS",
     "MAX_RELEVANCE",
     "MAX_SCORE",
+    "MAX_TELEMETRY_INTERVAL_SECONDS",
     "MIN_CONFIDENCE",
     "MIN_DURATION_MS",
     "MIN_RELEVANCE",
     "MIN_SCORE",
+    "MIN_TELEMETRY_INTERVAL_SECONDS",
     "NATURAL_SUCCESSOR",
     "RESOLUTION_PRINCIPLES",
     "TASK_TO_AGENT",
@@ -464,6 +500,9 @@ __all__ = [
     "VALID_HANDOFF_STATUSES",
     "VALID_HEALTH_SEVERITIES",
     "VALID_INTERVENTION_STRATEGIES",
+    "VALID_METRIC_CATEGORIES",
+    "VALID_METRIC_STATUSES",
+    "VALID_METRIC_TRENDS",
     "VALID_PATTERN_TYPES",
     "VALID_PROTOCOL_STATUSES",
     "VALID_RECOVERY_ACTIONS",
@@ -492,6 +531,7 @@ __all__ = [
     "CycleAnalysis",
     "CycleLog",
     "CycleSeverity",
+    "DashboardMetrics",
     "DelegationConfig",
     "DelegationRequest",
     "DelegationResult",
@@ -522,6 +562,10 @@ __all__ = [
     "InjectionResult",
     "InterventionStrategy",
     "MediationResult",
+    "MetricCategory",
+    "MetricStatus",
+    "MetricSummary",
+    "MetricTrend",
     "PatternType",
     "PlanningConfig",
     "Priority",
@@ -550,6 +594,8 @@ __all__ = [
     "StoryProgress",
     "StoryStatus",
     "TaskType",
+    "TelemetryConfig",
+    "TelemetrySnapshot",
     "VelocityConfig",
     "VelocityForecast",
     "VelocityMetrics",
@@ -560,6 +606,7 @@ __all__ = [
     "calculate_sprint_velocity",
     "calculate_velocity_metrics",
     "checkpoint_state",
+    "collect_telemetry",
     "coordinate_rollback",
     "create_escalation_request",
     "create_rollback_plan",
@@ -569,6 +616,8 @@ __all__ = [
     "escalate_emergency",
     "execute_rollback",
     "forecast_velocity",
+    "format_for_dashboard",
+    "get_dashboard_telemetry",
     "get_progress_for_display",
     "get_progress_summary",
     "get_stories_by_status",
