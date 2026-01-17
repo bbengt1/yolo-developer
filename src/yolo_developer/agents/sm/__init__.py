@@ -19,6 +19,7 @@ Key Responsibilities:
 - Priority scoring: Calculate weighted priority scores for story selection (Story 10.11)
 - Velocity tracking: Track burn-down velocity and cycle time metrics (Story 10.12)
 - Context injection: Inject context when agents lack information (Story 10.13)
+- Human escalation: Create escalation requests for human intervention (Story 10.14)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -247,6 +248,29 @@ from yolo_developer.agents.sm.health_types import (
     HealthSeverity,
     HealthStatus,
 )
+from yolo_developer.agents.sm.human_escalation import (
+    create_escalation_request,
+    handle_escalation_timeout,
+    integrate_escalation_response,
+    manage_human_escalation,
+    should_escalate,
+)
+from yolo_developer.agents.sm.human_escalation_types import (
+    DEFAULT_ESCALATION_TIMEOUT_SECONDS,
+    DEFAULT_LOG_ESCALATIONS,
+    DEFAULT_MAX_PENDING,
+    MAX_DURATION_MS,
+    MIN_DURATION_MS,
+    VALID_ESCALATION_STATUSES,
+    VALID_ESCALATION_TRIGGERS,
+    EscalationConfig,
+    EscalationOption,
+    EscalationRequest,
+    EscalationResponse,
+    EscalationResult,
+    EscalationStatus,
+    EscalationTrigger,
+)
 from yolo_developer.agents.sm.node import sm_node
 from yolo_developer.agents.sm.planning import (
     CircularDependencyError,
@@ -340,6 +364,8 @@ __all__ = [
     "DEFAULT_DEPENDENCY_WEIGHT",
     # Emergency Protocols (Story 10.10)
     "DEFAULT_ESCALATION_THRESHOLD",
+    # Human Escalation (Story 10.14)
+    "DEFAULT_ESCALATION_TIMEOUT_SECONDS",
     # Progress Tracking (Story 10.9)
     "DEFAULT_ESTIMATE_CONFIDENCE_THRESHOLD",
     # Circular Detection (Story 10.6)
@@ -347,6 +373,7 @@ __all__ = [
     # Priority Scoring (Story 10.11)
     "DEFAULT_INCLUDE_EXPLANATION",
     # Context Injection (Story 10.13)
+    "DEFAULT_LOG_ESCALATIONS",
     "DEFAULT_LOG_INJECTIONS",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
@@ -355,6 +382,7 @@ __all__ = [
     "DEFAULT_MAX_CONTEXT_SIZE_BYTES",
     "DEFAULT_MAX_CYCLE_TIME_SECONDS",
     "DEFAULT_MAX_IDLE_TIME_SECONDS",
+    "DEFAULT_MAX_PENDING",
     "DEFAULT_MAX_POINTS",
     "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
@@ -377,9 +405,11 @@ __all__ = [
     "DEFAULT_WARNING_THRESHOLD_RATIO",
     "LONG_CYCLE_TIME_MULTIPLIER",
     "MAX_CONFIDENCE",
+    "MAX_DURATION_MS",
     "MAX_RELEVANCE",
     "MAX_SCORE",
     "MIN_CONFIDENCE",
+    "MIN_DURATION_MS",
     "MIN_RELEVANCE",
     "MIN_SCORE",
     "NATURAL_SUCCESSOR",
@@ -393,6 +423,8 @@ __all__ = [
     "VALID_CONTEXT_SOURCES",
     "VALID_CYCLE_SEVERITIES",
     "VALID_EMERGENCY_TYPES",
+    "VALID_ESCALATION_STATUSES",
+    "VALID_ESCALATION_TRIGGERS",
     "VALID_GAP_REASONS",
     "VALID_HANDOFF_STATUSES",
     "VALID_HEALTH_SEVERITIES",
@@ -430,7 +462,14 @@ __all__ = [
     "EmergencyProtocol",
     "EmergencyTrigger",
     "EmergencyType",
+    "EscalationConfig",
+    "EscalationOption",
     "EscalationReason",
+    "EscalationRequest",
+    "EscalationResponse",
+    "EscalationResult",
+    "EscalationStatus",
+    "EscalationTrigger",
     "GapReason",
     "HandoffConfig",
     "HandoffMetrics",
@@ -478,6 +517,7 @@ __all__ = [
     "calculate_sprint_velocity",
     "calculate_velocity_metrics",
     "checkpoint_state",
+    "create_escalation_request",
     "delegate_task",
     "detect_circular_logic",
     "detect_context_gap",
@@ -487,9 +527,12 @@ __all__ = [
     "get_progress_summary",
     "get_stories_by_status",
     "get_velocity_trend",
+    "handle_escalation_timeout",
     "inject_context",
+    "integrate_escalation_response",
     "manage_context_injection",
     "manage_handoff",
+    "manage_human_escalation",
     "mediate_conflicts",
     "monitor_health",
     "normalize_results",
@@ -498,6 +541,7 @@ __all__ = [
     "retrieve_relevant_context",
     "routing_to_task_type",
     "score_stories",
+    "should_escalate",
     "sm_node",
     "track_progress",
     "track_sprint_velocity",

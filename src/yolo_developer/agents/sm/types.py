@@ -156,6 +156,7 @@ class SMOutput:
         sprint_progress: Optional sprint progress tracking result (Story 10.9)
         emergency_protocol: Optional emergency protocol result (Story 10.10)
         injection_result: Optional context injection result (Story 10.13)
+        escalation_result: Optional human escalation result (Story 10.14)
         created_at: ISO timestamp when output was created
 
     Example:
@@ -188,6 +189,7 @@ class SMOutput:
     sprint_progress: dict[str, Any] | None = None
     emergency_protocol: dict[str, Any] | None = None
     injection_result: dict[str, Any] | None = None
+    escalation_result: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -216,6 +218,7 @@ class SMOutput:
             "sprint_progress": self.sprint_progress,
             "emergency_protocol": self.emergency_protocol,
             "injection_result": self.injection_result,
+            "escalation_result": self.escalation_result,
             "created_at": self.created_at,
         }
 

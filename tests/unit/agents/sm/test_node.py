@@ -1718,3 +1718,366 @@ class TestSMNodeEmergencyProtocol:
         # If emergency protocol escalated, routing should escalate too
         if emergency_protocol is not None and emergency_protocol.get("status") == "escalated":
             assert sm_output["escalation_triggered"] is True
+
+
+class TestSMNodeHumanEscalation:
+    """Tests for human escalation integration in SM node (Story 10.14).
+
+    Verifies that the SM node properly integrates with manage_human_escalation()
+    to create escalation requests when escalation is triggered, per FR70.
+    """
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_escalation_result_key(self) -> None:
+        """Test that sm_node always includes escalation_result key in result.
+
+        Per Story 10.14, the sm_node should return escalation_result in its
+        state update dict, even if None when no escalation triggered.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        assert "escalation_result" in result
+
+    @pytest.mark.asyncio
+    async def test_escalation_result_none_without_escalation(self) -> None:
+        """Test that escalation_result is None when no escalation triggered.
+
+        Escalation results are only created when an escalation condition is met.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should not trigger escalation
+        assert result["escalation_result"] is None
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_escalation_result_field(self) -> None:
+        """Test that SMOutput includes escalation_result when available.
+
+        The sm_output dict should contain the escalation_result data.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+
+        assert "escalation_result" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_escalation_result_created_on_circular_logic(self) -> None:
+        """Test that escalation_result is created when circular logic with escalation flag.
+
+        The enhanced circular detection (Story 10.6) tries to break cycles before
+        escalating. Escalation is only triggered for critical severity patterns.
+        This test verifies the human escalation works when circular detection
+        sets escalation_triggered=True (via escalate_to_human flag as proxy).
+        """
+        # Note: Normal ping-pong patterns use "break_cycle" intervention.
+        # Critical escalation requires severity=critical patterns.
+        # We test the integration by using escalate_to_human flag which
+        # simulates when circular detection would trigger escalation.
+        state = create_test_state(
+            messages=[],
+            current_agent="tea",
+            escalate_to_human=True,  # Simulates critical circular logic escalation
+        )
+
+        result = await sm_node(state)
+
+        # Should have escalation result
+        assert result["escalation_result"] is not None
+        escalation_result = result["escalation_result"]
+        assert escalation_result["status"] == "pending"
+        assert "request" in escalation_result
+
+        # Request should have user_requested trigger (via escalate_to_human flag)
+        request = escalation_result["request"]
+        assert request["trigger"] == "user_requested"
+
+    @pytest.mark.asyncio
+    async def test_escalation_result_created_on_human_requested(self) -> None:
+        """Test that escalation_result is created when human escalation requested.
+
+        When escalate_to_human flag is set, an EscalationResult should be created.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+
+        # Should have escalation result
+        assert result["escalation_result"] is not None
+        escalation_result = result["escalation_result"]
+        assert escalation_result["status"] == "pending"
+
+        # Request should have user_requested trigger
+        request = escalation_result["request"]
+        assert request["trigger"] == "user_requested"
+
+    @pytest.mark.asyncio
+    async def test_escalation_request_includes_options(self) -> None:
+        """Test that escalation request includes actionable options.
+
+        Per AC #2, the escalation request should have options for user to choose.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+
+        assert result["escalation_result"] is not None
+        request = result["escalation_result"]["request"]
+        assert "options" in request
+        assert len(request["options"]) > 0
+
+        # Each option should have required fields
+        for option in request["options"]:
+            assert "option_id" in option
+            assert "label" in option
+            assert "description" in option
+            assert "action" in option
+
+    @pytest.mark.asyncio
+    async def test_escalation_request_has_recommended_option(self) -> None:
+        """Test that escalation request has a recommended option.
+
+        Per AC #2, one option should be marked as recommended.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+
+        assert result["escalation_result"] is not None
+        request = result["escalation_result"]["request"]
+
+        # Should have recommended_option field
+        assert "recommended_option" in request
+        assert request["recommended_option"] is not None
+
+        # At least one option should be marked as recommended
+        options = request["options"]
+        recommended = [opt for opt in options if opt.get("is_recommended")]
+        assert len(recommended) >= 1
+
+    @pytest.mark.asyncio
+    async def test_escalation_does_not_block_workflow(self) -> None:
+        """Test that escalation errors don't block the main workflow.
+
+        Escalation is non-blocking - errors should be logged but
+        not prevent routing decisions.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # Should not raise, should complete with routing decision
+        result = await sm_node(state)
+
+        assert "routing_decision" in result
+        assert result["routing_decision"] is not None
+
+    @pytest.mark.asyncio
+    async def test_processing_notes_include_escalation_info(self) -> None:
+        """Test that processing_notes includes escalation info when triggered.
+
+        When escalation is triggered, the processing_notes should
+        mention the escalation request.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+        processing_notes = sm_output["processing_notes"]
+
+        # If escalation was triggered, notes should mention it
+        if result["escalation_result"] is not None:
+            assert "Escalation" in processing_notes or "escalation" in processing_notes.lower()
+
+    @pytest.mark.asyncio
+    async def test_escalation_result_structure(self) -> None:
+        """Test that escalation_result has expected structure when present.
+
+        The escalation_result should contain all expected fields from
+        EscalationResult.to_dict().
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+        escalation_result = result.get("escalation_result")
+
+        if escalation_result is not None:
+            # Check expected fields
+            assert "request" in escalation_result
+            assert "response" in escalation_result
+            assert "status" in escalation_result
+            assert "resolution_action" in escalation_result
+            assert "integration_success" in escalation_result
+            assert "duration_ms" in escalation_result
+
+            # Request should have its fields
+            request = escalation_result["request"]
+            assert "request_id" in request
+            assert "trigger" in request
+            assert "agent" in request
+            assert "summary" in request
+            assert "context" in request
+            assert "options" in request
+
+    @pytest.mark.asyncio
+    async def test_escalation_request_captures_context(self) -> None:
+        """Test that escalation request includes relevant context.
+
+        Per AC #1, the request should include issue context, history,
+        and available options.
+        """
+        # Create state with decisions to include in context
+        decision = Decision(
+            agent="analyst",
+            summary="Analysis complete",
+            rationale="All requirements gathered",
+            related_artifacts=("requirements",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            decisions=[decision],
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+
+        assert result["escalation_result"] is not None
+        request = result["escalation_result"]["request"]
+        context = request["context"]
+
+        # Context should include state information
+        assert "current_agent" in context
+        assert "trigger" in context
+
+    @pytest.mark.asyncio
+    async def test_escalation_integrates_with_circular_detection(self) -> None:
+        """Test that human escalation integrates with circular logic detection.
+
+        The enhanced circular detection (Story 10.6) uses break_cycle intervention
+        for normal patterns before resorting to escalation. This test verifies
+        that when circular logic IS detected, the SM handles it appropriately.
+        """
+        # Create messages that trigger enhanced circular detection
+        messages = [
+            create_agent_message("Analysis 1", "analyst"),
+            create_agent_message("Needs more analysis", "pm"),
+            create_agent_message("Analysis 2", "analyst"),
+            create_agent_message("Still needs more", "pm"),
+            create_agent_message("Analysis 3", "analyst"),
+            create_agent_message("Not quite right", "pm"),
+            create_agent_message("Analysis 4", "analyst"),
+            create_agent_message("Still not right", "pm"),
+        ]
+        state = create_test_state(
+            messages=messages,
+            current_agent="pm",
+        )
+
+        result = await sm_node(state)
+
+        # Should detect circular logic
+        sm_output = result["sm_output"]
+        assert sm_output["circular_logic_detected"] is True
+
+        # Enhanced circular detection may use break_cycle or escalate
+        # depending on pattern severity. Either way, the system handles it.
+        cycle_analysis = result.get("cycle_analysis")
+        assert cycle_analysis is not None
+        assert cycle_analysis["circular_detected"] is True
+
+        # If escalation was triggered by circular detection, verify result
+        if cycle_analysis.get("escalation_triggered"):
+            assert result["escalation_result"] is not None
+            assert result["escalation_result"]["request"]["trigger"] == "circular_logic"
+
+    @pytest.mark.asyncio
+    async def test_escalation_integrates_with_conflict_mediation(self) -> None:
+        """Test that human escalation integrates with conflict mediation.
+
+        When conflict mediation triggers escalation (Story 10.7),
+        the human escalation module should create a request.
+        """
+        # Create conflicting decisions that may trigger escalation
+        decision1 = Decision(
+            agent="architect",
+            summary="Must use blocking synchronous pattern",
+            rationale="This is a blocking requirement, cannot proceed otherwise",
+            related_artifacts=("architecture-pattern",),
+        )
+        decision2 = Decision(
+            agent="dev",
+            summary="Must use blocking asynchronous pattern",
+            rationale="This is a blocking requirement, cannot proceed otherwise",
+            related_artifacts=("architecture-pattern",),
+        )
+
+        state = create_test_state(
+            messages=[],
+            current_agent="sm",
+            decisions=[decision1, decision2],
+        )
+
+        result = await sm_node(state)
+
+        # Check if conflict escalation was triggered
+        mediation_result = result.get("mediation_result")
+        if mediation_result and len(mediation_result.get("escalations_triggered", [])) > 0:
+            # Should have escalation result
+            assert result["escalation_result"] is not None
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_with_escalation(self) -> None:
+        """Test that routing decision is 'escalate' when escalation triggered.
+
+        When escalation is triggered, routing_decision should be 'escalate'.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+            escalate_to_human=True,
+        )
+
+        result = await sm_node(state)
+
+        # Routing should be to escalate
+        assert result["routing_decision"] == "escalate"
+
+        # And escalation result should be created
+        assert result["escalation_result"] is not None

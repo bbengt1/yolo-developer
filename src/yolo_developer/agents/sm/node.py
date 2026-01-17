@@ -1,4 +1,4 @@
-"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.13).
+"""SM agent node for LangGraph orchestration (Story 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 10.13, 10.14).
 
 This module provides the sm_node function that integrates with the
 LangGraph orchestration workflow. The SM (Scrum Master) agent serves
@@ -17,7 +17,7 @@ Key Concepts:
 - **Sprint Progress Tracking**: Tracks sprint progress and completion estimates (Story 10.9)
 - **Emergency Protocols**: Triggers emergency protocols when health degrades (Story 10.10)
 - **Context Injection**: Injects context when agents lack information (Story 10.13)
-- **Escalation Handling**: Triggers human intervention when needed
+- **Human Escalation**: Creates escalation requests for human intervention (Story 10.14)
 
 Example:
     >>> from yolo_developer.agents.sm import sm_node
@@ -59,6 +59,8 @@ from yolo_developer.agents.sm.handoff import manage_handoff
 from yolo_developer.agents.sm.handoff_types import HandoffResult
 from yolo_developer.agents.sm.health import monitor_health
 from yolo_developer.agents.sm.health_types import HealthStatus
+from yolo_developer.agents.sm.human_escalation import manage_human_escalation
+from yolo_developer.agents.sm.human_escalation_types import EscalationResult
 from yolo_developer.agents.sm.progress import track_progress
 from yolo_developer.agents.sm.progress_types import SprintProgress
 from yolo_developer.agents.sm.types import (
@@ -621,6 +623,29 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         # Conflict mediation should never block the main workflow
         logger.error("conflict_mediation_failed", error=str(e))
 
+    # Step 6c2: Human escalation (Story 10.14 - FR70)
+    # Creates escalation request when any escalation trigger is detected
+    # Must run AFTER conflict_mediation since it uses mediation_result
+    human_escalation_result: EscalationResult | None = None
+    try:
+        human_escalation_result = await manage_human_escalation(
+            state=state,
+            cycle_analysis=cycle_analysis,
+            mediation_result=mediation_result,
+            health_status=health_status,
+        )
+        if human_escalation_result:
+            logger.info(
+                "human_escalation_triggered",
+                request_id=human_escalation_result.request.request_id,
+                trigger=human_escalation_result.request.trigger,
+                status=human_escalation_result.status,
+                option_count=len(human_escalation_result.request.options),
+            )
+    except Exception as e:
+        # Human escalation should never block the main workflow
+        logger.error("human_escalation_failed", error=str(e))
+
     # Step 6d: Managed handoff (Story 10.8 - FR14, FR15)
     # Replaces direct handoff_context setting with managed handoff that:
     # - Validates context completeness for target agent
@@ -724,6 +749,12 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             f"{len(injection_result.contexts_retrieved)} contexts, "
             f"{injection_result.total_context_size} bytes."
         )
+    if human_escalation_result:
+        processing_notes += (
+            f" Escalation: trigger={human_escalation_result.request.trigger}, "
+            f"status={human_escalation_result.status}, "
+            f"options={len(human_escalation_result.request.options)}."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -745,6 +776,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         sprint_progress=sprint_progress.to_dict() if sprint_progress else None,
         emergency_protocol=emergency_protocol.to_dict() if emergency_protocol else None,
         injection_result=injection_result.to_dict() if injection_result else None,
+        escalation_result=human_escalation_result.to_dict() if human_escalation_result else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -785,6 +817,9 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         emergency_type=emergency_protocol.trigger.emergency_type if emergency_protocol else None,
         context_injection_triggered=injection_result.injected if injection_result else None,
         context_gap_reason=injection_result.gap.reason if injection_result else None,
+        human_escalation_triggered=human_escalation_result is not None,
+        human_escalation_trigger=human_escalation_result.request.trigger if human_escalation_result else None,
+        human_escalation_status=human_escalation_result.status if human_escalation_result else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -820,4 +855,5 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "emergency_protocol": emergency_protocol.to_dict() if emergency_protocol else None,  # Emergency protocol (Story 10.10)
         "injected_context": injected_context,  # Context injection payload (Story 10.13)
         "injection_result": injection_result.to_dict() if injection_result else None,  # Context injection result (Story 10.13)
+        "escalation_result": human_escalation_result.to_dict() if human_escalation_result else None,  # Human escalation (Story 10.14)
     }
