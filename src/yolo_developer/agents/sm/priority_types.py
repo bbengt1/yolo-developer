@@ -125,8 +125,7 @@ class PriorityFactors:
         for field_name, value in score_fields:
             if value < MIN_SCORE or value > MAX_SCORE:
                 _logger.warning(
-                    "PriorityFactors %s=%s is outside valid range [%.1f, %.1f] "
-                    "for story_id=%s",
+                    "PriorityFactors %s=%s is outside valid range [%.1f, %.1f] for story_id=%s",
                     field_name,
                     value,
                     MIN_SCORE,

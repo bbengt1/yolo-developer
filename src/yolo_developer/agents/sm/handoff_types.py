@@ -134,9 +134,7 @@ class HandoffRecord:
     source_agent: str
     target_agent: str
     status: HandoffStatus
-    started_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     completed_at: str | None = None
     metrics: HandoffMetrics | None = None
     context_checksum: str | None = None

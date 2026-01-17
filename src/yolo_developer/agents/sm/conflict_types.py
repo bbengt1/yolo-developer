@@ -45,7 +45,9 @@ from typing import Any, Literal
 # Literal Types
 # =============================================================================
 
-ConflictType = Literal["design_conflict", "priority_conflict", "approach_conflict", "scope_conflict"]
+ConflictType = Literal[
+    "design_conflict", "priority_conflict", "approach_conflict", "scope_conflict"
+]
 """Type of conflict between agents.
 
 Values:
@@ -65,7 +67,9 @@ Values:
     blocking: Blocks progress, must be resolved immediately
 """
 
-ResolutionStrategy = Literal["accept_first", "accept_second", "compromise", "defer", "escalate_human"]
+ResolutionStrategy = Literal[
+    "accept_first", "accept_second", "compromise", "defer", "escalate_human"
+]
 """Strategy for resolving conflicts.
 
 Values:
@@ -88,9 +92,7 @@ VALID_CONFLICT_TYPES: frozenset[str] = frozenset(
 )
 """Set of valid conflict type values."""
 
-VALID_CONFLICT_SEVERITIES: frozenset[str] = frozenset(
-    {"minor", "moderate", "major", "blocking"}
-)
+VALID_CONFLICT_SEVERITIES: frozenset[str] = frozenset({"minor", "moderate", "major", "blocking"})
 """Set of valid conflict severity values."""
 
 VALID_RESOLUTION_STRATEGIES: frozenset[str] = frozenset(
@@ -212,9 +214,7 @@ class Conflict:
     severity: ConflictSeverity
     parties: tuple[ConflictParty, ...]
     topic: str
-    detected_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     blocking_progress: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -266,9 +266,7 @@ class ConflictResolution:
     winning_position: str | None = None
     compromises: tuple[str, ...] = field(default_factory=tuple)
     principles_applied: tuple[str, ...] = field(default_factory=tuple)
-    documented_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    documented_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -321,9 +319,7 @@ class MediationResult:
     escalations_triggered: tuple[str, ...]
     success: bool
     mediation_notes: str = ""
-    mediated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    mediated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.

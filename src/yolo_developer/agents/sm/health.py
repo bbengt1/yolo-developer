@@ -326,7 +326,9 @@ def _calculate_percentile(values: list[float], percentile: float) -> float:
     upper_idx = min(lower_idx + 1, n - 1)
     fraction = position - lower_idx
 
-    return sorted_values[lower_idx] + fraction * (sorted_values[upper_idx] - sorted_values[lower_idx])
+    return sorted_values[lower_idx] + fraction * (
+        sorted_values[upper_idx] - sorted_values[lower_idx]
+    )
 
 
 def _calculate_cycle_time_percentiles(

@@ -211,8 +211,7 @@ def _check_gate_failure(state: YoloState) -> bool:
     if isinstance(gate_failure, str):
         failure_lower = gate_failure.lower()
         if any(
-            keyword in failure_lower
-            for keyword in ("missing", "context", "information", "unclear")
+            keyword in failure_lower for keyword in ("missing", "context", "information", "unclear")
         ):
             return True
 
@@ -713,9 +712,7 @@ async def retrieve_relevant_context(
 
     # Retrieve from memory store
     if "memory" in config.enabled_sources and memory is not None:
-        memory_contexts = await _retrieve_from_memory(
-            gap.context_query, memory, config
-        )
+        memory_contexts = await _retrieve_from_memory(gap.context_query, memory, config)
         contexts.extend(memory_contexts)
 
     # Retrieve from state

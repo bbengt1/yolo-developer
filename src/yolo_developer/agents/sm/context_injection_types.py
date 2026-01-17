@@ -115,9 +115,7 @@ MAX_RELEVANCE: float = 1.0
 LONG_CYCLE_TIME_MULTIPLIER: float = 2.0
 """Multiplier for detecting long cycle times (2x baseline = gap)."""
 
-VALID_CONTEXT_SOURCES: frozenset[str] = frozenset(
-    {"memory", "state", "sprint", "architecture"}
-)
+VALID_CONTEXT_SOURCES: frozenset[str] = frozenset({"memory", "state", "sprint", "architecture"})
 """Set of valid context source values."""
 
 VALID_GAP_REASONS: frozenset[str] = frozenset(
@@ -172,9 +170,7 @@ class ContextGap:
     context_query: str
     confidence: float
     indicators: tuple[str, ...]
-    detected_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
         """Validate context gap data and log warnings for issues."""
@@ -254,9 +250,7 @@ class RetrievedContext:
     content: str
     relevance_score: float
     metadata: dict[str, Any] = field(default_factory=dict)
-    retrieved_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    retrieved_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
         """Validate retrieved context data and log warnings for issues."""
@@ -402,10 +396,7 @@ class InjectionConfig:
                 "InjectionConfig max_context_items=%d should be at least 1",
                 self.max_context_items,
             )
-        if (
-            self.min_relevance_score < MIN_RELEVANCE
-            or self.min_relevance_score > MAX_RELEVANCE
-        ):
+        if self.min_relevance_score < MIN_RELEVANCE or self.min_relevance_score > MAX_RELEVANCE:
             _logger.warning(
                 "InjectionConfig min_relevance_score=%.3f should be between %.1f and %.1f",
                 self.min_relevance_score,

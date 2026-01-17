@@ -94,9 +94,7 @@ VALID_INTERVENTION_STRATEGIES: frozenset[str] = frozenset(
 )
 """Set of valid intervention strategy values."""
 
-VALID_PATTERN_TYPES: frozenset[str] = frozenset(
-    {"agent_pair", "multi_agent", "topic_cycle"}
-)
+VALID_PATTERN_TYPES: frozenset[str] = frozenset({"agent_pair", "multi_agent", "topic_cycle"})
 """Set of valid pattern type values."""
 
 # =============================================================================
@@ -246,9 +244,7 @@ class CircularLogicConfig:
 
     exchange_threshold: int = DEFAULT_EXCHANGE_THRESHOLD
     time_window_seconds: float = DEFAULT_TIME_WINDOW_SECONDS
-    severity_thresholds: dict[str, int] = field(
-        default_factory=_default_severity_thresholds
-    )
+    severity_thresholds: dict[str, int] = field(default_factory=_default_severity_thresholds)
     auto_escalate_severity: CycleSeverity = "critical"
     enable_topic_detection: bool = True
     enable_multi_agent_detection: bool = True
@@ -298,9 +294,7 @@ class CycleAnalysis:
     topic_exchanges: dict[str, list[str]]
     total_exchange_count: int
     cycle_log: CycleLog | None
-    analyzed_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    analyzed_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.

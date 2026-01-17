@@ -63,6 +63,8 @@ from yolo_developer.agents.sm.human_escalation import manage_human_escalation
 from yolo_developer.agents.sm.human_escalation_types import EscalationResult
 from yolo_developer.agents.sm.progress import track_progress
 from yolo_developer.agents.sm.progress_types import SprintProgress
+from yolo_developer.agents.sm.rollback import coordinate_rollback
+from yolo_developer.agents.sm.rollback_types import RollbackResult
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -602,6 +604,34 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             # Emergency protocol should never block the main workflow
             logger.error("emergency_protocol_failed", error=str(e))
 
+    # Step 6b4: Rollback coordination (Story 10.15 - FR71)
+    # Coordinates rollback when emergency_protocol.recommended_action == "rollback"
+    rollback_result: RollbackResult | None = None
+    if emergency_protocol and emergency_protocol.selected_action == "rollback":
+        try:
+            rollback_result = await coordinate_rollback(
+                state=cast(dict[str, Any], state),
+                checkpoint=emergency_protocol.checkpoint,
+                emergency_protocol=emergency_protocol,
+            )
+            if rollback_result:
+                logger.info(
+                    "rollback_coordination_completed",
+                    plan_id=rollback_result.plan.plan_id,
+                    status=rollback_result.status,
+                    rollback_complete=rollback_result.rollback_complete,
+                    steps_executed=rollback_result.steps_executed,
+                    steps_failed=rollback_result.steps_failed,
+                )
+
+                # If rollback escalated, trigger human escalation
+                if rollback_result.status == "escalated" and not should_escalate:
+                    should_escalate = True
+                    escalation_reason = "agent_failure"  # Rollback failure is an agent failure
+        except Exception as e:
+            # Rollback coordination should never block the main workflow
+            logger.error("rollback_coordination_failed", error=str(e))
+
     # Step 6c: Conflict mediation (Story 10.7 - FR13)
     mediation_result: MediationResult | None = None
     try:
@@ -662,7 +692,11 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             )
             if handoff_result.success:
                 # Use handoff_context from managed handoff instead of delegation
-                handoff_context = handoff_result.state_updates.get("handoff_context") if handoff_result.state_updates else None
+                handoff_context = (
+                    handoff_result.state_updates.get("handoff_context")
+                    if handoff_result.state_updates
+                    else None
+                )
                 logger.debug(
                     "managed_handoff_completed",
                     source_agent=current_agent,
@@ -697,7 +731,9 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
                 progress_percentage=sprint_progress.snapshot.progress_percentage,
                 stories_completed=sprint_progress.snapshot.stories_completed,
                 total_stories=sprint_progress.snapshot.total_stories,
-                estimated_completion=sprint_progress.completion_estimate.estimated_completion_time if sprint_progress.completion_estimate else None,
+                estimated_completion=sprint_progress.completion_estimate.estimated_completion_time
+                if sprint_progress.completion_estimate
+                else None,
             )
         except Exception as e:
             # Progress tracking should never block the main workflow
@@ -755,6 +791,13 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
             f"status={human_escalation_result.status}, "
             f"options={len(human_escalation_result.request.options)}."
         )
+    if rollback_result:
+        processing_notes += (
+            f" Rollback: plan={rollback_result.plan.plan_id}, "
+            f"status={rollback_result.status}, "
+            f"complete={rollback_result.rollback_complete}, "
+            f"steps={rollback_result.steps_executed}/{len(rollback_result.plan.steps)}."
+        )
 
     # Create SM output (AC #3 - structured format)
     output = SMOutput(
@@ -777,6 +820,7 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         emergency_protocol=emergency_protocol.to_dict() if emergency_protocol else None,
         injection_result=injection_result.to_dict() if injection_result else None,
         escalation_result=human_escalation_result.to_dict() if human_escalation_result else None,
+        rollback_result=rollback_result.to_dict() if rollback_result else None,
     )
 
     # Create decision record (includes delegation info for audit trail - Task 4.2)
@@ -811,15 +855,25 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         mediation_success=mediation_result.success if mediation_result else None,
         handoff_success=handoff_result.success if handoff_result else None,
         handoff_validated=handoff_result.context_validated if handoff_result else None,
-        sprint_progress_percentage=sprint_progress.snapshot.progress_percentage if sprint_progress else None,
-        sprint_stories_completed=sprint_progress.snapshot.stories_completed if sprint_progress else None,
+        sprint_progress_percentage=sprint_progress.snapshot.progress_percentage
+        if sprint_progress
+        else None,
+        sprint_stories_completed=sprint_progress.snapshot.stories_completed
+        if sprint_progress
+        else None,
         emergency_protocol_status=emergency_protocol.status if emergency_protocol else None,
         emergency_type=emergency_protocol.trigger.emergency_type if emergency_protocol else None,
         context_injection_triggered=injection_result.injected if injection_result else None,
         context_gap_reason=injection_result.gap.reason if injection_result else None,
         human_escalation_triggered=human_escalation_result is not None,
-        human_escalation_trigger=human_escalation_result.request.trigger if human_escalation_result else None,
+        human_escalation_trigger=human_escalation_result.request.trigger
+        if human_escalation_result
+        else None,
         human_escalation_status=human_escalation_result.status if human_escalation_result else None,
+        rollback_triggered=rollback_result is not None,
+        rollback_status=rollback_result.status if rollback_result else None,
+        rollback_complete=rollback_result.rollback_complete if rollback_result else None,
+        rollback_steps_executed=rollback_result.steps_executed if rollback_result else None,
     )
 
     # Return ONLY updates (AC #1, #2, #3, #4)
@@ -846,14 +900,35 @@ async def sm_node(state: YoloState) -> dict[str, Any]:
         "sm_output": output.to_dict(),
         "routing_decision": routing_decision,  # Convenience key for routing
         "handoff_context": handoff_context,  # From delegation (Story 10.4)
-        "health_status": health_status.to_dict() if health_status else None,  # Current snapshot (Story 10.5)
-        "health_history": [health_snapshot] if health_snapshot else [],  # For trend analysis (Task 7.4)
-        "cycle_analysis": cycle_analysis.to_dict() if cycle_analysis else None,  # Enhanced detection (Story 10.6)
-        "mediation_result": mediation_result.to_dict() if mediation_result else None,  # Conflict mediation (Story 10.7)
-        "handoff_result": handoff_result.to_dict() if handoff_result else None,  # Handoff management (Story 10.8)
-        "sprint_progress": sprint_progress.to_dict() if sprint_progress else None,  # Sprint progress tracking (Story 10.9)
-        "emergency_protocol": emergency_protocol.to_dict() if emergency_protocol else None,  # Emergency protocol (Story 10.10)
+        "health_status": health_status.to_dict()
+        if health_status
+        else None,  # Current snapshot (Story 10.5)
+        "health_history": [health_snapshot]
+        if health_snapshot
+        else [],  # For trend analysis (Task 7.4)
+        "cycle_analysis": cycle_analysis.to_dict()
+        if cycle_analysis
+        else None,  # Enhanced detection (Story 10.6)
+        "mediation_result": mediation_result.to_dict()
+        if mediation_result
+        else None,  # Conflict mediation (Story 10.7)
+        "handoff_result": handoff_result.to_dict()
+        if handoff_result
+        else None,  # Handoff management (Story 10.8)
+        "sprint_progress": sprint_progress.to_dict()
+        if sprint_progress
+        else None,  # Sprint progress tracking (Story 10.9)
+        "emergency_protocol": emergency_protocol.to_dict()
+        if emergency_protocol
+        else None,  # Emergency protocol (Story 10.10)
         "injected_context": injected_context,  # Context injection payload (Story 10.13)
-        "injection_result": injection_result.to_dict() if injection_result else None,  # Context injection result (Story 10.13)
-        "escalation_result": human_escalation_result.to_dict() if human_escalation_result else None,  # Human escalation (Story 10.14)
+        "injection_result": injection_result.to_dict()
+        if injection_result
+        else None,  # Context injection result (Story 10.13)
+        "escalation_result": human_escalation_result.to_dict()
+        if human_escalation_result
+        else None,  # Human escalation (Story 10.14)
+        "rollback_result": rollback_result.to_dict()
+        if rollback_result
+        else None,  # Rollback coordination (Story 10.15)
     }

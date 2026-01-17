@@ -336,9 +336,7 @@ def _capture_state_snapshot(state: dict[str, Any]) -> dict[str, Any]:
 
     snapshot: dict[str, Any] = {}
     for key, value in state.items():
-        if key.lower() not in exclude_keys and not any(
-            exc in key.lower() for exc in exclude_keys
-        ):
+        if key.lower() not in exclude_keys and not any(exc in key.lower() for exc in exclude_keys):
             # Deep copy simple types, reference complex ones
             if isinstance(value, (str, int, float, bool, type(None))):
                 snapshot[key] = value
@@ -484,7 +482,11 @@ def _evaluate_retry_option(
     # Decrease confidence with each attempt
     confidence = max(0.1, base_confidence - (recovery_attempts * 0.2))
 
-    risks = ("May fail again", "Could waste resources") if recovery_attempts > 0 else ("May fail again",)
+    risks = (
+        ("May fail again", "Could waste resources")
+        if recovery_attempts > 0
+        else ("May fail again",)
+    )
 
     return RecoveryOption(
         action="retry",

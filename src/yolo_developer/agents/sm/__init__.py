@@ -20,6 +20,7 @@ Key Responsibilities:
 - Velocity tracking: Track burn-down velocity and cycle time metrics (Story 10.12)
 - Context injection: Inject context when agents lack information (Story 10.13)
 - Human escalation: Create escalation requests for human intervention (Story 10.14)
+- Rollback coordination: Coordinate rollback operations as emergency sprints (Story 10.15)
 
 Example:
     >>> from yolo_developer.agents.sm import (
@@ -42,6 +43,9 @@ Example:
     ...     score_stories,
     ...     PriorityFactors,
     ...     PriorityResult,
+    ...     coordinate_rollback,
+    ...     RollbackConfig,
+    ...     RollbackResult,
     ... )
     >>>
     >>> # Run the SM node
@@ -98,6 +102,11 @@ Example:
     >>> metrics = calculate_velocity_metrics([velocity])
     >>> metrics.trend
     'stable'
+    >>>
+    >>> # Coordinate rollback (Story 10.15)
+    >>> result = await coordinate_rollback(state, checkpoint, emergency_protocol)
+    >>> result.status
+    'completed'
 
 Architecture:
     The sm_node function is a LangGraph node that:
@@ -322,6 +331,27 @@ from yolo_developer.agents.sm.progress_types import (
     StoryProgress,
     StoryStatus,
 )
+from yolo_developer.agents.sm.rollback import (
+    coordinate_rollback,
+    create_rollback_plan,
+    execute_rollback,
+    handle_rollback_failure,
+    should_rollback,
+)
+from yolo_developer.agents.sm.rollback_types import (
+    DEFAULT_ALLOW_PARTIAL_ROLLBACK,
+    DEFAULT_AUTO_ESCALATE_ON_FAILURE,
+    DEFAULT_LOG_ROLLBACKS,
+    DEFAULT_MAX_ROLLBACK_STEPS,
+    VALID_ROLLBACK_REASONS,
+    VALID_ROLLBACK_STATUSES,
+    RollbackConfig,
+    RollbackPlan,
+    RollbackReason,
+    RollbackResult,
+    RollbackStatus,
+    RollbackStep,
+)
 from yolo_developer.agents.sm.types import (
     CIRCULAR_LOGIC_THRESHOLD,
     NATURAL_SUCCESSOR,
@@ -360,6 +390,8 @@ __all__ = [
     # Velocity Tracking (Story 10.12)
     "CONFIDENCE_DECIMAL_PLACES",
     "DEFAULT_ACKNOWLEDGMENT_TIMEOUT_SECONDS",
+    "DEFAULT_ALLOW_PARTIAL_ROLLBACK",
+    "DEFAULT_AUTO_ESCALATE_ON_FAILURE",
     # Planning (Story 10.3)
     "DEFAULT_DEPENDENCY_WEIGHT",
     # Emergency Protocols (Story 10.10)
@@ -375,6 +407,8 @@ __all__ = [
     # Context Injection (Story 10.13)
     "DEFAULT_LOG_ESCALATIONS",
     "DEFAULT_LOG_INJECTIONS",
+    # Rollback Coordination (Story 10.15)
+    "DEFAULT_LOG_ROLLBACKS",
     # Health Monitoring (Story 10.5)
     "DEFAULT_MAX_CHURN_RATE",
     "DEFAULT_MAX_CONTEXT_ITEMS",
@@ -386,6 +420,7 @@ __all__ = [
     "DEFAULT_MAX_POINTS",
     "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "DEFAULT_MAX_RETRY_ATTEMPTS",
+    "DEFAULT_MAX_ROLLBACK_STEPS",
     "DEFAULT_MAX_STORIES",
     "DEFAULT_MIN_RELEVANCE_SCORE",
     "DEFAULT_MIN_SCORE_THRESHOLD",
@@ -433,6 +468,8 @@ __all__ = [
     "VALID_PROTOCOL_STATUSES",
     "VALID_RECOVERY_ACTIONS",
     "VALID_RESOLUTION_STRATEGIES",
+    "VALID_ROLLBACK_REASONS",
+    "VALID_ROLLBACK_STATUSES",
     "VALID_STORY_STATUSES",
     "VALID_TASK_TYPES",
     "VALID_TRENDS",
@@ -497,6 +534,12 @@ __all__ = [
     "RecoveryOption",
     "ResolutionStrategy",
     "RetrievedContext",
+    "RollbackConfig",
+    "RollbackPlan",
+    "RollbackReason",
+    "RollbackResult",
+    "RollbackStatus",
+    "RollbackStep",
     "RoutingDecision",
     "SMOutput",
     "SprintPlan",
@@ -517,17 +560,21 @@ __all__ = [
     "calculate_sprint_velocity",
     "calculate_velocity_metrics",
     "checkpoint_state",
+    "coordinate_rollback",
     "create_escalation_request",
+    "create_rollback_plan",
     "delegate_task",
     "detect_circular_logic",
     "detect_context_gap",
     "escalate_emergency",
+    "execute_rollback",
     "forecast_velocity",
     "get_progress_for_display",
     "get_progress_summary",
     "get_stories_by_status",
     "get_velocity_trend",
     "handle_escalation_timeout",
+    "handle_rollback_failure",
     "inject_context",
     "integrate_escalation_response",
     "manage_context_injection",
@@ -542,6 +589,7 @@ __all__ = [
     "routing_to_task_type",
     "score_stories",
     "should_escalate",
+    "should_rollback",
     "sm_node",
     "track_progress",
     "track_sprint_velocity",

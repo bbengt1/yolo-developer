@@ -72,9 +72,7 @@ Values:
     system_error: Unrecoverable error in orchestration
 """
 
-ProtocolStatus = Literal[
-    "pending", "active", "checkpointed", "recovering", "resolved", "escalated"
-]
+ProtocolStatus = Literal["pending", "active", "checkpointed", "recovering", "resolved", "escalated"]
 """Current status of the emergency protocol.
 
 Values:
@@ -170,9 +168,7 @@ class EmergencyTrigger:
     source_agent: str | None
     trigger_reason: str
     health_status: dict[str, Any] | None
-    detected_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -330,9 +326,7 @@ class EmergencyProtocol:
     recovery_options: tuple[RecoveryOption, ...]
     selected_action: RecoveryAction | None
     escalation_reason: str | None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     resolved_at: str | None = None
     """ISO timestamp when protocol resolved (MVP: always None, reserved for future use)."""
 

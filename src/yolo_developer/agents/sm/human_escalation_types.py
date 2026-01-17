@@ -249,9 +249,7 @@ class EscalationRequest:
     context: dict[str, Any]
     options: tuple[EscalationOption, ...]
     recommended_option: str | None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
         """Validate request data and log warnings for issues."""
@@ -328,9 +326,7 @@ class EscalationResponse:
     request_id: str
     selected_option: str
     user_rationale: str | None
-    responded_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    responded_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
         """Validate response data and log warnings for issues."""

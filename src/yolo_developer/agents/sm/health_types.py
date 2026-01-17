@@ -244,7 +244,9 @@ class HealthMetrics:
     overall_cycle_time: float
     overall_churn_rate: float
     unproductive_churn_rate: float = 0.0
-    cycle_time_percentiles: dict[str, float] = field(default_factory=lambda: {"p50": 0.0, "p90": 0.0, "p95": 0.0})
+    cycle_time_percentiles: dict[str, float] = field(
+        default_factory=lambda: {"p50": 0.0, "p90": 0.0, "p95": 0.0}
+    )
     agent_snapshots: tuple[AgentHealthSnapshot, ...] = ()
     collected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 

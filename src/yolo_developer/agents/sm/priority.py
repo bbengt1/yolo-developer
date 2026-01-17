@@ -107,9 +107,7 @@ def calculate_dependency_score(
 
     # Count how many stories list this story_id in their dependencies
     dependents = sum(
-        1
-        for s in all_stories
-        if story_id in s.dependencies and s.story_id != story_id
+        1 for s in all_stories if story_id in s.dependencies and s.story_id != story_id
     )
 
     max_possible = len(all_stories) - 1

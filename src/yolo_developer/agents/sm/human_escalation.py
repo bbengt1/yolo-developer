@@ -589,12 +589,18 @@ def _validate_response(
     """
     # Check request_id match
     if response.request_id != request.request_id:
-        return False, f"Response request_id '{response.request_id}' does not match request '{request.request_id}'"
+        return (
+            False,
+            f"Response request_id '{response.request_id}' does not match request '{request.request_id}'",
+        )
 
     # Check selected option exists
     valid_option_ids = {opt.option_id for opt in request.options}
     if response.selected_option not in valid_option_ids:
-        return False, f"Selected option '{response.selected_option}' not in valid options: {valid_option_ids}"
+        return (
+            False,
+            f"Selected option '{response.selected_option}' not in valid options: {valid_option_ids}",
+        )
 
     return True, None
 
@@ -828,12 +834,8 @@ async def manage_human_escalation(
         additional_context["patterns_count"] = len(cycle_analysis.patterns_found)
         additional_context["exchange_count"] = cycle_analysis.total_exchange_count
     elif trigger == "conflict_unresolved" and mediation_result:
-        additional_context["conflicts_triggered"] = list(
-            mediation_result.escalations_triggered
-        )
-        additional_context["conflict_count"] = len(
-            mediation_result.conflicts_detected
-        )
+        additional_context["conflicts_triggered"] = list(mediation_result.escalations_triggered)
+        additional_context["conflict_count"] = len(mediation_result.conflicts_detected)
     elif trigger == "system_error" and health_status:
         additional_context["health_summary"] = health_status.summary
         additional_context["health_status"] = health_status.status

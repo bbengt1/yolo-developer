@@ -117,9 +117,7 @@ def _calculate_priority_score(story: SprintStory, config: PlanningConfig) -> flo
         velocity_impact=story.velocity_impact,
         tech_debt_score=story.tech_debt_score,
     )
-    scoring_config = PriorityScoringConfig.from_planning_config(
-        config, include_explanation=False
-    )
+    scoring_config = PriorityScoringConfig.from_planning_config(config, include_explanation=False)
     result = calculate_priority_score(factors, scoring_config)
     return result.priority_score
 
@@ -230,9 +228,7 @@ def _topological_sort(stories: Sequence[SprintStory]) -> list[SprintStory]:
             "circular_dependency_detected",
             remaining_stories=remaining,
         )
-        raise CircularDependencyError(
-            f"Circular dependency detected in stories: {remaining}"
-        )
+        raise CircularDependencyError(f"Circular dependency detected in stories: {remaining}")
 
     logger.debug(
         "topological_sort_complete",
@@ -400,9 +396,7 @@ def _generate_planning_rationale(
         # Note any dependency ordering
         dep_ordered = [s for s in stories if s.dependencies]
         if dep_ordered:
-            rationale_parts.append(
-                f"{len(dep_ordered)} stories ordered by dependencies."
-            )
+            rationale_parts.append(f"{len(dep_ordered)} stories ordered by dependencies.")
 
     return " ".join(rationale_parts)
 

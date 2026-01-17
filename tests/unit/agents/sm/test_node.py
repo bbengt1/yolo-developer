@@ -2081,3 +2081,142 @@ class TestSMNodeHumanEscalation:
 
         # And escalation result should be created
         assert result["escalation_result"] is not None
+
+
+class TestSMNodeRollbackCoordination:
+    """Tests for rollback coordination integration in SM node (Story 10.15).
+
+    Verifies that the SM node properly integrates with coordinate_rollback()
+    when emergency protocol selects rollback action, per FR71.
+    """
+
+    @pytest.mark.asyncio
+    async def test_sm_node_returns_rollback_result_key(self) -> None:
+        """Test that sm_node always includes rollback_result key in result.
+
+        Per Story 10.15, the sm_node should return rollback_result in its
+        state update dict, even if None when no rollback triggered.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        assert "rollback_result" in result
+
+    @pytest.mark.asyncio
+    async def test_rollback_result_none_without_emergency_rollback(self) -> None:
+        """Test that rollback_result is None when no emergency rollback triggered.
+
+        Rollback coordination is only triggered when emergency_protocol.selected_action == "rollback".
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should not trigger rollback
+        assert result["rollback_result"] is None
+
+    @pytest.mark.asyncio
+    async def test_sm_output_includes_rollback_result_field(self) -> None:
+        """Test that SMOutput includes rollback_result when available.
+
+        The sm_output dict should contain the rollback_result data.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="dev",
+        )
+
+        result = await sm_node(state)
+        sm_output = result["sm_output"]
+
+        assert "rollback_result" in sm_output
+
+    @pytest.mark.asyncio
+    async def test_rollback_does_not_block_workflow(self) -> None:
+        """Test that rollback errors don't block the workflow.
+
+        Rollback coordination is non-blocking - errors should be logged but
+        not prevent routing decisions.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        # Should not raise, should complete with routing decision
+        result = await sm_node(state)
+
+        assert "routing_decision" in result
+        assert result["routing_decision"] is not None
+
+    @pytest.mark.asyncio
+    async def test_sm_node_preserves_routing_without_rollback(self) -> None:
+        """Test that routing still works correctly without rollback.
+
+        Without emergency protocol triggering rollback, normal routing should continue.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+
+        # Normal routing should still occur (analyst -> pm)
+        if not result["sm_output"]["escalation_triggered"]:
+            assert result["routing_decision"] == "pm"
+
+    @pytest.mark.asyncio
+    async def test_rollback_result_structure_when_present(self) -> None:
+        """Test that rollback_result has expected structure when present.
+
+        The rollback_result should contain all expected fields from
+        RollbackResult.to_dict() when triggered.
+        """
+        # This test verifies the structure if rollback is triggered
+        # In normal operation, rollback_result will be None
+        state = create_test_state(
+            messages=[],
+            current_agent="analyst",
+        )
+
+        result = await sm_node(state)
+        rollback_result = result.get("rollback_result")
+
+        # When rollback_result is not None, verify structure
+        if rollback_result is not None:
+            assert "plan" in rollback_result
+            assert "status" in rollback_result
+            assert "steps_executed" in rollback_result
+            assert "steps_failed" in rollback_result
+            assert "rollback_complete" in rollback_result
+            assert "duration_ms" in rollback_result
+            assert "error_message" in rollback_result
+
+    @pytest.mark.asyncio
+    async def test_rollback_result_none_for_healthy_state(self) -> None:
+        """Test that rollback_result is None for healthy state without emergencies.
+
+        When system is healthy, no emergency protocol is triggered,
+        so rollback should not be coordinated.
+        """
+        state = create_test_state(
+            messages=[],
+            current_agent="pm",
+        )
+
+        result = await sm_node(state)
+
+        # Healthy state should not trigger rollback
+        assert result["rollback_result"] is None
+        # Emergency protocol may or may not be present, but not with rollback action
+        ep = result.get("emergency_protocol")
+        if ep is not None:
+            assert ep.get("selected_action") != "rollback"

@@ -377,15 +377,12 @@ def _detect_multi_agent_cycles(
                     relevant_exchanges = [
                         e
                         for e in exchanges
-                        if e.source_agent in unique_agents
-                        and e.target_agent in unique_agents
+                        if e.source_agent in unique_agents and e.target_agent in unique_agents
                     ]
 
                     if len(relevant_exchanges) > config.exchange_threshold:
                         seen_agent_sets.add(agent_set)
-                        severity = _calculate_severity(
-                            len(relevant_exchanges), config
-                        )
+                        severity = _calculate_severity(len(relevant_exchanges), config)
                         pattern = CircularPattern(
                             pattern_type="multi_agent",
                             agents_involved=tuple(sorted(unique_agents)),
@@ -710,9 +707,7 @@ async def detect_circular_logic(
     intervention_strategy: InterventionStrategy = "none"
     intervention_message = ""
     if circular_detected:
-        intervention_strategy, intervention_message = _determine_intervention_strategy(
-            patterns
-        )
+        intervention_strategy, intervention_message = _determine_intervention_strategy(patterns)
 
     # Step 6: Check for escalation
     escalation_triggered = False
@@ -723,9 +718,7 @@ async def detect_circular_logic(
     # Step 7: Create cycle log
     cycle_log: CycleLog | None = None
     if circular_detected:
-        cycle_log = _create_cycle_log(
-            patterns, intervention_strategy, escalation_triggered
-        )
+        cycle_log = _create_cycle_log(patterns, intervention_strategy, escalation_triggered)
         _log_cycle_detection(cycle_log)
 
     # Step 8: Build and return result
