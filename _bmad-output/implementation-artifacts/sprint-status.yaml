@@ -173,7 +173,7 @@ development_status:
   11-4-audit-export: done
   11-5-cross-agent-correlation: done
   11-6-token-cost-tracking: done
-  11-7-audit-filtering: backlog
+  11-7-audit-filtering: done
   11-8-auto-adr-generation: backlog
   epic-11-retrospective: optional
 

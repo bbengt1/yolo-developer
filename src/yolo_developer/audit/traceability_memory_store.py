@@ -210,3 +210,56 @@ class InMemoryTraceabilityStore:
                     ):
                         result.append(artifact)
             return result
+
+    async def get_artifacts_by_type(
+        self,
+        artifact_type: str,
+    ) -> list[TraceableArtifact]:
+        """Get all artifacts of a specific type.
+
+        Args:
+            artifact_type: Type to filter by (requirement, story, design_decision, code, test)
+
+        Returns:
+            List of artifacts matching the type.
+        """
+        with self._lock:
+            return [
+                artifact
+                for artifact in self._artifacts.values()
+                if artifact.artifact_type == artifact_type
+            ]
+
+    async def get_artifacts_by_filters(
+        self,
+        artifact_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+    ) -> list[TraceableArtifact]:
+        """Get artifacts with optional filtering.
+
+        Multiple filters are combined with AND logic.
+
+        Args:
+            artifact_type: Optional type filter
+            created_after: Optional start time filter (ISO 8601, inclusive)
+            created_before: Optional end time filter (ISO 8601, inclusive)
+
+        Returns:
+            List of artifacts matching all specified filters.
+        """
+        with self._lock:
+            results = list(self._artifacts.values())
+
+            # Apply artifact type filter
+            if artifact_type is not None:
+                results = [a for a in results if a.artifact_type == artifact_type]
+
+            # Apply time range filters (ISO 8601 strings are lexicographically sortable)
+            if created_after is not None:
+                results = [a for a in results if a.created_at >= created_after]
+
+            if created_before is not None:
+                results = [a for a in results if a.created_at <= created_before]
+
+            return results

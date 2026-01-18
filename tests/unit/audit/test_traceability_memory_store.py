@@ -574,3 +574,287 @@ class TestConcurrentAccess:
         # All links should be retrievable via get_links_to
         links = await store.get_links_to("FR82")
         assert len(links) == 50
+
+
+class TestGetArtifactsByType:
+    """Tests for get_artifacts_by_type method (Story 11.7)."""
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_type_returns_matching(
+        self,
+        sample_requirement: TraceableArtifact,
+        sample_story: TraceableArtifact,
+        sample_code: TraceableArtifact,
+    ) -> None:
+        """Test that get_artifacts_by_type returns only matching artifacts."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+        await store.register_artifact(sample_requirement)
+        await store.register_artifact(sample_story)
+        await store.register_artifact(sample_code)
+
+        requirements = await store.get_artifacts_by_type("requirement")
+
+        assert len(requirements) == 1
+        assert requirements[0].id == "FR82"
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_type_returns_multiple(self) -> None:
+        """Test that get_artifacts_by_type returns all matching artifacts."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        # Register multiple requirements
+        for i in range(3):
+            artifact = TraceableArtifact(
+                id=f"req-{i}",
+                artifact_type="requirement",
+                name=f"Requirement {i}",
+                description=f"Description {i}",
+                created_at="2026-01-18T12:00:00Z",
+            )
+            await store.register_artifact(artifact)
+
+        requirements = await store.get_artifacts_by_type("requirement")
+
+        assert len(requirements) == 3
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_type_returns_empty_for_no_matches(self) -> None:
+        """Test that get_artifacts_by_type returns empty for no matching type."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+        artifacts = await store.get_artifacts_by_type("code")
+
+        assert artifacts == []
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_type_for_each_valid_type(self) -> None:
+        """Test filtering for each valid artifact type."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        # Register one of each type
+        valid_types = ["requirement", "story", "design_decision", "code", "test"]
+        for artifact_type in valid_types:
+            artifact = TraceableArtifact(
+                id=f"art-{artifact_type}",
+                artifact_type=artifact_type,
+                name=f"Sample {artifact_type}",
+                description=f"A {artifact_type} artifact",
+                created_at="2026-01-18T12:00:00Z",
+            )
+            await store.register_artifact(artifact)
+
+        # Verify each type can be filtered
+        for artifact_type in valid_types:
+            artifacts = await store.get_artifacts_by_type(artifact_type)
+            assert len(artifacts) == 1
+            assert artifacts[0].artifact_type == artifact_type
+
+
+class TestGetArtifactsByFilters:
+    """Tests for get_artifacts_by_filters method (Story 11.7)."""
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_with_type_only(
+        self,
+        sample_requirement: TraceableArtifact,
+        sample_story: TraceableArtifact,
+    ) -> None:
+        """Test filtering by artifact type only."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+        await store.register_artifact(sample_requirement)
+        await store.register_artifact(sample_story)
+
+        results = await store.get_artifacts_by_filters(artifact_type="requirement")
+
+        assert len(results) == 1
+        assert results[0].id == "FR82"
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_with_time_range(self) -> None:
+        """Test filtering by time range."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        # Register artifacts with different timestamps
+        for i, timestamp in enumerate(
+            [
+                "2026-01-01T00:00:00Z",
+                "2026-01-15T00:00:00Z",
+                "2026-01-31T00:00:00Z",
+            ]
+        ):
+            artifact = TraceableArtifact(
+                id=f"req-{i}",
+                artifact_type="requirement",
+                name=f"Requirement {i}",
+                description=f"Created at {timestamp}",
+                created_at=timestamp,
+            )
+            await store.register_artifact(artifact)
+
+        # Filter for middle of month
+        results = await store.get_artifacts_by_filters(
+            created_after="2026-01-10T00:00:00Z",
+            created_before="2026-01-20T00:00:00Z",
+        )
+
+        assert len(results) == 1
+        assert results[0].id == "req-1"
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_combined(self) -> None:
+        """Test filtering with multiple filters combined (AND logic)."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        # Register requirements and stories with various timestamps
+        for i, (artifact_type, timestamp) in enumerate(
+            [
+                ("requirement", "2026-01-01T00:00:00Z"),
+                ("requirement", "2026-01-15T00:00:00Z"),
+                ("story", "2026-01-15T00:00:00Z"),
+                ("requirement", "2026-01-31T00:00:00Z"),
+            ]
+        ):
+            artifact = TraceableArtifact(
+                id=f"art-{i}",
+                artifact_type=artifact_type,
+                name=f"Artifact {i}",
+                description=f"Type {artifact_type} at {timestamp}",
+                created_at=timestamp,
+            )
+            await store.register_artifact(artifact)
+
+        # Filter for requirements in mid-January
+        results = await store.get_artifacts_by_filters(
+            artifact_type="requirement",
+            created_after="2026-01-10T00:00:00Z",
+            created_before="2026-01-20T00:00:00Z",
+        )
+
+        assert len(results) == 1
+        assert results[0].id == "art-1"
+        assert results[0].artifact_type == "requirement"
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_no_filters_returns_all(self) -> None:
+        """Test that no filters returns all artifacts."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        for i in range(3):
+            artifact = TraceableArtifact(
+                id=f"art-{i}",
+                artifact_type="requirement",
+                name=f"Artifact {i}",
+                description=f"Description {i}",
+                created_at="2026-01-18T12:00:00Z",
+            )
+            await store.register_artifact(artifact)
+
+        results = await store.get_artifacts_by_filters()
+
+        assert len(results) == 3
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_empty_for_no_matches(self) -> None:
+        """Test that non-matching filters return empty list."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        artifact = TraceableArtifact(
+            id="req-1",
+            artifact_type="requirement",
+            name="Requirement 1",
+            description="Description",
+            created_at="2026-01-18T12:00:00Z",
+        )
+        await store.register_artifact(artifact)
+
+        # Filter for future time range
+        results = await store.get_artifacts_by_filters(
+            created_after="2027-01-01T00:00:00Z",
+        )
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_created_after_inclusive(self) -> None:
+        """Test that created_after is inclusive."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        artifact = TraceableArtifact(
+            id="req-1",
+            artifact_type="requirement",
+            name="Requirement 1",
+            description="Description",
+            created_at="2026-01-18T12:00:00Z",
+        )
+        await store.register_artifact(artifact)
+
+        # Filter with exact timestamp should include
+        results = await store.get_artifacts_by_filters(
+            created_after="2026-01-18T12:00:00Z",
+        )
+
+        assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_artifacts_by_filters_created_before_inclusive(self) -> None:
+        """Test that created_before is inclusive."""
+        from yolo_developer.audit.traceability_memory_store import (
+            InMemoryTraceabilityStore,
+        )
+
+        store = InMemoryTraceabilityStore()
+
+        artifact = TraceableArtifact(
+            id="req-1",
+            artifact_type="requirement",
+            name="Requirement 1",
+            description="Description",
+            created_at="2026-01-18T12:00:00Z",
+        )
+        await store.register_artifact(artifact)
+
+        # Filter with exact timestamp should include
+        results = await store.get_artifacts_by_filters(
+            created_before="2026-01-18T12:00:00Z",
+        )
+
+        assert len(results) == 1

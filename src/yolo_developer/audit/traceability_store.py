@@ -135,3 +135,37 @@ class TraceabilityStore(Protocol):
             List of artifacts with no outgoing links.
         """
         ...
+
+    async def get_artifacts_by_type(
+        self,
+        artifact_type: str,
+    ) -> list[TraceableArtifact]:
+        """Get all artifacts of a specific type.
+
+        Args:
+            artifact_type: Type to filter by (requirement, story, design_decision, code, test)
+
+        Returns:
+            List of artifacts matching the type.
+        """
+        ...
+
+    async def get_artifacts_by_filters(
+        self,
+        artifact_type: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+    ) -> list[TraceableArtifact]:
+        """Get artifacts with optional filtering.
+
+        Multiple filters are combined with AND logic.
+
+        Args:
+            artifact_type: Optional type filter
+            created_after: Optional start time filter (ISO 8601, inclusive)
+            created_before: Optional end time filter (ISO 8601, inclusive)
+
+        Returns:
+            List of artifacts matching all specified filters.
+        """
+        ...

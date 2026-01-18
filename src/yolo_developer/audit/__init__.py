@@ -7,6 +7,7 @@ This module provides functionality for:
 - Exporting audit trail for compliance reporting (FR84: Story 11.4)
 - Correlating decisions across agent boundaries (FR85: Story 11.5)
 - Tracking token usage and costs per operation (FR86: Story 11.6)
+- Filtering audit data by agent, time range, or artifact (FR87: Story 11.7)
 
 Components:
     Decision Logging (Story 11.1):
@@ -48,6 +49,10 @@ Components:
         - In-memory store: InMemoryCostStore for testing and single-session use
         - Service: CostTrackingService for recording and querying LLM costs
         - LiteLLM utilities: extract_token_usage, extract_cost, calculate_cost_if_missing
+
+    Audit Filtering (Story 11.7):
+        - Filter types: AuditFilters for unified filtering across all stores
+        - Filter service: AuditFilterService for coordinated querying
 
 Example (Decision Logging):
     >>> from yolo_developer.audit import (
@@ -180,6 +185,36 @@ Example (Token/Cost Tracking):
     >>> # Get cost breakdown by agent
     >>> agent_costs = await service.get_agent_costs()
 
+Example (Audit Filtering):
+    >>> from yolo_developer.audit import (
+    ...     AuditFilterService,
+    ...     AuditFilters,
+    ...     InMemoryDecisionStore,
+    ...     InMemoryTraceabilityStore,
+    ...     InMemoryCostStore,
+    ...     get_audit_filter_service,
+    ... )
+    >>>
+    >>> # Create stores and filter service
+    >>> decision_store = InMemoryDecisionStore()
+    >>> traceability_store = InMemoryTraceabilityStore()
+    >>> cost_store = InMemoryCostStore()
+    >>> service = get_audit_filter_service(
+    ...     decision_store, traceability_store, cost_store
+    ... )
+    >>>
+    >>> # Filter by agent name
+    >>> filters = AuditFilters(agent_name="analyst")
+    >>> results = await service.filter_all(filters)
+    >>> results["decisions"]  # Decisions from analyst
+    >>>
+    >>> # Filter by time range
+    >>> filters = AuditFilters(
+    ...     start_time="2026-01-01T00:00:00Z",
+    ...     end_time="2026-01-31T23:59:59Z",
+    ... )
+    >>> artifacts = await service.filter_artifacts(filters)
+
 References:
     - FR81: System can log all agent decisions with rationale
     - FR82: System can generate decision traceability from requirement to code
@@ -187,6 +222,7 @@ References:
     - FR84: System can export audit trail for compliance reporting
     - FR85: System can correlate decisions across agent boundaries
     - FR86: System can track token usage and cost per operation
+    - FR87: Users can filter audit trail by agent, time range, or artifact
     - ADR-001: TypedDict for graph state, frozen dataclasses for internal types
 """
 
@@ -270,6 +306,15 @@ from yolo_developer.audit.export_types import (
     ExportOptions,
     RedactionConfig,
 )
+
+# Filter service (Story 11.7)
+from yolo_developer.audit.filter_service import (
+    AuditFilterService,
+    get_audit_filter_service,
+)
+
+# Filter types (Story 11.7)
+from yolo_developer.audit.filter_types import AuditFilters
 
 # Formatter protocol
 from yolo_developer.audit.formatter_protocol import AuditFormatter
@@ -372,6 +417,8 @@ __all__ = [
     # Services and Stores
     "AuditExportService",
     "AuditExporter",
+    "AuditFilters",
+    "AuditFilterService",
     "AuditFormatter",
     "AuditViewService",
     "CausalRelation",
@@ -420,6 +467,7 @@ __all__ = [
     "extract_cost",
     "extract_token_usage",
     "get_audit_export_service",
+    "get_audit_filter_service",
     "get_audit_view_service",
     "get_correlation_service",
     "get_cost_tracking_service",
