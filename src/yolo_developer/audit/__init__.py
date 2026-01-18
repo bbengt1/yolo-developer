@@ -3,6 +3,7 @@
 This module provides functionality for:
 - Logging and tracking agent decisions (FR81: Story 11.1)
 - Tracing requirements to code for full traceability (FR82: Story 11.2)
+- Viewing audit trail in human-readable format (FR83: Story 11.3)
 
 Components:
     Decision Logging (Story 11.1):
@@ -16,6 +17,13 @@ Components:
         - Store protocol: TraceabilityStore for pluggable traceability backends
         - In-memory store: InMemoryTraceabilityStore for testing
         - Service: TraceabilityService for creating and navigating trace chains
+
+    Human-Readable View (Story 11.3):
+        - Formatter types: FormatterStyle, ColorScheme, FormatOptions
+        - Formatter protocol: AuditFormatter for pluggable output formats
+        - Rich formatter: RichAuditFormatter for terminal output with colors
+        - Plain formatter: PlainAuditFormatter for ASCII text output
+        - View service: AuditViewService for viewing decisions and traces
 
 Example (Decision Logging):
     >>> from yolo_developer.audit import (
@@ -61,13 +69,44 @@ Example (Requirement Traceability):
     >>> # Navigate trace chain
     >>> requirement = await service.get_requirement_for_code("code-1")
 
+Example (Human-Readable View):
+    >>> from yolo_developer.audit import (
+    ...     AuditViewService,
+    ...     InMemoryDecisionStore,
+    ...     InMemoryTraceabilityStore,
+    ...     get_audit_view_service,
+    ... )
+    >>>
+    >>> # Create stores and view service
+    >>> decision_store = InMemoryDecisionStore()
+    >>> traceability_store = InMemoryTraceabilityStore()
+    >>> service = get_audit_view_service(decision_store, traceability_store)
+    >>>
+    >>> # View decisions
+    >>> output = await service.view_decisions()
+    >>> print(output)
+
 References:
     - FR81: System can log all agent decisions with rationale
     - FR82: System can generate decision traceability from requirement to code
+    - FR83: Users can view audit trail in human-readable format
     - ADR-001: TypedDict for graph state, frozen dataclasses for internal types
 """
 
 from __future__ import annotations
+
+# Formatter protocol
+from yolo_developer.audit.formatter_protocol import AuditFormatter
+
+# Formatter types
+from yolo_developer.audit.formatter_types import (
+    DEFAULT_COLOR_SCHEME,
+    DEFAULT_FORMAT_OPTIONS,
+    VALID_FORMATTER_STYLES,
+    ColorScheme,
+    FormatOptions,
+    FormatterStyle,
+)
 
 # Logger
 from yolo_developer.audit.logger import (
@@ -77,6 +116,12 @@ from yolo_developer.audit.logger import (
 
 # In-memory implementation
 from yolo_developer.audit.memory_store import InMemoryDecisionStore
+
+# Plain text formatter
+from yolo_developer.audit.plain_formatter import PlainAuditFormatter
+
+# Rich terminal formatter
+from yolo_developer.audit.rich_formatter import RichAuditFormatter
 
 # Store protocol and filters
 from yolo_developer.audit.store import (
@@ -117,13 +162,28 @@ from yolo_developer.audit.types import (
     DecisionType,
 )
 
+# View service
+from yolo_developer.audit.view import (
+    AuditViewService,
+    get_audit_view_service,
+)
+
 __all__ = [
+    # Constants
+    "DEFAULT_COLOR_SCHEME",
+    "DEFAULT_FORMAT_OPTIONS",
     "VALID_ARTIFACT_TYPES",
     "VALID_DECISION_SEVERITIES",
     "VALID_DECISION_TYPES",
+    "VALID_FORMATTER_STYLES",
     "VALID_LINK_TYPES",
+    # Types
     "AgentIdentity",
     "ArtifactType",
+    "AuditFormatter",
+    # Services and Stores
+    "AuditViewService",
+    "ColorScheme",
     "Decision",
     "DecisionContext",
     "DecisionFilters",
@@ -131,13 +191,19 @@ __all__ = [
     "DecisionSeverity",
     "DecisionStore",
     "DecisionType",
+    "FormatOptions",
+    "FormatterStyle",
     "InMemoryDecisionStore",
     "InMemoryTraceabilityStore",
     "LinkType",
+    "PlainAuditFormatter",
+    "RichAuditFormatter",
     "TraceLink",
     "TraceabilityService",
     "TraceabilityStore",
     "TraceableArtifact",
+    # Factory functions
+    "get_audit_view_service",
     "get_logger",
     "get_traceability_service",
 ]

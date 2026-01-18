@@ -368,9 +368,7 @@ class TestTraceTest:
         )
 
         # Verify link was created
-        links = await store.get_links_from(
-            "tests/unit/audit/test_traceability_service.py"
-        )
+        links = await store.get_links_from("tests/unit/audit/test_traceability_service.py")
         assert len(links) == 1
         assert links[0].target_id == "src/yolo_developer/audit/traceability.py"
         assert links[0].link_type == "tests"

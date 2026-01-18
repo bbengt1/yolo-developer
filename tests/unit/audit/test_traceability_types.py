@@ -139,9 +139,7 @@ class TestTraceableArtifact:
         json_str = json.dumps(result)
         assert json_str is not None
 
-    def test_artifact_validation_warns_on_empty_id(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_artifact_validation_warns_on_empty_id(self, caplog: LogCaptureFixture) -> None:
         """Test that empty id logs a warning."""
         from yolo_developer.audit.traceability_types import TraceableArtifact
 
@@ -156,9 +154,7 @@ class TestTraceableArtifact:
 
         assert "TraceableArtifact id is empty" in caplog.text
 
-    def test_artifact_validation_warns_on_empty_name(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_artifact_validation_warns_on_empty_name(self, caplog: LogCaptureFixture) -> None:
         """Test that empty name logs a warning."""
         from yolo_developer.audit.traceability_types import TraceableArtifact
 
@@ -173,9 +169,7 @@ class TestTraceableArtifact:
 
         assert "TraceableArtifact name is empty" in caplog.text
 
-    def test_artifact_validation_warns_on_invalid_type(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_artifact_validation_warns_on_invalid_type(self, caplog: LogCaptureFixture) -> None:
         """Test that invalid artifact_type logs a warning."""
         from yolo_developer.audit.traceability_types import TraceableArtifact
 
@@ -190,9 +184,7 @@ class TestTraceableArtifact:
 
         assert "is not a valid artifact type" in caplog.text
 
-    def test_artifact_validation_warns_on_empty_created_at(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_artifact_validation_warns_on_empty_created_at(self, caplog: LogCaptureFixture) -> None:
         """Test that empty created_at logs a warning."""
         from yolo_developer.audit.traceability_types import TraceableArtifact
 
@@ -299,9 +291,7 @@ class TestTraceLink:
         json_str = json.dumps(result)
         assert json_str is not None
 
-    def test_link_validation_warns_on_empty_id(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_empty_id(self, caplog: LogCaptureFixture) -> None:
         """Test that empty id logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -318,9 +308,7 @@ class TestTraceLink:
 
         assert "TraceLink id is empty" in caplog.text
 
-    def test_link_validation_warns_on_empty_source_id(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_empty_source_id(self, caplog: LogCaptureFixture) -> None:
         """Test that empty source_id logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -337,9 +325,7 @@ class TestTraceLink:
 
         assert "TraceLink source_id is empty" in caplog.text
 
-    def test_link_validation_warns_on_empty_target_id(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_empty_target_id(self, caplog: LogCaptureFixture) -> None:
         """Test that empty target_id logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -356,9 +342,7 @@ class TestTraceLink:
 
         assert "TraceLink target_id is empty" in caplog.text
 
-    def test_link_validation_warns_on_invalid_source_type(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_invalid_source_type(self, caplog: LogCaptureFixture) -> None:
         """Test that invalid source_type logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -375,9 +359,7 @@ class TestTraceLink:
 
         assert "is not a valid artifact type" in caplog.text
 
-    def test_link_validation_warns_on_invalid_target_type(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_invalid_target_type(self, caplog: LogCaptureFixture) -> None:
         """Test that invalid target_type logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -394,9 +376,7 @@ class TestTraceLink:
 
         assert "is not a valid artifact type" in caplog.text
 
-    def test_link_validation_warns_on_invalid_link_type(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_invalid_link_type(self, caplog: LogCaptureFixture) -> None:
         """Test that invalid link_type logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 
@@ -413,9 +393,7 @@ class TestTraceLink:
 
         assert "is not a valid link type" in caplog.text
 
-    def test_link_validation_warns_on_empty_created_at(
-        self, caplog: LogCaptureFixture
-    ) -> None:
+    def test_link_validation_warns_on_empty_created_at(self, caplog: LogCaptureFixture) -> None:
         """Test that empty created_at logs a warning."""
         from yolo_developer.audit.traceability_types import TraceLink
 

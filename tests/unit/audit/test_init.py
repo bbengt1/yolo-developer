@@ -1,7 +1,8 @@
-"""Tests for audit module exports (Story 11.1 - Task 5, Story 11.2 - Task 6).
+"""Tests for audit module exports (Story 11.1, 11.2, 11.3).
 
 Tests that the audit module exports all public types, protocols, and functions
-for both decision logging (FR81) and requirement traceability (FR82).
+for decision logging (FR81), requirement traceability (FR82), and
+human-readable view (FR83).
 """
 
 from __future__ import annotations
@@ -118,6 +119,13 @@ class TestAuditModuleExports:
         assert audit_module.__doc__ is not None
         assert "FR82" in audit_module.__doc__
 
+    def test_module_docstring_mentions_fr83(self) -> None:
+        """Module docstring should reference FR83 (Story 11.3)."""
+        import yolo_developer.audit as audit_module
+
+        assert audit_module.__doc__ is not None
+        assert "FR83" in audit_module.__doc__
+
 
 class TestAuditModuleAll:
     """Tests for __all__ exports."""
@@ -162,6 +170,21 @@ class TestAuditModuleAll:
             # Traceability service (Story 11.2)
             "TraceabilityService",
             "get_traceability_service",
+            # Formatter types (Story 11.3)
+            "FormatterStyle",
+            "ColorScheme",
+            "FormatOptions",
+            "VALID_FORMATTER_STYLES",
+            "DEFAULT_COLOR_SCHEME",
+            "DEFAULT_FORMAT_OPTIONS",
+            # Formatter protocol (Story 11.3)
+            "AuditFormatter",
+            # Formatters (Story 11.3)
+            "RichAuditFormatter",
+            "PlainAuditFormatter",
+            # View service (Story 11.3)
+            "AuditViewService",
+            "get_audit_view_service",
         ]
 
         for name in expected:
@@ -253,4 +276,103 @@ class TestTraceabilityExports:
         from yolo_developer.audit import get_traceability_service
 
         service = get_traceability_service()
+        assert service is not None
+
+
+class TestHumanReadableViewExports:
+    """Tests for human-readable view exports (Story 11.3 - Task 6)."""
+
+    def test_exports_formatter_style(self) -> None:
+        """Should export FormatterStyle."""
+        from yolo_developer.audit import FormatterStyle
+
+        assert FormatterStyle is not None
+
+    def test_exports_color_scheme(self) -> None:
+        """Should export ColorScheme."""
+        from yolo_developer.audit import ColorScheme
+
+        scheme = ColorScheme()
+        assert scheme is not None
+
+    def test_exports_format_options(self) -> None:
+        """Should export FormatOptions."""
+        from yolo_developer.audit import FormatOptions
+
+        options = FormatOptions()
+        assert options is not None
+
+    def test_exports_valid_formatter_styles(self) -> None:
+        """Should export VALID_FORMATTER_STYLES constant."""
+        from yolo_developer.audit import VALID_FORMATTER_STYLES
+
+        assert isinstance(VALID_FORMATTER_STYLES, frozenset)
+        assert "minimal" in VALID_FORMATTER_STYLES
+        assert "standard" in VALID_FORMATTER_STYLES
+        assert "verbose" in VALID_FORMATTER_STYLES
+
+    def test_exports_default_color_scheme(self) -> None:
+        """Should export DEFAULT_COLOR_SCHEME constant."""
+        from yolo_developer.audit import DEFAULT_COLOR_SCHEME, ColorScheme
+
+        assert isinstance(DEFAULT_COLOR_SCHEME, ColorScheme)
+
+    def test_exports_default_format_options(self) -> None:
+        """Should export DEFAULT_FORMAT_OPTIONS constant."""
+        from yolo_developer.audit import DEFAULT_FORMAT_OPTIONS, FormatOptions
+
+        assert isinstance(DEFAULT_FORMAT_OPTIONS, FormatOptions)
+
+    def test_exports_audit_formatter_protocol(self) -> None:
+        """Should export AuditFormatter protocol."""
+        from yolo_developer.audit import AuditFormatter
+
+        assert AuditFormatter is not None
+
+    def test_exports_rich_audit_formatter(self) -> None:
+        """Should export RichAuditFormatter."""
+        from rich.console import Console
+
+        from yolo_developer.audit import RichAuditFormatter
+
+        formatter = RichAuditFormatter(Console())
+        assert formatter is not None
+
+    def test_exports_plain_audit_formatter(self) -> None:
+        """Should export PlainAuditFormatter."""
+        from yolo_developer.audit import PlainAuditFormatter
+
+        formatter = PlainAuditFormatter()
+        assert formatter is not None
+
+    def test_exports_audit_view_service(self) -> None:
+        """Should export AuditViewService."""
+        from yolo_developer.audit import (
+            AuditViewService,
+            InMemoryDecisionStore,
+            InMemoryTraceabilityStore,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        service = AuditViewService(
+            decision_store=decision_store,
+            traceability_store=traceability_store,
+        )
+        assert service is not None
+
+    def test_exports_get_audit_view_service(self) -> None:
+        """Should export get_audit_view_service factory function."""
+        from yolo_developer.audit import (
+            InMemoryDecisionStore,
+            InMemoryTraceabilityStore,
+            get_audit_view_service,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        service = get_audit_view_service(
+            decision_store=decision_store,
+            traceability_store=traceability_store,
+        )
         assert service is not None

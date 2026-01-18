@@ -315,9 +315,7 @@ class TestGetTraceChain:
         )
 
         # Navigate upstream from code
-        chain = await store.get_trace_chain(
-            "src/yolo_developer/audit/traceability.py", "upstream"
-        )
+        chain = await store.get_trace_chain("src/yolo_developer/audit/traceability.py", "upstream")
 
         # Should get: design → story → requirement
         assert len(chain) == 3

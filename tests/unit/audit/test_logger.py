@@ -403,9 +403,7 @@ class TestTraceLinksIntegration:
         assert logged_decision.context.trace_links == ("link-001", "link-002")
 
     @pytest.mark.asyncio
-    async def test_log_with_trace_links_merges_with_context(
-        self, mock_store: AsyncMock
-    ) -> None:
+    async def test_log_with_trace_links_merges_with_context(self, mock_store: AsyncMock) -> None:
         """log should merge trace_links with existing context."""
         from yolo_developer.audit.logger import DecisionLogger
         from yolo_developer.audit.types import DecisionContext
