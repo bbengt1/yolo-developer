@@ -5,6 +5,7 @@ This module provides functionality for:
 - Tracing requirements to code for full traceability (FR82: Story 11.2)
 - Viewing audit trail in human-readable format (FR83: Story 11.3)
 - Exporting audit trail for compliance reporting (FR84: Story 11.4)
+- Correlating decisions across agent boundaries (FR85: Story 11.5)
 
 Components:
     Decision Logging (Story 11.1):
@@ -33,6 +34,12 @@ Components:
         - CSV exporter: CsvAuditExporter for spreadsheet-compatible output
         - PDF exporter: PdfAuditExporter for human-readable reports
         - Export service: AuditExportService for high-level export operations
+
+    Cross-Agent Correlation (Story 11.5):
+        - Correlation types: DecisionChain, CausalRelation, AgentTransition, TimelineEntry
+        - Store protocol: CorrelationStore for pluggable correlation backends
+        - In-memory store: InMemoryCorrelationStore for testing
+        - Service: CorrelationService for correlating decisions across agents
 
 Example (Decision Logging):
     >>> from yolo_developer.audit import (
@@ -116,15 +123,63 @@ Example (Audit Export):
     >>> options = ExportOptions(redaction_config=RedactionConfig(redact_metadata=True))
     >>> await service.export_to_file("/path/to/audit.pdf", options=options)
 
+Example (Cross-Agent Correlation):
+    >>> from yolo_developer.audit import (
+    ...     CorrelationService,
+    ...     InMemoryDecisionStore,
+    ...     InMemoryCorrelationStore,
+    ...     get_correlation_service,
+    ... )
+    >>>
+    >>> # Create stores and correlation service
+    >>> decision_store = InMemoryDecisionStore()
+    >>> correlation_store = InMemoryCorrelationStore()
+    >>> service = get_correlation_service(decision_store, correlation_store)
+    >>>
+    >>> # Correlate decisions
+    >>> chain = await service.correlate_decisions(["dec-001", "dec-002"])
+    >>>
+    >>> # Record agent transition
+    >>> await service.record_transition("analyst", "pm", "dec-002")
+    >>>
+    >>> # Get timeline view
+    >>> timeline = await service.get_timeline_view(session_id="session-123")
+
 References:
     - FR81: System can log all agent decisions with rationale
     - FR82: System can generate decision traceability from requirement to code
     - FR83: Users can view audit trail in human-readable format
     - FR84: System can export audit trail for compliance reporting
+    - FR85: System can correlate decisions across agent boundaries
     - ADR-001: TypedDict for graph state, frozen dataclasses for internal types
 """
 
 from __future__ import annotations
+
+# Correlation service
+from yolo_developer.audit.correlation import (
+    CorrelationService,
+    get_correlation_service,
+)
+
+# Correlation in-memory implementation
+from yolo_developer.audit.correlation_memory_store import InMemoryCorrelationStore
+
+# Correlation store protocol
+from yolo_developer.audit.correlation_store import (
+    CorrelationFilters,
+    CorrelationStore,
+)
+
+# Correlation types
+from yolo_developer.audit.correlation_types import (
+    VALID_CORRELATION_TYPES,
+    AgentTransition,
+    CausalRelation,
+    CorrelationType,
+    DecisionChain,
+    TimelineEntry,
+)
 
 # CSV exporter
 from yolo_developer.audit.csv_exporter import CsvAuditExporter
@@ -234,6 +289,7 @@ __all__ = [
     "DEFAULT_FORMAT_OPTIONS",
     "DEFAULT_REDACTION_CONFIG",
     "VALID_ARTIFACT_TYPES",
+    "VALID_CORRELATION_TYPES",
     "VALID_DECISION_SEVERITIES",
     "VALID_DECISION_TYPES",
     "VALID_EXPORT_FORMATS",
@@ -241,33 +297,42 @@ __all__ = [
     "VALID_LINK_TYPES",
     # Types
     "AgentIdentity",
+    "AgentTransition",
     "ArtifactType",
-    "AuditExporter",
-    "AuditFormatter",
-    "ExportFormat",
-    "ExportOptions",
-    "RedactionConfig",
     # Services and Stores
     "AuditExportService",
+    "AuditExporter",
+    "AuditFormatter",
     "AuditViewService",
+    "CausalRelation",
     "ColorScheme",
+    "CorrelationFilters",
+    "CorrelationService",
+    "CorrelationStore",
+    "CorrelationType",
     "CsvAuditExporter",
     "Decision",
+    "DecisionChain",
     "DecisionContext",
     "DecisionFilters",
     "DecisionLogger",
     "DecisionSeverity",
     "DecisionStore",
     "DecisionType",
+    "ExportFormat",
+    "ExportOptions",
     "FormatOptions",
     "FormatterStyle",
+    "InMemoryCorrelationStore",
     "InMemoryDecisionStore",
     "InMemoryTraceabilityStore",
     "JsonAuditExporter",
     "LinkType",
     "PdfAuditExporter",
     "PlainAuditFormatter",
+    "RedactionConfig",
     "RichAuditFormatter",
+    "TimelineEntry",
     "TraceLink",
     "TraceabilityService",
     "TraceabilityStore",
@@ -275,6 +340,7 @@ __all__ = [
     # Factory functions
     "get_audit_export_service",
     "get_audit_view_service",
+    "get_correlation_service",
     "get_logger",
     "get_traceability_service",
 ]

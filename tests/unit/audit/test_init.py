@@ -1,8 +1,8 @@
-"""Tests for audit module exports (Story 11.1, 11.2, 11.3, 11.4).
+"""Tests for audit module exports (Story 11.1, 11.2, 11.3, 11.4, 11.5).
 
 Tests that the audit module exports all public types, protocols, and functions
 for decision logging (FR81), requirement traceability (FR82),
-human-readable view (FR83), and audit export (FR84).
+human-readable view (FR83), audit export (FR84), and cross-agent correlation (FR85).
 """
 
 from __future__ import annotations
@@ -133,6 +133,13 @@ class TestAuditModuleExports:
         assert audit_module.__doc__ is not None
         assert "FR84" in audit_module.__doc__
 
+    def test_module_docstring_mentions_fr85(self) -> None:
+        """Module docstring should reference FR85 (Story 11.5)."""
+        import yolo_developer.audit as audit_module
+
+        assert audit_module.__doc__ is not None
+        assert "FR85" in audit_module.__doc__
+
 
 class TestAuditModuleAll:
     """Tests for __all__ exports."""
@@ -208,6 +215,20 @@ class TestAuditModuleAll:
             # Export service (Story 11.4)
             "AuditExportService",
             "get_audit_export_service",
+            # Correlation types (Story 11.5)
+            "CorrelationType",
+            "VALID_CORRELATION_TYPES",
+            "DecisionChain",
+            "CausalRelation",
+            "AgentTransition",
+            "TimelineEntry",
+            # Correlation store (Story 11.5)
+            "CorrelationFilters",
+            "CorrelationStore",
+            "InMemoryCorrelationStore",
+            # Correlation service (Story 11.5)
+            "CorrelationService",
+            "get_correlation_service",
         ]
 
         for name in expected:
@@ -502,4 +523,134 @@ class TestAuditExportExports:
             decision_store=decision_store,
             traceability_store=traceability_store,
         )
+        assert service is not None
+
+
+class TestCorrelationExports:
+    """Tests for correlation exports (Story 11.5 - Task 7)."""
+
+    def test_exports_correlation_type(self) -> None:
+        """Should export CorrelationType."""
+        from yolo_developer.audit import CorrelationType
+
+        assert CorrelationType is not None
+
+    def test_exports_valid_correlation_types(self) -> None:
+        """Should export VALID_CORRELATION_TYPES constant."""
+        from yolo_developer.audit import VALID_CORRELATION_TYPES
+
+        assert isinstance(VALID_CORRELATION_TYPES, frozenset)
+        assert "causal" in VALID_CORRELATION_TYPES
+        assert "temporal" in VALID_CORRELATION_TYPES
+        assert "session" in VALID_CORRELATION_TYPES
+        assert "artifact" in VALID_CORRELATION_TYPES
+
+    def test_exports_decision_chain(self) -> None:
+        """Should export DecisionChain."""
+        from yolo_developer.audit import DecisionChain
+
+        chain = DecisionChain(
+            id="chain-001",
+            decisions=("dec-001", "dec-002"),
+            chain_type="session",
+            created_at="2026-01-18T12:00:00Z",
+        )
+        assert chain.id == "chain-001"
+
+    def test_exports_causal_relation(self) -> None:
+        """Should export CausalRelation."""
+        from yolo_developer.audit import CausalRelation
+
+        relation = CausalRelation(
+            id="rel-001",
+            cause_decision_id="dec-001",
+            effect_decision_id="dec-002",
+            relation_type="derives_from",
+            created_at="2026-01-18T12:00:00Z",
+        )
+        assert relation.id == "rel-001"
+
+    def test_exports_agent_transition(self) -> None:
+        """Should export AgentTransition."""
+        from yolo_developer.audit import AgentTransition
+
+        transition = AgentTransition(
+            id="trans-001",
+            from_agent="analyst",
+            to_agent="pm",
+            decision_id="dec-001",
+            timestamp="2026-01-18T12:00:00Z",
+        )
+        assert transition.id == "trans-001"
+
+    def test_exports_timeline_entry(self) -> None:
+        """Should export TimelineEntry."""
+        from yolo_developer.audit import (
+            AgentIdentity,
+            Decision,
+            DecisionContext,
+            TimelineEntry,
+        )
+
+        decision = Decision(
+            id="dec-001",
+            decision_type="requirement_analysis",
+            content="Content",
+            rationale="Rationale",
+            agent=AgentIdentity("analyst", "analyst", "session-1"),
+            context=DecisionContext(),
+            timestamp="2026-01-18T12:00:00Z",
+        )
+        entry = TimelineEntry(
+            decision=decision,
+            sequence_number=1,
+            timestamp="2026-01-18T12:00:00Z",
+        )
+        assert entry.sequence_number == 1
+
+    def test_exports_correlation_filters(self) -> None:
+        """Should export CorrelationFilters."""
+        from yolo_developer.audit import CorrelationFilters
+
+        filters = CorrelationFilters(chain_type="session")
+        assert filters.chain_type == "session"
+
+    def test_exports_correlation_store_protocol(self) -> None:
+        """Should export CorrelationStore protocol."""
+        from yolo_developer.audit import CorrelationStore
+
+        assert CorrelationStore is not None
+
+    def test_exports_in_memory_correlation_store(self) -> None:
+        """Should export InMemoryCorrelationStore."""
+        from yolo_developer.audit import InMemoryCorrelationStore
+
+        store = InMemoryCorrelationStore()
+        assert store is not None
+
+    def test_exports_correlation_service(self) -> None:
+        """Should export CorrelationService."""
+        from yolo_developer.audit import (
+            CorrelationService,
+            InMemoryCorrelationStore,
+            InMemoryDecisionStore,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        correlation_store = InMemoryCorrelationStore()
+        service = CorrelationService(
+            decision_store=decision_store,
+            correlation_store=correlation_store,
+        )
+        assert service is not None
+
+    def test_exports_get_correlation_service(self) -> None:
+        """Should export get_correlation_service factory function."""
+        from yolo_developer.audit import (
+            InMemoryDecisionStore,
+            get_correlation_service,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        service = get_correlation_service(decision_store)
         assert service is not None
