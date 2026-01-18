@@ -1,6 +1,7 @@
-"""Tests for audit module exports (Story 11.1 - Task 5).
+"""Tests for audit module exports (Story 11.1 - Task 5, Story 11.2 - Task 6).
 
-Tests that the audit module exports all public types, protocols, and functions.
+Tests that the audit module exports all public types, protocols, and functions
+for both decision logging (FR81) and requirement traceability (FR82).
 """
 
 from __future__ import annotations
@@ -110,6 +111,13 @@ class TestAuditModuleExports:
         assert audit_module.__doc__ is not None
         assert "FR81" in audit_module.__doc__
 
+    def test_module_docstring_mentions_fr82(self) -> None:
+        """Module docstring should reference FR82 (Story 11.2)."""
+        import yolo_developer.audit as audit_module
+
+        assert audit_module.__doc__ is not None
+        assert "FR82" in audit_module.__doc__
+
 
 class TestAuditModuleAll:
     """Tests for __all__ exports."""
@@ -141,7 +149,108 @@ class TestAuditModuleAll:
             # Logger
             "DecisionLogger",
             "get_logger",
+            # Traceability types (Story 11.2)
+            "ArtifactType",
+            "LinkType",
+            "VALID_ARTIFACT_TYPES",
+            "VALID_LINK_TYPES",
+            "TraceableArtifact",
+            "TraceLink",
+            # Traceability store (Story 11.2)
+            "TraceabilityStore",
+            "InMemoryTraceabilityStore",
+            # Traceability service (Story 11.2)
+            "TraceabilityService",
+            "get_traceability_service",
         ]
 
         for name in expected:
             assert name in audit.__all__, f"{name} not in __all__"
+
+
+class TestTraceabilityExports:
+    """Tests for traceability exports (Story 11.2 - Task 6)."""
+
+    def test_exports_artifact_type(self) -> None:
+        """Should export ArtifactType."""
+        from yolo_developer.audit import ArtifactType
+
+        assert ArtifactType is not None
+
+    def test_exports_link_type(self) -> None:
+        """Should export LinkType."""
+        from yolo_developer.audit import LinkType
+
+        assert LinkType is not None
+
+    def test_exports_valid_artifact_types(self) -> None:
+        """Should export VALID_ARTIFACT_TYPES constant."""
+        from yolo_developer.audit import VALID_ARTIFACT_TYPES
+
+        assert isinstance(VALID_ARTIFACT_TYPES, frozenset)
+        assert "requirement" in VALID_ARTIFACT_TYPES
+        assert "code" in VALID_ARTIFACT_TYPES
+
+    def test_exports_valid_link_types(self) -> None:
+        """Should export VALID_LINK_TYPES constant."""
+        from yolo_developer.audit import VALID_LINK_TYPES
+
+        assert isinstance(VALID_LINK_TYPES, frozenset)
+        assert "derives_from" in VALID_LINK_TYPES
+        assert "implements" in VALID_LINK_TYPES
+
+    def test_exports_traceable_artifact(self) -> None:
+        """Should export TraceableArtifact."""
+        from yolo_developer.audit import TraceableArtifact
+
+        artifact = TraceableArtifact(
+            id="req-001",
+            artifact_type="requirement",
+            name="Test Requirement",
+            description="A test requirement",
+            created_at="2026-01-17T12:00:00Z",
+        )
+        assert artifact.id == "req-001"
+
+    def test_exports_trace_link(self) -> None:
+        """Should export TraceLink."""
+        from yolo_developer.audit import TraceLink
+
+        link = TraceLink(
+            id="link-001",
+            source_id="story-001",
+            source_type="story",
+            target_id="req-001",
+            target_type="requirement",
+            link_type="derives_from",
+            created_at="2026-01-17T12:00:00Z",
+        )
+        assert link.id == "link-001"
+
+    def test_exports_traceability_store_protocol(self) -> None:
+        """Should export TraceabilityStore protocol."""
+        from yolo_developer.audit import TraceabilityStore
+
+        assert TraceabilityStore is not None
+
+    def test_exports_in_memory_traceability_store(self) -> None:
+        """Should export InMemoryTraceabilityStore."""
+        from yolo_developer.audit import InMemoryTraceabilityStore
+
+        store = InMemoryTraceabilityStore()
+        assert store is not None
+
+    def test_exports_traceability_service(self) -> None:
+        """Should export TraceabilityService."""
+        from yolo_developer.audit import InMemoryTraceabilityStore, TraceabilityService
+
+        store = InMemoryTraceabilityStore()
+        service = TraceabilityService(store)
+        assert service is not None
+
+    def test_exports_get_traceability_service(self) -> None:
+        """Should export get_traceability_service factory function."""
+        from yolo_developer.audit import get_traceability_service
+
+        service = get_traceability_service()
+        assert service is not None

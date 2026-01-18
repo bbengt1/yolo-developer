@@ -163,18 +163,21 @@ class DecisionContext:
     """Context about when/where a decision was made.
 
     Provides optional contextual information for traceability,
-    linking decisions to sprints, stories, artifacts, and parent decisions.
+    linking decisions to sprints, stories, artifacts, parent decisions,
+    and trace links from the traceability system (Story 11.2).
 
     Attributes:
         sprint_id: Sprint identifier (optional)
         story_id: Story identifier (optional)
         artifact_id: Related artifact identifier (optional)
         parent_decision_id: ID of parent decision in a chain (optional)
+        trace_links: List of TraceLink IDs from traceability system (optional)
 
     Example:
         >>> context = DecisionContext(
         ...     sprint_id="sprint-1",
         ...     story_id="1-2-user-auth",
+        ...     trace_links=["link-001", "link-002"],
         ... )
         >>> context.sprint_id
         'sprint-1'
@@ -184,6 +187,7 @@ class DecisionContext:
     story_id: str | None = None
     artifact_id: str | None = None
     parent_decision_id: str | None = None
+    trace_links: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON output.
@@ -196,6 +200,7 @@ class DecisionContext:
             "story_id": self.story_id,
             "artifact_id": self.artifact_id,
             "parent_decision_id": self.parent_decision_id,
+            "trace_links": list(self.trace_links),
         }
 
 

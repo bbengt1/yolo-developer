@@ -168,7 +168,7 @@ development_status:
   # Epic 11: Audit Trail & Observability (8 stories)
   epic-11: in-progress
   11-1-decision-logging: done
-  11-2-requirement-traceability: backlog
+  11-2-requirement-traceability: review
   11-3-human-readable-audit-view: backlog
   11-4-audit-export: backlog
   11-5-cross-agent-correlation: backlog

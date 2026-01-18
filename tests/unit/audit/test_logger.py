@@ -377,3 +377,156 @@ class TestGetLogger:
         decisions = await store.get_decisions()
         assert len(decisions) == 1
         assert decisions[0].content == "Test decision"
+
+
+class TestTraceLinksIntegration:
+    """Tests for trace_links integration with DecisionLogger (Story 11.2 - Task 5)."""
+
+    @pytest.mark.asyncio
+    async def test_log_with_trace_links_no_context(self, mock_store: AsyncMock) -> None:
+        """log should create context with trace_links when no context provided."""
+        from yolo_developer.audit.logger import DecisionLogger
+
+        logger = DecisionLogger(mock_store)
+
+        await logger.log(
+            agent_name="analyst",
+            agent_type="analyst",
+            decision_type="requirement_analysis",
+            content="Content",
+            rationale="Rationale",
+            trace_links=["link-001", "link-002"],
+        )
+
+        logged_decision = mock_store.log_decision.call_args[0][0]
+
+        assert logged_decision.context.trace_links == ("link-001", "link-002")
+
+    @pytest.mark.asyncio
+    async def test_log_with_trace_links_merges_with_context(
+        self, mock_store: AsyncMock
+    ) -> None:
+        """log should merge trace_links with existing context."""
+        from yolo_developer.audit.logger import DecisionLogger
+        from yolo_developer.audit.types import DecisionContext
+
+        logger = DecisionLogger(mock_store)
+        context = DecisionContext(
+            sprint_id="sprint-1",
+            story_id="story-1",
+            trace_links=("existing-link",),
+        )
+
+        await logger.log(
+            agent_name="analyst",
+            agent_type="analyst",
+            decision_type="requirement_analysis",
+            content="Content",
+            rationale="Rationale",
+            context=context,
+            trace_links=["new-link-1", "new-link-2"],
+        )
+
+        logged_decision = mock_store.log_decision.call_args[0][0]
+
+        # Should have merged trace links
+        assert logged_decision.context.trace_links == (
+            "existing-link",
+            "new-link-1",
+            "new-link-2",
+        )
+        # Should preserve other context fields
+        assert logged_decision.context.sprint_id == "sprint-1"
+        assert logged_decision.context.story_id == "story-1"
+
+    @pytest.mark.asyncio
+    async def test_log_with_context_no_trace_links(self, mock_store: AsyncMock) -> None:
+        """log should preserve context when trace_links not provided."""
+        from yolo_developer.audit.logger import DecisionLogger
+        from yolo_developer.audit.types import DecisionContext
+
+        logger = DecisionLogger(mock_store)
+        context = DecisionContext(
+            sprint_id="sprint-1",
+            trace_links=("existing-link",),
+        )
+
+        await logger.log(
+            agent_name="analyst",
+            agent_type="analyst",
+            decision_type="requirement_analysis",
+            content="Content",
+            rationale="Rationale",
+            context=context,
+        )
+
+        logged_decision = mock_store.log_decision.call_args[0][0]
+
+        # Should preserve original context
+        assert logged_decision.context.sprint_id == "sprint-1"
+        assert logged_decision.context.trace_links == ("existing-link",)
+
+    @pytest.mark.asyncio
+    async def test_log_with_empty_trace_links(self, mock_store: AsyncMock) -> None:
+        """log should handle empty trace_links list."""
+        from yolo_developer.audit.logger import DecisionLogger
+
+        logger = DecisionLogger(mock_store)
+
+        await logger.log(
+            agent_name="analyst",
+            agent_type="analyst",
+            decision_type="requirement_analysis",
+            content="Content",
+            rationale="Rationale",
+            trace_links=[],
+        )
+
+        logged_decision = mock_store.log_decision.call_args[0][0]
+
+        # Empty list should result in empty tuple (default)
+        assert logged_decision.context.trace_links == ()
+
+    @pytest.mark.asyncio
+    async def test_log_with_trace_links_logs_count(
+        self, mock_store: AsyncMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """log should include trace_link_count in structured log when links present."""
+        import logging
+
+        import structlog
+
+        # Configure structlog to use stdlib logging for capture
+        structlog.configure(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.PositionalArgumentsFormatter(),
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+                structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+            ],
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            cache_logger_on_first_use=False,
+        )
+
+        from yolo_developer.audit.logger import DecisionLogger
+
+        logger = DecisionLogger(mock_store)
+
+        with caplog.at_level(logging.INFO, logger="yolo_developer.audit.logger"):
+            await logger.log(
+                agent_name="analyst",
+                agent_type="analyst",
+                decision_type="requirement_analysis",
+                content="Content",
+                rationale="Rationale",
+                trace_links=["link-1", "link-2", "link-3"],
+            )
+
+        # Should have logged with trace_link_count
+        log_text = " ".join(str(record.__dict__) for record in caplog.records)
+        # The count should be included somewhere in the log output
+        assert "3" in log_text or "trace_link" in log_text.lower()

@@ -87,6 +87,7 @@ class DecisionLogger:
         context: DecisionContext | None = None,
         metadata: dict[str, Any] | None = None,
         severity: DecisionSeverity = "info",
+        trace_links: list[str] | None = None,
     ) -> str:
         """Log a decision and return its ID.
 
@@ -102,6 +103,7 @@ class DecisionLogger:
             context: Optional context (sprint, story, etc.).
             metadata: Optional additional key-value data.
             severity: Decision importance level (default: "info").
+            trace_links: Optional list of TraceLink IDs from traceability system.
 
         Returns:
             The decision ID (UUID).
@@ -124,7 +126,23 @@ class DecisionLogger:
         )
 
         # Use provided context or create empty one
-        decision_context = context or DecisionContext()
+        # Merge trace_links into context if provided
+        if trace_links:
+            if context:
+                # Create new context with merged trace_links
+                existing_links = list(context.trace_links)
+                merged_links = tuple(existing_links + trace_links)
+                decision_context = DecisionContext(
+                    sprint_id=context.sprint_id,
+                    story_id=context.story_id,
+                    artifact_id=context.artifact_id,
+                    parent_decision_id=context.parent_decision_id,
+                    trace_links=merged_links,
+                )
+            else:
+                decision_context = DecisionContext(trace_links=tuple(trace_links))
+        else:
+            decision_context = context or DecisionContext()
 
         # Create decision
         decision = Decision(
@@ -152,15 +170,17 @@ class DecisionLogger:
             # Still return the decision_id - decision was created but may not be persisted
 
         # Emit structured log
-        _logger.info(
-            "decision_logged",
-            decision_id=decision_id,
-            agent_name=agent_name,
-            agent_type=agent_type,
-            decision_type=decision_type,
-            severity=severity,
-            content_preview=content[:100] if len(content) > 100 else content,
-        )
+        log_kwargs: dict[str, Any] = {
+            "decision_id": decision_id,
+            "agent_name": agent_name,
+            "agent_type": agent_type,
+            "decision_type": decision_type,
+            "severity": severity,
+            "content_preview": content[:100] if len(content) > 100 else content,
+        }
+        if decision_context.trace_links:
+            log_kwargs["trace_link_count"] = len(decision_context.trace_links)
+        _logger.info("decision_logged", **log_kwargs)
 
         return decision_id
 
