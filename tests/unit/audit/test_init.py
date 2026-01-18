@@ -1,8 +1,8 @@
-"""Tests for audit module exports (Story 11.1, 11.2, 11.3).
+"""Tests for audit module exports (Story 11.1, 11.2, 11.3, 11.4).
 
 Tests that the audit module exports all public types, protocols, and functions
-for decision logging (FR81), requirement traceability (FR82), and
-human-readable view (FR83).
+for decision logging (FR81), requirement traceability (FR82),
+human-readable view (FR83), and audit export (FR84).
 """
 
 from __future__ import annotations
@@ -126,6 +126,13 @@ class TestAuditModuleExports:
         assert audit_module.__doc__ is not None
         assert "FR83" in audit_module.__doc__
 
+    def test_module_docstring_mentions_fr84(self) -> None:
+        """Module docstring should reference FR84 (Story 11.4)."""
+        import yolo_developer.audit as audit_module
+
+        assert audit_module.__doc__ is not None
+        assert "FR84" in audit_module.__doc__
+
 
 class TestAuditModuleAll:
     """Tests for __all__ exports."""
@@ -185,6 +192,22 @@ class TestAuditModuleAll:
             # View service (Story 11.3)
             "AuditViewService",
             "get_audit_view_service",
+            # Export types (Story 11.4)
+            "ExportFormat",
+            "ExportOptions",
+            "RedactionConfig",
+            "VALID_EXPORT_FORMATS",
+            "DEFAULT_EXPORT_OPTIONS",
+            "DEFAULT_REDACTION_CONFIG",
+            # Export protocol (Story 11.4)
+            "AuditExporter",
+            # Exporters (Story 11.4)
+            "JsonAuditExporter",
+            "CsvAuditExporter",
+            "PdfAuditExporter",
+            # Export service (Story 11.4)
+            "AuditExportService",
+            "get_audit_export_service",
         ]
 
         for name in expected:
@@ -372,6 +395,110 @@ class TestHumanReadableViewExports:
         decision_store = InMemoryDecisionStore()
         traceability_store = InMemoryTraceabilityStore()
         service = get_audit_view_service(
+            decision_store=decision_store,
+            traceability_store=traceability_store,
+        )
+        assert service is not None
+
+
+class TestAuditExportExports:
+    """Tests for audit export exports (Story 11.4 - Task 7)."""
+
+    def test_exports_export_format(self) -> None:
+        """Should export ExportFormat."""
+        from yolo_developer.audit import ExportFormat
+
+        assert ExportFormat is not None
+
+    def test_exports_export_options(self) -> None:
+        """Should export ExportOptions."""
+        from yolo_developer.audit import ExportOptions
+
+        options = ExportOptions()
+        assert options is not None
+
+    def test_exports_redaction_config(self) -> None:
+        """Should export RedactionConfig."""
+        from yolo_developer.audit import RedactionConfig
+
+        config = RedactionConfig()
+        assert config is not None
+
+    def test_exports_valid_export_formats(self) -> None:
+        """Should export VALID_EXPORT_FORMATS constant."""
+        from yolo_developer.audit import VALID_EXPORT_FORMATS
+
+        assert isinstance(VALID_EXPORT_FORMATS, frozenset)
+        assert "json" in VALID_EXPORT_FORMATS
+        assert "csv" in VALID_EXPORT_FORMATS
+        assert "pdf" in VALID_EXPORT_FORMATS
+
+    def test_exports_default_export_options(self) -> None:
+        """Should export DEFAULT_EXPORT_OPTIONS constant."""
+        from yolo_developer.audit import DEFAULT_EXPORT_OPTIONS, ExportOptions
+
+        assert isinstance(DEFAULT_EXPORT_OPTIONS, ExportOptions)
+
+    def test_exports_default_redaction_config(self) -> None:
+        """Should export DEFAULT_REDACTION_CONFIG constant."""
+        from yolo_developer.audit import DEFAULT_REDACTION_CONFIG, RedactionConfig
+
+        assert isinstance(DEFAULT_REDACTION_CONFIG, RedactionConfig)
+
+    def test_exports_audit_exporter_protocol(self) -> None:
+        """Should export AuditExporter protocol."""
+        from yolo_developer.audit import AuditExporter
+
+        assert AuditExporter is not None
+
+    def test_exports_json_audit_exporter(self) -> None:
+        """Should export JsonAuditExporter."""
+        from yolo_developer.audit import JsonAuditExporter
+
+        exporter = JsonAuditExporter()
+        assert exporter is not None
+
+    def test_exports_csv_audit_exporter(self) -> None:
+        """Should export CsvAuditExporter."""
+        from yolo_developer.audit import CsvAuditExporter
+
+        exporter = CsvAuditExporter()
+        assert exporter is not None
+
+    def test_exports_pdf_audit_exporter(self) -> None:
+        """Should export PdfAuditExporter."""
+        from yolo_developer.audit import PdfAuditExporter
+
+        exporter = PdfAuditExporter()
+        assert exporter is not None
+
+    def test_exports_audit_export_service(self) -> None:
+        """Should export AuditExportService."""
+        from yolo_developer.audit import (
+            AuditExportService,
+            InMemoryDecisionStore,
+            InMemoryTraceabilityStore,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        service = AuditExportService(
+            decision_store=decision_store,
+            traceability_store=traceability_store,
+        )
+        assert service is not None
+
+    def test_exports_get_audit_export_service(self) -> None:
+        """Should export get_audit_export_service factory function."""
+        from yolo_developer.audit import (
+            InMemoryDecisionStore,
+            InMemoryTraceabilityStore,
+            get_audit_export_service,
+        )
+
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        service = get_audit_export_service(
             decision_store=decision_store,
             traceability_store=traceability_store,
         )

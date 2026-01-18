@@ -170,7 +170,7 @@ development_status:
   11-1-decision-logging: done
   11-2-requirement-traceability: done
   11-3-human-readable-audit-view: done
-  11-4-audit-export: backlog
+  11-4-audit-export: done
   11-5-cross-agent-correlation: backlog
   11-6-token-cost-tracking: backlog
   11-7-audit-filtering: backlog
