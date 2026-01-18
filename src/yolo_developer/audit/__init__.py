@@ -6,6 +6,7 @@ This module provides functionality for:
 - Viewing audit trail in human-readable format (FR83: Story 11.3)
 - Exporting audit trail for compliance reporting (FR84: Story 11.4)
 - Correlating decisions across agent boundaries (FR85: Story 11.5)
+- Tracking token usage and costs per operation (FR86: Story 11.6)
 
 Components:
     Decision Logging (Story 11.1):
@@ -40,6 +41,13 @@ Components:
         - Store protocol: CorrelationStore for pluggable correlation backends
         - In-memory store: InMemoryCorrelationStore for testing
         - Service: CorrelationService for correlating decisions across agents
+
+    Token/Cost Tracking (Story 11.6):
+        - Cost types: TokenUsage, CostRecord, CostAggregation
+        - Store protocol: CostStore for pluggable cost storage backends
+        - In-memory store: InMemoryCostStore for testing and single-session use
+        - Service: CostTrackingService for recording and querying LLM costs
+        - LiteLLM utilities: extract_token_usage, extract_cost, calculate_cost_if_missing
 
 Example (Decision Logging):
     >>> from yolo_developer.audit import (
@@ -145,12 +153,40 @@ Example (Cross-Agent Correlation):
     >>> # Get timeline view
     >>> timeline = await service.get_timeline_view(session_id="session-123")
 
+Example (Token/Cost Tracking):
+    >>> from yolo_developer.audit import (
+    ...     CostTrackingService,
+    ...     InMemoryCostStore,
+    ...     get_cost_tracking_service,
+    ...     extract_token_usage,
+    ...     extract_cost,
+    ... )
+    >>>
+    >>> # Create store and service
+    >>> cost_store = InMemoryCostStore()
+    >>> service = get_cost_tracking_service(cost_store)
+    >>>
+    >>> # Record an LLM call
+    >>> record = await service.record_llm_call(
+    ...     model="gpt-4o-mini",
+    ...     tier="routine",
+    ...     prompt_tokens=100,
+    ...     completion_tokens=50,
+    ...     cost_usd=0.0015,
+    ...     agent_name="analyst",
+    ...     session_id="session-123",
+    ... )
+    >>>
+    >>> # Get cost breakdown by agent
+    >>> agent_costs = await service.get_agent_costs()
+
 References:
     - FR81: System can log all agent decisions with rationale
     - FR82: System can generate decision traceability from requirement to code
     - FR83: Users can view audit trail in human-readable format
     - FR84: System can export audit trail for compliance reporting
     - FR85: System can correlate decisions across agent boundaries
+    - FR86: System can track token usage and cost per operation
     - ADR-001: TypedDict for graph state, frozen dataclasses for internal types
 """
 
@@ -179,6 +215,38 @@ from yolo_developer.audit.correlation_types import (
     CorrelationType,
     DecisionChain,
     TimelineEntry,
+)
+
+# Cost tracking in-memory store
+from yolo_developer.audit.cost_memory_store import InMemoryCostStore
+
+# Cost tracking service
+from yolo_developer.audit.cost_service import (
+    CostTrackingService,
+    get_cost_tracking_service,
+)
+
+# Cost store protocol
+from yolo_developer.audit.cost_store import (
+    CostFilters,
+    CostStore,
+)
+
+# Cost tracking types
+from yolo_developer.audit.cost_types import (
+    VALID_GROUPBY_VALUES,
+    VALID_TIER_VALUES,
+    CostAggregation,
+    CostGroupBy,
+    CostRecord,
+    TokenUsage,
+)
+
+# Cost tracking utilities
+from yolo_developer.audit.cost_utils import (
+    calculate_cost_if_missing,
+    extract_cost,
+    extract_token_usage,
 )
 
 # CSV exporter
@@ -294,7 +362,9 @@ __all__ = [
     "VALID_DECISION_TYPES",
     "VALID_EXPORT_FORMATS",
     "VALID_FORMATTER_STYLES",
+    "VALID_GROUPBY_VALUES",
     "VALID_LINK_TYPES",
+    "VALID_TIER_VALUES",
     # Types
     "AgentIdentity",
     "AgentTransition",
@@ -310,6 +380,12 @@ __all__ = [
     "CorrelationService",
     "CorrelationStore",
     "CorrelationType",
+    "CostAggregation",
+    "CostFilters",
+    "CostGroupBy",
+    "CostRecord",
+    "CostStore",
+    "CostTrackingService",
     "CsvAuditExporter",
     "Decision",
     "DecisionChain",
@@ -324,6 +400,7 @@ __all__ = [
     "FormatOptions",
     "FormatterStyle",
     "InMemoryCorrelationStore",
+    "InMemoryCostStore",
     "InMemoryDecisionStore",
     "InMemoryTraceabilityStore",
     "JsonAuditExporter",
@@ -333,14 +410,19 @@ __all__ = [
     "RedactionConfig",
     "RichAuditFormatter",
     "TimelineEntry",
+    "TokenUsage",
     "TraceLink",
     "TraceabilityService",
     "TraceabilityStore",
     "TraceableArtifact",
     # Factory functions
+    "calculate_cost_if_missing",
+    "extract_cost",
+    "extract_token_usage",
     "get_audit_export_service",
     "get_audit_view_service",
     "get_correlation_service",
+    "get_cost_tracking_service",
     "get_logger",
     "get_traceability_service",
 ]
