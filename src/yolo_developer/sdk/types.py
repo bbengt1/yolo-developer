@@ -1,4 +1,4 @@
-"""SDK-specific type definitions (Stories 13.1, 13.4, 13.5).
+"""SDK-specific type definitions (Stories 13.1, 13.4, 13.5, 13.6).
 
 This module provides type definitions for SDK operation results,
 enabling full type safety for SDK consumers.
@@ -16,18 +16,156 @@ References:
     - AC3: Complete type hints for all SDK operations
     - Story 13.4: Configuration API types
     - Story 13.5: Agent hooks
+    - Story 13.6: Event emission
 """
 
 from __future__ import annotations
 
+from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum, auto
 from typing import Any, Literal, Protocol, runtime_checkable
 
 
 def _utc_now() -> datetime:
     """Return current UTC datetime for default factory."""
     return datetime.now(timezone.utc)
+
+
+# =============================================================================
+# Event Types (Story 13.6)
+# =============================================================================
+
+
+class EventType(Enum):
+    """Types of events emitted by YOLO Developer during workflow execution.
+
+    Events are emitted at key points during workflow execution, allowing
+    external integrations to react to workflow progress and state changes.
+
+    Event Types:
+        WORKFLOW_START: Emitted when workflow execution begins.
+        WORKFLOW_END: Emitted when workflow execution completes (success or failure).
+        AGENT_START: Emitted before an agent begins execution.
+        AGENT_END: Emitted after an agent completes execution.
+        GATE_PASS: Emitted when a quality gate evaluation passes.
+        GATE_FAIL: Emitted when a quality gate evaluation fails.
+        ERROR: Emitted when an error occurs during workflow execution.
+
+    Example:
+        >>> from yolo_developer.sdk.types import EventType
+        >>>
+        >>> # Subscribe to specific event types
+        >>> client.subscribe(callback, event_types=[EventType.AGENT_START, EventType.AGENT_END])
+        >>>
+        >>> # Subscribe to all events
+        >>> client.subscribe(callback)  # event_types=None means all
+    """
+
+    WORKFLOW_START = auto()
+    WORKFLOW_END = auto()
+    AGENT_START = auto()
+    AGENT_END = auto()
+    GATE_PASS = auto()
+    GATE_FAIL = auto()
+    ERROR = auto()
+
+
+@dataclass(frozen=True)
+class EventData:
+    """Immutable event data emitted during workflow execution.
+
+    EventData is passed to subscriber callbacks when events occur. It contains
+    the event type, timestamp, optional agent name, and additional context data.
+
+    Attributes:
+        event_type: The type of event that occurred.
+        timestamp: When the event occurred (UTC timezone-aware).
+        agent: The agent associated with the event, or None for workflow-level events.
+        data: Additional event-specific data (e.g., seed_id, workflow_id, error details).
+
+    Note:
+        While EventData is a frozen dataclass (immutable), it contains a `data` dict
+        field which makes instances unhashable. EventData cannot be used as dict keys
+        or in sets. This is intentional to allow flexible event data without copying.
+
+    Example:
+        >>> def on_event(event: EventData) -> None:
+        ...     print(f"[{event.timestamp}] {event.event_type.name}")
+        ...     if event.agent:
+        ...         print(f"  Agent: {event.agent}")
+        ...     if event.data:
+        ...         print(f"  Data: {event.data}")
+        >>>
+        >>> # Event data for AGENT_START
+        >>> event = EventData(
+        ...     event_type=EventType.AGENT_START,
+        ...     agent="analyst",
+        ...     data={"context": "processing seed"}
+        ... )
+    """
+
+    event_type: EventType
+    timestamp: datetime = field(default_factory=_utc_now)
+    agent: str | None = None
+    data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EventSubscription:
+    """Registration record for an event subscription.
+
+    Attributes:
+        subscription_id: Unique identifier for this subscription.
+        event_types: List of event types this subscription listens for, or None for all.
+        callback: The callback function to invoke when matching events occur.
+        timestamp: When the subscription was created.
+
+    Example:
+        >>> subscriptions = client.list_subscriptions()
+        >>> for sub in subscriptions:
+        ...     types = sub.event_types or ["ALL"]
+        ...     print(f"Subscription {sub.subscription_id}: {types}")
+    """
+
+    subscription_id: str
+    event_types: list[EventType] | None
+    callback: EventCallback
+    timestamp: datetime = field(default_factory=_utc_now)
+
+
+@runtime_checkable
+class EventCallback(Protocol):
+    """Protocol for event callbacks (sync or async).
+
+    Event callbacks receive an EventData object when subscribed events occur.
+    Callbacks can be either synchronous or asynchronous functions.
+
+    Example:
+        >>> # Sync callback
+        >>> def on_event(event: EventData) -> None:
+        ...     print(f"Event: {event.event_type.name}")
+        >>>
+        >>> # Async callback
+        >>> async def on_event_async(event: EventData) -> None:
+        ...     await log_event(event)
+        >>>
+        >>> # Both are valid EventCallback implementations
+        >>> client.subscribe(on_event)
+        >>> client.subscribe(on_event_async)
+    """
+
+    def __call__(self, event: EventData) -> None | Coroutine[Any, Any, None]:
+        """Handle an event.
+
+        Args:
+            event: The event data containing type, timestamp, agent, and data.
+
+        Returns:
+            None for sync callbacks, or a coroutine for async callbacks.
+        """
+        ...
 
 
 # =============================================================================

@@ -191,13 +191,13 @@ development_status:
   epic-12-retrospective: optional
 
   # Epic 13: Python SDK (6 stories)
-  epic-13: in-progress
+  epic-13: done
   13-1-sdk-client-class: done
   13-2-programmatic-init-seed-run: done
   13-3-audit-trail-access: done
   13-4-configuration-api: done
   13-5-agent-hooks: done
-  13-6-event-emission: backlog
+  13-6-event-emission: done
   epic-13-retrospective: optional
 
   # Epic 14: MCP Integration (6 stories)

@@ -1,4 +1,4 @@
-"""SDK-specific exception hierarchy (Stories 13.1, 13.5).
+"""SDK-specific exception hierarchy (Stories 13.1, 13.5, 13.6).
 
 This module provides SDK-specific exception types that wrap and enhance
 underlying errors with helpful messages while preserving the original
@@ -20,6 +20,7 @@ References:
     - FR106-FR111: Python SDK requirements
     - AC5: SDK-specific exceptions with helpful error messages
     - Story 13.5: Agent hooks and HookExecutionError
+    - Story 13.6: Event emission and EventCallbackError
 """
 
 from __future__ import annotations
@@ -310,3 +311,46 @@ class HookExecutionError(SDKError):
         self.hook_id = hook_id
         self.agent = agent
         self.phase = phase
+
+
+class EventCallbackError(SDKError):
+    """Raised when an event callback execution fails.
+
+    This error is raised when a registered event callback raises an exception
+    during event emission. Callback errors are logged and recorded but do not
+    block workflow execution or prevent other callbacks from receiving the event.
+
+    Attributes:
+        subscription_id: The ID of the subscription whose callback failed.
+        event_type: The type of event that was being emitted.
+
+    Example:
+        >>> # Callbacks don't block workflow, but you can inspect failures
+        >>> def faulty_callback(event: EventData) -> None:
+        ...     raise ValueError("Something went wrong")
+        >>>
+        >>> # The callback error is logged but workflow continues
+        >>> # You can check logs for EventCallbackError details
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        subscription_id: str | None = None,
+        event_type: str | None = None,
+        original_error: Exception | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize EventCallbackError.
+
+        Args:
+            message: Human-readable error description.
+            subscription_id: The ID of the subscription whose callback failed.
+            event_type: The type of event that was being emitted.
+            original_error: The underlying exception that caused this error.
+            details: Additional context about the error.
+        """
+        super().__init__(message, original_error=original_error, details=details)
+        self.subscription_id = subscription_id
+        self.event_type = event_type

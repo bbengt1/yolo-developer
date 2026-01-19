@@ -1,4 +1,4 @@
-"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2, 13.3, 13.5).
+"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2, 13.3, 13.5, 13.6).
 
 This module provides the main YoloClient class that serves as the
 primary entry point for programmatic access to YOLO Developer.
@@ -16,6 +16,12 @@ Example:
     >>> from yolo_developer.config import YoloConfig
     >>> config = YoloConfig(project_name="my-project")
     >>> client = YoloClient(config=config)
+    >>>
+    >>> # Subscribe to events (Story 13.6)
+    >>> from yolo_developer.sdk.types import EventData, EventType
+    >>> def on_event(event: EventData) -> None:
+    ...     print(f"Event: {event.event_type.name}")
+    >>> client.subscribe(on_event, event_types=[EventType.AGENT_START])
 
 References:
     - FR106: Developers can initialize projects programmatically via SDK
@@ -23,6 +29,7 @@ References:
     - FR108: Developers can access audit trail data via SDK
     - FR109: Developers can configure all project settings via SDK
     - FR110: Developers can extend agent behavior via SDK hooks
+    - FR111: SDK can emit events for custom integrations
     - AC1: YoloClient instantiation with configuration
     - AC2: Full functionality access
 """
@@ -51,6 +58,9 @@ from yolo_developer.sdk.types import (
     ConfigUpdateResult,
     ConfigValidationIssue,
     ConfigValidationResult,
+    EventCallback,
+    EventSubscription,
+    EventType,
     HookRegistration,
     HookResult,
     InitResult,
@@ -156,6 +166,7 @@ class YoloClient:
         """
         self._project_path = Path(project_path) if project_path else Path.cwd()
         self._hooks: dict[str, HookRegistration] = {}  # hook_id -> registration
+        self._subscriptions: dict[str, EventSubscription] = {}  # sub_id -> subscription
 
         try:
             if config is not None:
@@ -990,6 +1001,12 @@ memory:
         agents_executed: list[str] = []
         errors: list[str] = []
 
+        # Emit WORKFLOW_START event (Story 13.6)
+        await self._emit_event(
+            EventType.WORKFLOW_START,
+            data={"workflow_id": workflow_id, "seed_id": seed_id},
+        )
+
         try:
             # Import orchestrator components
             from yolo_developer.orchestrator import (
@@ -1002,11 +1019,32 @@ memory:
             if seed_content:
                 seed_result = await self.seed_async(content=seed_content)
                 if seed_result.status == "rejected":
+                    # Emit GATE_FAIL event for seed quality gate failure (Story 13.6 AC3)
+                    await self._emit_event(
+                        EventType.GATE_FAIL,
+                        data={
+                            "workflow_id": workflow_id,
+                            "gate": "seed_quality",
+                            "seed_id": seed_result.seed_id,
+                            "quality_score": seed_result.quality_score,
+                            "reason": "Seed quality below threshold",
+                        },
+                    )
                     raise WorkflowExecutionError(
                         "Seed was rejected",
                         workflow_id=workflow_id,
                         details={"seed_id": seed_result.seed_id},
                     )
+                # Emit GATE_PASS event for seed quality gate success (Story 13.6 AC3)
+                await self._emit_event(
+                    EventType.GATE_PASS,
+                    data={
+                        "workflow_id": workflow_id,
+                        "gate": "seed_quality",
+                        "seed_id": seed_result.seed_id,
+                        "quality_score": seed_result.quality_score,
+                    },
+                )
 
             # Create workflow config
             workflow_config = WorkflowConfig(
@@ -1023,6 +1061,14 @@ memory:
             # Note: Per-agent hooks require orchestrator-level integration.
             # Currently hooks fire at workflow boundaries (start/end).
             entry_agent = workflow_config.entry_point
+
+            # Emit AGENT_START event (Story 13.6)
+            await self._emit_event(
+                EventType.AGENT_START,
+                agent=entry_agent,
+                data={"workflow_id": workflow_id},
+            )
+
             pre_modifications, _pre_results = await self._execute_pre_hooks(
                 entry_agent, dict(initial_state)
             )
@@ -1053,6 +1099,13 @@ memory:
                 # Post-hooks can modify the workflow output
                 workflow_output = post_modifications
 
+            # Emit AGENT_END event (Story 13.6)
+            await self._emit_event(
+                EventType.AGENT_END,
+                agent=last_agent,
+                data={"workflow_id": workflow_id, "output": workflow_output},
+            )
+
             # Extract results from final state
             # Note: YoloState has messages, current_agent, handoff_context, decisions
             # Workflow execution details would be derived from these
@@ -1065,12 +1118,34 @@ memory:
 
             duration = time.time() - start_time
 
+            # Emit GATE_PASS event for successful workflow completion (Story 13.6 AC3)
+            await self._emit_event(
+                EventType.GATE_PASS,
+                data={
+                    "workflow_id": workflow_id,
+                    "gate": "workflow_completion",
+                    "agents_executed": agents_executed,
+                    "duration_seconds": duration,
+                },
+            )
+
             logger.info(
                 "workflow_completed",
                 workflow_id=workflow_id,
                 agents_executed=agents_executed,
                 stories_completed=stories_completed,
                 duration_seconds=duration,
+            )
+
+            # Emit WORKFLOW_END event (Story 13.6)
+            await self._emit_event(
+                EventType.WORKFLOW_END,
+                data={
+                    "workflow_id": workflow_id,
+                    "status": "completed",
+                    "agents_executed": agents_executed,
+                    "duration_seconds": duration,
+                },
             )
 
             return RunResult(
@@ -1086,6 +1161,11 @@ memory:
             )
 
         except (ClientNotInitializedError, SDKError):
+            # Emit ERROR event for SDK errors (Story 13.6)
+            await self._emit_event(
+                EventType.ERROR,
+                data={"workflow_id": workflow_id, "error_type": "sdk_error"},
+            )
             raise
         except Exception as e:
             duration = time.time() - start_time
@@ -1097,6 +1177,16 @@ memory:
                 workflow_id=workflow_id,
                 error=error_msg,
                 duration_seconds=duration,
+            )
+
+            # Emit ERROR event (Story 13.6)
+            await self._emit_event(
+                EventType.ERROR,
+                data={
+                    "workflow_id": workflow_id,
+                    "error": error_msg,
+                    "duration_seconds": duration,
+                },
             )
 
             raise WorkflowExecutionError(
@@ -1469,6 +1559,111 @@ memory:
         return sorted(self._hooks.values(), key=lambda h: h.timestamp)
 
     # =========================================================================
+    # Event Subscription (Story 13.6)
+    # =========================================================================
+
+    def subscribe(
+        self,
+        callback: EventCallback,
+        event_types: list[EventType] | None = None,
+    ) -> str:
+        """Subscribe to workflow events.
+
+        Registers a callback to receive events during workflow execution.
+        Callbacks can be sync or async functions that receive an EventData object.
+
+        Args:
+            callback: Function to call when matching events occur. Signature is
+                `(event: EventData) -> None` for sync or
+                `async (event: EventData) -> None` for async.
+            event_types: List of event types to subscribe to. If None, subscribes
+                to all event types.
+
+        Returns:
+            Subscription ID string that can be used to unsubscribe.
+
+        Example:
+            >>> # Sync callback for specific events
+            >>> def on_agent_start(event: EventData) -> None:
+            ...     print(f"Agent {event.agent} starting")
+            >>>
+            >>> sub_id = client.subscribe(
+            ...     on_agent_start,
+            ...     event_types=[EventType.AGENT_START],
+            ... )
+            >>>
+            >>> # Async callback for all events
+            >>> async def log_all(event: EventData) -> None:
+            ...     await save_to_db(event)
+            >>>
+            >>> sub_id = client.subscribe(log_all)  # All events
+        """
+        import uuid
+        from datetime import datetime, timezone
+
+        subscription_id = f"sub-{uuid.uuid4().hex[:8]}"
+
+        subscription = EventSubscription(
+            subscription_id=subscription_id,
+            event_types=event_types,
+            callback=callback,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        self._subscriptions[subscription_id] = subscription
+
+        event_type_names = (
+            [et.name for et in event_types] if event_types else ["ALL"]
+        )
+        logger.info(
+            "event_subscription_created",
+            subscription_id=subscription_id,
+            event_types=event_type_names,
+        )
+
+        return subscription_id
+
+    def unsubscribe(self, subscription_id: str) -> bool:
+        """Unsubscribe from workflow events.
+
+        Removes the subscription so the callback won't receive further events.
+
+        Args:
+            subscription_id: The subscription ID returned from subscribe().
+
+        Returns:
+            True if the subscription was found and removed, False if not found.
+
+        Example:
+            >>> sub_id = client.subscribe(my_callback)
+            >>> # ... later ...
+            >>> client.unsubscribe(sub_id)
+            True
+        """
+        if subscription_id in self._subscriptions:
+            del self._subscriptions[subscription_id]
+            logger.info("event_subscription_removed", subscription_id=subscription_id)
+            return True
+        return False
+
+    def list_subscriptions(self) -> list[EventSubscription]:
+        """List all active event subscriptions.
+
+        Returns a list of all currently registered subscriptions, sorted by
+        creation time (oldest first).
+
+        Returns:
+            List of EventSubscription objects.
+
+        Example:
+            >>> subscriptions = client.list_subscriptions()
+            >>> for sub in subscriptions:
+            ...     types = [et.name for et in sub.event_types] if sub.event_types else ["ALL"]
+            ...     print(f"{sub.subscription_id}: {types}")
+        """
+        return sorted(self._subscriptions.values(), key=lambda s: s.timestamp)
+
+    # =========================================================================
     # Hook Execution (Story 13.5)
     # =========================================================================
 
@@ -1633,3 +1828,69 @@ memory:
                 )
 
         return final_modifications, results
+
+    # =========================================================================
+    # Event Emission (Story 13.6)
+    # =========================================================================
+
+    async def _emit_event(
+        self,
+        event_type: EventType,
+        agent: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        """Emit an event to all matching subscribers.
+
+        Finds all subscriptions that match the event type and invokes their
+        callbacks. Supports both sync and async callbacks. Errors in callbacks
+        are logged but don't block other callbacks or workflow execution.
+
+        Args:
+            event_type: The type of event to emit.
+            agent: Optional agent name associated with the event.
+            data: Optional additional event data.
+        """
+        import asyncio
+        from datetime import datetime, timezone
+
+        from yolo_developer.sdk.types import EventData
+
+        event = EventData(
+            event_type=event_type,
+            timestamp=datetime.now(timezone.utc),
+            agent=agent,
+            data=data or {},
+        )
+
+        # Find matching subscriptions
+        matching_subs = [
+            sub
+            for sub in self.list_subscriptions()
+            if sub.event_types is None or event_type in sub.event_types
+        ]
+
+        for subscription in matching_subs:
+            try:
+                # Check if callback is async or sync
+                if asyncio.iscoroutinefunction(subscription.callback):
+                    await subscription.callback(event)
+                else:
+                    subscription.callback(event)
+
+                logger.debug(
+                    "event_callback_executed",
+                    subscription_id=subscription.subscription_id,
+                    event_type=event_type.name,
+                    agent=agent,
+                )
+
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(
+                    "event_callback_failed",
+                    subscription_id=subscription.subscription_id,
+                    event_type=event_type.name,
+                    agent=agent,
+                    error=error_msg,
+                )
+                # Continue to next callback - don't block workflow

@@ -1,4 +1,4 @@
-"""Unit tests for YoloClient class (Story 13.1).
+"""Unit tests for YoloClient class (Stories 13.1, 13.5, 13.6).
 
 Tests cover:
 - Client initialization with various configurations
@@ -6,12 +6,16 @@ Tests cover:
 - Core client methods (init, seed, run, status, get_audit)
 - Error handling and exceptions
 - Type hints verification
+- Agent hooks (Story 13.5)
+- Event emission (Story 13.6)
 """
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,6 +27,7 @@ from yolo_developer.sdk.exceptions import (
     ProjectNotFoundError,
     SDKError,
     SeedValidationError,
+    WorkflowExecutionError,
 )
 from yolo_developer.sdk.types import (
     InitResult,
@@ -1092,7 +1097,7 @@ class TestYoloClientHookRegistration:
         def my_hook(agent: str, state: dict) -> dict | None:
             return None
 
-        hook_id = client.register_hook(agent="*", phase="pre", callback=my_hook)
+        client.register_hook(agent="*", phase="pre", callback=my_hook)
 
         hooks = client.list_hooks()
         assert hooks[0].agent == "*"
@@ -1121,7 +1126,7 @@ class TestYoloClientHookRegistration:
         def my_hook(agent: str, state: dict, output: dict) -> dict | None:
             return None
 
-        hook_id = client.register_hook(agent="dev", phase="post", callback=my_hook)
+        client.register_hook(agent="dev", phase="post", callback=my_hook)
 
         hooks = client.list_hooks()
         assert hooks[0].phase == "post"
@@ -1190,7 +1195,7 @@ class TestYoloClientPreHookExecution:
 
         client.register_hook(agent="analyst", phase="pre", callback=my_hook)
 
-        modifications, results = await client._execute_pre_hooks(
+        _modifications, _results = await client._execute_pre_hooks(
             "analyst", {"existing": "data"}
         )
 
@@ -1246,7 +1251,7 @@ class TestYoloClientPreHookExecution:
         client.register_hook(agent="analyst", phase="pre", callback=hook1)
         client.register_hook(agent="analyst", phase="pre", callback=hook2)
 
-        modifications, results = await client._execute_pre_hooks("analyst", {})
+        modifications, _results = await client._execute_pre_hooks("analyst", {})
 
         assert order == ["hook1", "hook2"]
         # Modifications should be merged
@@ -1286,7 +1291,7 @@ class TestYoloClientPostHookExecution:
 
         client.register_hook(agent="analyst", phase="post", callback=my_hook)
 
-        modifications, results = await client._execute_post_hooks(
+        _modifications, _results = await client._execute_post_hooks(
             "analyst", {"input": "state"}, {"agent": "output"}
         )
 
@@ -1305,7 +1310,7 @@ class TestYoloClientPostHookExecution:
 
         client.register_hook(agent="analyst", phase="post", callback=modify_output)
 
-        modifications, results = await client._execute_post_hooks(
+        modifications, _results = await client._execute_post_hooks(
             "analyst", {}, {"original": "data"}
         )
 
@@ -1342,7 +1347,7 @@ class TestYoloClientPostHookExecution:
         client.register_hook(agent="analyst", phase="post", callback=hook1)
         client.register_hook(agent="analyst", phase="post", callback=hook2)
 
-        modifications, results = await client._execute_post_hooks(
+        modifications, _results = await client._execute_post_hooks(
             "analyst", {}, {"original": True}
         )
 
@@ -1384,7 +1389,7 @@ class TestYoloClientHookTypeSafety:
         def my_hook(agent: str, state: dict) -> dict | None:
             return None
 
-        hook_id = client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+        client.register_hook(agent="analyst", phase="pre", callback=my_hook)
         hooks = client.list_hooks()
 
         assert len(hooks) == 1
@@ -1417,7 +1422,7 @@ class TestYoloClientHookErrorHandling:
         client.register_hook(agent="analyst", phase="pre", callback=failing_hook)
         client.register_hook(agent="analyst", phase="pre", callback=succeeding_hook)
 
-        modifications, results = await client._execute_pre_hooks("analyst", {})
+        modifications, _results = await client._execute_pre_hooks("analyst", {})
 
         # Second hook should still be called
         assert len(hook2_called) == 1
@@ -1434,7 +1439,7 @@ class TestYoloClientHookErrorHandling:
 
         client.register_hook(agent="analyst", phase="pre", callback=failing_hook)
 
-        modifications, results = await client._execute_pre_hooks("analyst", {})
+        _modifications, results = await client._execute_pre_hooks("analyst", {})
 
         assert len(results) == 1
         assert results[0].success is False
@@ -1456,7 +1461,7 @@ class TestYoloClientHookErrorHandling:
         client.register_hook(agent="analyst", phase="post", callback=failing_hook)
         client.register_hook(agent="analyst", phase="post", callback=succeeding_hook)
 
-        modifications, results = await client._execute_post_hooks(
+        _modifications, results = await client._execute_post_hooks(
             "analyst", {}, {"original": True}
         )
 
@@ -1776,3 +1781,841 @@ class TestYoloClientHookIntegration:
         # Verify injected data was passed to workflow
         assert len(captured_state) == 1
         assert captured_state[0].get("custom_context") == "injected_value"
+
+
+# ============================================================================
+# Event Emission Tests (Story 13.6)
+# ============================================================================
+
+
+class TestYoloClientEventTypes:
+    """Tests for event type definitions (AC1)."""
+
+    def test_event_type_enum_values(self) -> None:
+        """Test EventType enum defines all required event categories."""
+        from yolo_developer.sdk.types import EventType
+
+        # Verify all required event types exist
+        assert hasattr(EventType, "WORKFLOW_START")
+        assert hasattr(EventType, "WORKFLOW_END")
+        assert hasattr(EventType, "AGENT_START")
+        assert hasattr(EventType, "AGENT_END")
+        assert hasattr(EventType, "GATE_PASS")
+        assert hasattr(EventType, "GATE_FAIL")
+        assert hasattr(EventType, "ERROR")
+
+    def test_event_data_structure(self) -> None:
+        """Test EventData dataclass has all required fields."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        event = EventData(
+            event_type=EventType.AGENT_START,
+            agent="analyst",
+            data={"context": "test"},
+        )
+
+        assert event.event_type == EventType.AGENT_START
+        assert event.agent == "analyst"
+        assert event.data == {"context": "test"}
+        assert event.timestamp is not None
+        assert event.timestamp.tzinfo is not None  # Timezone-aware
+
+    def test_event_data_is_frozen(self) -> None:
+        """Test EventData is immutable (frozen dataclass)."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        event = EventData(event_type=EventType.WORKFLOW_START)
+
+        with pytest.raises(AttributeError):
+            event.agent = "new_agent"  # type: ignore[misc]
+
+    def test_event_data_defaults(self) -> None:
+        """Test EventData has sensible defaults."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        event = EventData(event_type=EventType.ERROR)
+
+        assert event.agent is None
+        assert event.data == {}
+        assert event.timestamp is not None
+
+    def test_event_callback_error_type(self) -> None:
+        """Test EventCallbackError is available and has expected attributes."""
+        from yolo_developer.sdk.exceptions import EventCallbackError
+
+        error = EventCallbackError(
+            "Callback failed",
+            subscription_id="sub-123",
+            event_type="AGENT_START",
+        )
+
+        assert error.subscription_id == "sub-123"
+        assert error.event_type == "AGENT_START"
+        assert str(error) == "Callback failed"
+
+
+class TestYoloClientEventSubscription:
+    """Tests for event subscription (AC2)."""
+
+    def test_subscribe_returns_subscription_id(self, tmp_path: Path) -> None:
+        """Test subscribe returns a unique subscription ID."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        sub_id = client.subscribe(my_callback)
+
+        assert sub_id.startswith("sub-")
+        assert len(sub_id) > 4
+
+    def test_subscribe_stores_subscription(self, tmp_path: Path) -> None:
+        """Test subscribe stores the subscription."""
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        sub_id = client.subscribe(
+            my_callback, event_types=[EventType.AGENT_START]
+        )
+
+        subscriptions = client.list_subscriptions()
+        assert len(subscriptions) == 1
+        assert subscriptions[0].subscription_id == sub_id
+        assert subscriptions[0].event_types == [EventType.AGENT_START]
+
+    def test_subscribe_all_events(self, tmp_path: Path) -> None:
+        """Test subscribe with event_types=None subscribes to all events."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        client.subscribe(my_callback)
+
+        subscriptions = client.list_subscriptions()
+        assert subscriptions[0].event_types is None
+
+    def test_subscribe_multiple_event_types(self, tmp_path: Path) -> None:
+        """Test subscribing to multiple event types."""
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        client.subscribe(
+            my_callback,
+            event_types=[EventType.AGENT_START, EventType.AGENT_END],
+        )
+
+        subscriptions = client.list_subscriptions()
+        assert subscriptions[0].event_types == [
+            EventType.AGENT_START,
+            EventType.AGENT_END,
+        ]
+
+    def test_multiple_callbacks_same_event(self, tmp_path: Path) -> None:
+        """Test multiple callbacks can subscribe to the same event type."""
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def callback1(event: Any) -> None:
+            pass
+
+        def callback2(event: Any) -> None:
+            pass
+
+        sub_id1 = client.subscribe(callback1, event_types=[EventType.AGENT_START])
+        sub_id2 = client.subscribe(callback2, event_types=[EventType.AGENT_START])
+
+        subscriptions = client.list_subscriptions()
+        assert len(subscriptions) == 2
+        assert sub_id1 != sub_id2
+
+
+class TestYoloClientEventUnsubscription:
+    """Tests for event unsubscription (AC4)."""
+
+    def test_unsubscribe_removes_subscription(self, tmp_path: Path) -> None:
+        """Test unsubscribe removes the subscription."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        sub_id = client.subscribe(my_callback)
+        assert len(client.list_subscriptions()) == 1
+
+        result = client.unsubscribe(sub_id)
+
+        assert result is True
+        assert len(client.list_subscriptions()) == 0
+
+    def test_unsubscribe_not_found(self, tmp_path: Path) -> None:
+        """Test unsubscribe returns False for non-existent subscription."""
+        client = YoloClient(project_path=tmp_path)
+
+        result = client.unsubscribe("sub-nonexistent")
+
+        assert result is False
+
+    def test_list_subscriptions_reflects_removal(self, tmp_path: Path) -> None:
+        """Test list_subscriptions reflects subscription removal."""
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def callback1(event: Any) -> None:
+            pass
+
+        def callback2(event: Any) -> None:
+            pass
+
+        sub_id1 = client.subscribe(callback1, event_types=[EventType.AGENT_START])
+        sub_id2 = client.subscribe(callback2, event_types=[EventType.AGENT_END])
+
+        assert len(client.list_subscriptions()) == 2
+
+        client.unsubscribe(sub_id1)
+
+        subscriptions = client.list_subscriptions()
+        assert len(subscriptions) == 1
+        assert subscriptions[0].subscription_id == sub_id2
+
+
+class TestYoloClientEventEmission:
+    """Tests for event emission during workflow (AC3)."""
+
+    @pytest.mark.asyncio
+    async def test_emit_event_calls_matching_callbacks(self, tmp_path: Path) -> None:
+        """Test _emit_event calls callbacks for matching event types."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event, event_types=[EventType.AGENT_START])
+
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+
+        assert len(received_events) == 1
+        assert received_events[0].event_type == EventType.AGENT_START
+        assert received_events[0].agent == "analyst"
+
+    @pytest.mark.asyncio
+    async def test_emit_event_filters_by_event_type(self, tmp_path: Path) -> None:
+        """Test _emit_event only calls callbacks for matching types."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        # Subscribe only to AGENT_END
+        client.subscribe(capture_event, event_types=[EventType.AGENT_END])
+
+        # Emit AGENT_START - should NOT trigger callback
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+
+        assert len(received_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_emit_event_all_subscribers_receive(self, tmp_path: Path) -> None:
+        """Test all matching subscribers receive events."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received1: list[EventData] = []
+        received2: list[EventData] = []
+
+        def callback1(event: EventData) -> None:
+            received1.append(event)
+
+        def callback2(event: EventData) -> None:
+            received2.append(event)
+
+        client.subscribe(callback1, event_types=[EventType.WORKFLOW_START])
+        client.subscribe(callback2, event_types=[EventType.WORKFLOW_START])
+
+        await client._emit_event(
+            EventType.WORKFLOW_START, data={"workflow_id": "test-123"}
+        )
+
+        assert len(received1) == 1
+        assert len(received2) == 1
+        assert received1[0].data["workflow_id"] == "test-123"
+        assert received2[0].data["workflow_id"] == "test-123"
+
+    @pytest.mark.asyncio
+    async def test_emit_event_with_event_data(self, tmp_path: Path) -> None:
+        """Test _emit_event passes data to EventData correctly."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event)
+
+        await client._emit_event(
+            EventType.WORKFLOW_END,
+            agent="pm",
+            data={"status": "completed", "duration": 5.2},
+        )
+
+        assert len(received_events) == 1
+        event = received_events[0]
+        assert event.event_type == EventType.WORKFLOW_END
+        assert event.agent == "pm"
+        assert event.data["status"] == "completed"
+        assert event.data["duration"] == 5.2
+
+    @pytest.mark.asyncio
+    async def test_events_fire_during_run_async(self, tmp_path: Path) -> None:
+        """Test events fire at appropriate points during workflow execution."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event)
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "pm",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Verify expected events fired
+        event_types = [e.event_type for e in received_events]
+        assert EventType.WORKFLOW_START in event_types
+        assert EventType.AGENT_START in event_types
+        assert EventType.AGENT_END in event_types
+        assert EventType.GATE_PASS in event_types  # Seed quality + workflow completion
+        assert EventType.WORKFLOW_END in event_types
+
+    @pytest.mark.asyncio
+    async def test_gate_pass_fires_on_seed_acceptance(self, tmp_path: Path) -> None:
+        """Test GATE_PASS event fires when seed passes quality gate."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event, event_types=[EventType.GATE_PASS])
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "pm",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Verify GATE_PASS events fired (seed quality + workflow completion)
+        assert len(received_events) >= 2
+        gate_names = [e.data.get("gate") for e in received_events]
+        assert "seed_quality" in gate_names
+        assert "workflow_completion" in gate_names
+
+    @pytest.mark.asyncio
+    async def test_gate_fail_fires_on_seed_rejection(self, tmp_path: Path) -> None:
+        """Test GATE_FAIL event fires when seed fails quality gate."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event, event_types=[EventType.GATE_FAIL])
+
+        with patch("yolo_developer.seed.parse_seed") as mock_parse:
+            # Mock seed result with low quality (no goals, no features, many ambiguities)
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 0
+            mock_seed_result.feature_count = 0
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = True
+            mock_seed_result.ambiguities = [
+                MagicMock(description="Ambiguity 1"),
+                MagicMock(description="Ambiguity 2"),
+                MagicMock(description="Ambiguity 3"),
+                MagicMock(description="Ambiguity 4"),
+                MagicMock(description="Ambiguity 5"),
+                MagicMock(description="Ambiguity 6"),
+                MagicMock(description="Ambiguity 7"),
+            ]
+            mock_parse.return_value = mock_seed_result
+
+            with pytest.raises(WorkflowExecutionError, match="Seed was rejected"):
+                await client.run_async(seed_content="vague request")
+
+        # Verify GATE_FAIL event fired
+        assert len(received_events) == 1
+        event = received_events[0]
+        assert event.event_type == EventType.GATE_FAIL
+        assert event.data["gate"] == "seed_quality"
+        assert "reason" in event.data
+
+    @pytest.mark.asyncio
+    async def test_error_event_fires_on_exception(self, tmp_path: Path) -> None:
+        """Test ERROR event fires when workflow encounters an exception."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        received_events: list[EventData] = []
+
+        def capture_event(event: EventData) -> None:
+            received_events.append(event)
+
+        client.subscribe(capture_event, event_types=[EventType.ERROR])
+
+        # Mock orchestrator to raise an exception
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            side_effect=RuntimeError("Workflow failed!")
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            with pytest.raises(WorkflowExecutionError):
+                await client.run_async(seed_content="Build something")
+
+        # Verify ERROR event was emitted
+        assert len(received_events) == 1
+        assert received_events[0].event_type == EventType.ERROR
+        assert "error" in received_events[0].data
+
+
+class TestYoloClientAsyncCallbackSupport:
+    """Tests for async callback support (AC5)."""
+
+    @pytest.mark.asyncio
+    async def test_async_callback_awaited(self, tmp_path: Path) -> None:
+        """Test async callbacks are awaited properly."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        async_called = []
+
+        async def async_callback(event: EventData) -> None:
+            await asyncio.sleep(0.001)  # Simulate async work
+            async_called.append(event)
+
+        client.subscribe(async_callback, event_types=[EventType.AGENT_START])
+
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+
+        assert len(async_called) == 1
+        assert async_called[0].agent == "analyst"
+
+    @pytest.mark.asyncio
+    async def test_sync_callback_executed(self, tmp_path: Path) -> None:
+        """Test sync callbacks are executed synchronously."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        sync_called = []
+
+        def sync_callback(event: EventData) -> None:
+            sync_called.append(event)
+
+        client.subscribe(sync_callback, event_types=[EventType.WORKFLOW_END])
+
+        await client._emit_event(EventType.WORKFLOW_END, data={"status": "done"})
+
+        assert len(sync_called) == 1
+        assert sync_called[0].data["status"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_mixed_sync_async_callbacks(self, tmp_path: Path) -> None:
+        """Test mixed sync and async callbacks both execute."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        sync_results: list[str] = []
+        async_results: list[str] = []
+
+        def sync_callback(event: EventData) -> None:
+            sync_results.append("sync")
+
+        async def async_callback(event: EventData) -> None:
+            await asyncio.sleep(0.001)
+            async_results.append("async")
+
+        client.subscribe(sync_callback)
+        client.subscribe(async_callback)
+
+        await client._emit_event(EventType.WORKFLOW_START)
+
+        assert sync_results == ["sync"]
+        assert async_results == ["async"]
+
+    def test_callback_protocol_accepts_sync(self, tmp_path: Path) -> None:
+        """Test EventCallback protocol accepts sync functions."""
+        from yolo_developer.sdk.types import EventCallback, EventData
+
+        def sync_callback(event: EventData) -> None:
+            pass
+
+        # Should match the protocol
+        assert isinstance(sync_callback, EventCallback)
+
+    def test_callback_protocol_accepts_async(self, tmp_path: Path) -> None:
+        """Test EventCallback protocol accepts async functions."""
+        from yolo_developer.sdk.types import EventCallback, EventData
+
+        async def async_callback(event: EventData) -> None:
+            pass
+
+        # Should match the protocol
+        assert isinstance(async_callback, EventCallback)
+
+
+class TestYoloClientEventCallbackErrorHandling:
+    """Tests for graceful error handling in callbacks (AC6)."""
+
+    @pytest.mark.asyncio
+    async def test_callback_error_does_not_block_others(self, tmp_path: Path) -> None:
+        """Test callback errors don't block other callbacks."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        callback2_called = []
+
+        def failing_callback(event: EventData) -> None:
+            raise ValueError("Callback error!")
+
+        def succeeding_callback(event: EventData) -> None:
+            callback2_called.append(event)
+
+        client.subscribe(failing_callback)
+        client.subscribe(succeeding_callback)
+
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+
+        # Second callback should still be called
+        assert len(callback2_called) == 1
+
+    @pytest.mark.asyncio
+    async def test_callback_error_logged(self, tmp_path: Path) -> None:
+        """Test callback errors are logged with context."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def failing_callback(event: EventData) -> None:
+            raise RuntimeError("Test error")
+
+        client.subscribe(failing_callback)
+
+        # Should not raise, but logs the error
+        await client._emit_event(EventType.WORKFLOW_START)
+
+        # The error was handled gracefully (no exception raised)
+        # Logging would be verified with structlog capture if needed
+
+    @pytest.mark.asyncio
+    async def test_workflow_continues_despite_callback_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Test workflow execution continues despite callback errors."""
+        from yolo_developer.sdk.types import EventData
+
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        def failing_callback(event: EventData) -> None:
+            raise ValueError("Callback failed!")
+
+        client.subscribe(failing_callback)
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "analyst",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            # Should complete successfully despite callback error
+            result = await client.run_async(seed_content="Build something")
+
+        assert result.status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_async_callback_error_handled(self, tmp_path: Path) -> None:
+        """Test async callback errors are handled gracefully."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        callback2_called = []
+
+        async def failing_async_callback(event: EventData) -> None:
+            await asyncio.sleep(0.001)
+            raise RuntimeError("Async callback failed!")
+
+        async def succeeding_async_callback(event: EventData) -> None:
+            await asyncio.sleep(0.001)
+            callback2_called.append(event)
+
+        client.subscribe(failing_async_callback)
+        client.subscribe(succeeding_async_callback)
+
+        await client._emit_event(EventType.AGENT_END, agent="dev")
+
+        # Second callback should still be called
+        assert len(callback2_called) == 1
+
+
+class TestYoloClientEventFiltering:
+    """Tests for filtering events by type (AC2, AC3)."""
+
+    @pytest.mark.asyncio
+    async def test_filter_single_event_type(self, tmp_path: Path) -> None:
+        """Test filtering to receive only specific event type."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received: list[EventData] = []
+
+        def capture(event: EventData) -> None:
+            received.append(event)
+
+        client.subscribe(capture, event_types=[EventType.WORKFLOW_END])
+
+        # Emit multiple event types
+        await client._emit_event(EventType.WORKFLOW_START)
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+        await client._emit_event(EventType.AGENT_END, agent="analyst")
+        await client._emit_event(EventType.WORKFLOW_END)
+
+        # Should only receive WORKFLOW_END
+        assert len(received) == 1
+        assert received[0].event_type == EventType.WORKFLOW_END
+
+    @pytest.mark.asyncio
+    async def test_filter_multiple_event_types(self, tmp_path: Path) -> None:
+        """Test filtering to receive multiple specific event types."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received: list[EventData] = []
+
+        def capture(event: EventData) -> None:
+            received.append(event)
+
+        client.subscribe(
+            capture, event_types=[EventType.AGENT_START, EventType.AGENT_END]
+        )
+
+        # Emit multiple event types
+        await client._emit_event(EventType.WORKFLOW_START)
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+        await client._emit_event(EventType.AGENT_END, agent="analyst")
+        await client._emit_event(EventType.WORKFLOW_END)
+
+        # Should only receive AGENT_START and AGENT_END
+        assert len(received) == 2
+        assert received[0].event_type == EventType.AGENT_START
+        assert received[1].event_type == EventType.AGENT_END
+
+    @pytest.mark.asyncio
+    async def test_subscribe_all_receives_all(self, tmp_path: Path) -> None:
+        """Test subscribing to all events receives all event types."""
+        from yolo_developer.sdk.types import EventData, EventType
+
+        client = YoloClient(project_path=tmp_path)
+        received: list[EventData] = []
+
+        def capture(event: EventData) -> None:
+            received.append(event)
+
+        # Subscribe to all (event_types=None)
+        client.subscribe(capture)
+
+        # Emit multiple event types
+        await client._emit_event(EventType.WORKFLOW_START)
+        await client._emit_event(EventType.AGENT_START, agent="analyst")
+        await client._emit_event(EventType.GATE_PASS)
+        await client._emit_event(EventType.ERROR, data={"error": "test"})
+
+        # Should receive all
+        assert len(received) == 4
+
+
+class TestYoloClientEventSubscriptionInfo:
+    """Tests for EventSubscription dataclass."""
+
+    def test_event_subscription_structure(self, tmp_path: Path) -> None:
+        """Test EventSubscription has all expected fields."""
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def my_callback(event: Any) -> None:
+            pass
+
+        client.subscribe(my_callback, event_types=[EventType.WORKFLOW_START])
+
+        subscriptions = client.list_subscriptions()
+        sub = subscriptions[0]
+
+        assert hasattr(sub, "subscription_id")
+        assert hasattr(sub, "event_types")
+        assert hasattr(sub, "callback")
+        assert hasattr(sub, "timestamp")
+        assert sub.timestamp is not None
+
+    def test_list_subscriptions_sorted_by_timestamp(self, tmp_path: Path) -> None:
+        """Test list_subscriptions returns subscriptions sorted by creation time."""
+        import time
+
+        from yolo_developer.sdk.types import EventType
+
+        client = YoloClient(project_path=tmp_path)
+
+        def cb1(event: Any) -> None:
+            pass
+
+        def cb2(event: Any) -> None:
+            pass
+
+        def cb3(event: Any) -> None:
+            pass
+
+        id1 = client.subscribe(cb1, event_types=[EventType.WORKFLOW_START])
+        time.sleep(0.01)
+        id2 = client.subscribe(cb2, event_types=[EventType.AGENT_START])
+        time.sleep(0.01)
+        id3 = client.subscribe(cb3, event_types=[EventType.WORKFLOW_END])
+
+        subscriptions = client.list_subscriptions()
+
+        assert len(subscriptions) == 3
+        assert subscriptions[0].subscription_id == id1
+        assert subscriptions[1].subscription_id == id2
+        assert subscriptions[2].subscription_id == id3
+
+    def test_list_subscriptions_empty_initially(self, tmp_path: Path) -> None:
+        """Test list_subscriptions returns empty list initially."""
+        client = YoloClient(project_path=tmp_path)
+
+        subscriptions = client.list_subscriptions()
+
+        assert subscriptions == []
