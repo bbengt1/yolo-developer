@@ -267,17 +267,57 @@ def run(
 
 
 @app.command("status")
-def status() -> None:
+def status(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output including agent health snapshots and metrics.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output results as JSON instead of formatted display.",
+    ),
+    health_only: bool = typer.Option(
+        False,
+        "--health",
+        "-H",
+        help="Show only health metrics (skip sprint progress and sessions).",
+    ),
+    sessions_only: bool = typer.Option(
+        False,
+        "--sessions",
+        "-s",
+        help="Show only session list (skip sprint progress and health).",
+    ),
+) -> None:
     """Show sprint progress and status.
 
     Displays the current sprint status including completed stories,
-    in-progress work, and any blocked items.
+    in-progress work, system health metrics, and session information.
 
-    This command will be fully implemented in Story 12.5.
+    The command shows three main sections:
+    - Sprint Progress: Stories completed, in-progress, and blocked
+    - Health Metrics: Agent idle times, cycle times, and alerts
+    - Sessions: Available sessions with resume instructions
+
+    Examples:
+        yolo status                    # Show all status information
+        yolo status --verbose          # Show detailed health metrics
+        yolo status --json             # Output as JSON
+        yolo status --health           # Show only health metrics
+        yolo status --sessions         # Show only session list
     """
     from yolo_developer.cli.commands.status import status_command
 
-    status_command()
+    status_command(
+        verbose=verbose,
+        json_output=json_output,
+        health_only=health_only,
+        sessions_only=sessions_only,
+    )
 
 
 @app.command("logs")

@@ -5,39 +5,12 @@ Tests cover:
 - Each placeholder command module logs debug message
 
 Note: run_command tests moved to test_run_command.py after Story 12.4 implementation.
+Note: status_command tests moved to test_status_command.py after Story 12.5 implementation.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
-
-
-class TestStatusCommand:
-    """Tests for status command module."""
-
-    @patch("yolo_developer.cli.commands.status.coming_soon")
-    @patch("yolo_developer.cli.commands.status.logger")
-    def test_status_command_calls_coming_soon(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test status_command calls coming_soon with 'status'."""
-        from yolo_developer.cli.commands.status import status_command
-
-        status_command()
-
-        mock_coming_soon.assert_called_once_with("status")
-
-    @patch("yolo_developer.cli.commands.status.coming_soon")
-    @patch("yolo_developer.cli.commands.status.logger")
-    def test_status_command_logs_invocation(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test status_command logs debug message."""
-        from yolo_developer.cli.commands.status import status_command
-
-        status_command()
-
-        mock_logger.debug.assert_called_once_with("status_command_invoked")
 
 
 class TestLogsCommand:
