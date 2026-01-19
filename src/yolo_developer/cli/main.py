@@ -207,17 +207,63 @@ def seed(
 
 
 @app.command("run")
-def run() -> None:
+def run(
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Validate configuration and seed without executing the workflow.",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output including agent events and decisions.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output results as JSON instead of formatted display.",
+    ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        "-r",
+        help="Resume from the last checkpoint instead of starting fresh.",
+    ),
+    thread_id: str | None = typer.Option(
+        None,
+        "--thread-id",
+        "-t",
+        help="Specific thread ID for checkpointing. Auto-generated if not provided.",
+    ),
+) -> None:
     """Execute an autonomous sprint.
 
     Starts the multi-agent orchestration system to autonomously
     develop features based on the current sprint backlog.
 
-    This command will be fully implemented in Story 12.4.
+    The workflow executes agents in sequence: Analyst → PM → Architect → Dev → TEA,
+    with the SM Agent coordinating the overall process.
+
+    Examples:
+        yolo run                           # Start a new sprint
+        yolo run --dry-run                 # Validate without executing
+        yolo run --verbose                 # Show detailed progress
+        yolo run --resume                  # Resume from last checkpoint
+        yolo run --thread-id my-session    # Use specific thread ID
+        yolo run --json                    # Output JSON summary
     """
     from yolo_developer.cli.commands.run import run_command
 
-    run_command()
+    run_command(
+        dry_run=dry_run,
+        verbose=verbose,
+        json_output=json_output,
+        resume=resume,
+        thread_id=thread_id,
+    )
 
 
 @app.command("status")
