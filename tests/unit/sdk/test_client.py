@@ -10,6 +10,7 @@ Tests cover:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -500,6 +501,197 @@ class TestYoloClientGetAudit:
             entries = await client.get_audit_async()
 
         assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_with_decision_type_filter(
+        self, tmp_path: Path
+    ) -> None:
+        """Test get_audit_async() accepts decision_type filter."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
+            mock_service.return_value = mock_filter_service
+
+            entries = await client.get_audit_async(
+                decision_type="requirement_analysis"
+            )
+
+        assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_with_artifact_type_filter(
+        self, tmp_path: Path
+    ) -> None:
+        """Test get_audit_async() accepts artifact_type parameter (reserved for future use)."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
+            mock_service.return_value = mock_filter_service
+
+            entries = await client.get_audit_async(
+                artifact_type="requirement"
+            )
+
+        assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_with_pagination(self, tmp_path: Path) -> None:
+        """Test get_audit_async() supports offset and limit for pagination."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
+            mock_service.return_value = mock_filter_service
+
+            # Test with offset and limit
+            entries = await client.get_audit_async(limit=10, offset=5)
+
+        assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_pagination_slices_correctly(
+        self, tmp_path: Path
+    ) -> None:
+        """Test that pagination correctly slices results."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        # Create mock decisions
+        mock_decisions = []
+        for i in range(20):
+            mock_decision = MagicMock()
+            mock_decision.id = f"decision-{i}"
+            mock_decision.timestamp = datetime.now(timezone.utc)
+            mock_decision.agent = MagicMock()
+            mock_decision.agent.name = "analyst"
+            mock_decision.decision_type = "test"
+            mock_decision.content = f"Decision {i}"
+            mock_decision.rationale = None
+            mock_decision.metadata = {}
+            mock_decisions.append(mock_decision)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(
+                return_value={"decisions": mock_decisions}
+            )
+            mock_service.return_value = mock_filter_service
+
+            # Get first page (0-9)
+            page1 = await client.get_audit_async(limit=10, offset=0)
+            assert len(page1) == 10
+            assert page1[0].entry_id == "decision-0"
+            assert page1[9].entry_id == "decision-9"
+
+            # Get second page (10-19)
+            page2 = await client.get_audit_async(limit=10, offset=10)
+            assert len(page2) == 10
+            assert page2[0].entry_id == "decision-10"
+            assert page2[9].entry_id == "decision-19"
+
+            # Get third page (should be empty)
+            page3 = await client.get_audit_async(limit=10, offset=20)
+            assert len(page3) == 0
+
+    def test_get_audit_sync_wraps_async(self, tmp_path: Path) -> None:
+        """Test get_audit() correctly wraps get_audit_async()."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
+            mock_service.return_value = mock_filter_service
+
+            # Sync method should work
+            entries = client.get_audit(agent_filter="analyst", limit=50, offset=10)
+
+        assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_with_all_filters(self, tmp_path: Path) -> None:
+        """Test get_audit_async() with all filter parameters."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        now = datetime.now(timezone.utc)
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
+            mock_service.return_value = mock_filter_service
+
+            entries = await client.get_audit_async(
+                agent_filter="analyst",
+                decision_type="requirement_analysis",
+                artifact_type="requirement",
+                start_time=now,
+                end_time=now,
+                limit=50,
+                offset=5,
+            )
+
+        assert isinstance(entries, list)
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_uses_persistent_store(self, tmp_path: Path) -> None:
+        """Test that get_audit uses JsonDecisionStore for persistence (AC5)."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        # Call _get_decision_store and verify it returns JsonDecisionStore
+        store = client._get_decision_store()
+
+        # Verify it's JsonDecisionStore by checking it has the file_path attribute
+        assert hasattr(store, "_file_path")
+        expected_path = tmp_path / ".yolo" / "audit" / "decisions.json"
+        assert store._file_path == expected_path
+
+    @pytest.mark.asyncio
+    async def test_get_audit_async_entry_structure(self, tmp_path: Path) -> None:
+        """Test AuditEntry structure has all required fields."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        # Create a mock decision with all fields
+        mock_decision = MagicMock()
+        mock_decision.id = "dec-123"
+        mock_decision.timestamp = datetime.now(timezone.utc)
+        mock_decision.agent = MagicMock()
+        mock_decision.agent.name = "analyst"
+        mock_decision.decision_type = "requirement_analysis"
+        mock_decision.content = "Analyzed requirement"
+        mock_decision.rationale = "Industry best practice"
+        mock_decision.metadata = {"sprint_id": "sprint-1"}
+
+        with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
+            mock_filter_service = MagicMock()
+            mock_filter_service.filter_all = AsyncMock(
+                return_value={"decisions": [mock_decision]}
+            )
+            mock_service.return_value = mock_filter_service
+
+            entries = await client.get_audit_async()
+
+        assert len(entries) == 1
+        entry = entries[0]
+
+        # Verify AuditEntry structure (AC3)
+        assert entry.entry_id == "dec-123"
+        assert isinstance(entry.timestamp, datetime)
+        assert entry.timestamp.tzinfo is not None  # Timezone-aware
+        assert entry.agent == "analyst"
+        assert entry.decision_type == "requirement_analysis"
+        assert entry.content == "Analyzed requirement"
+        assert entry.rationale == "Industry best practice"
+        assert entry.metadata == {"sprint_id": "sprint-1"}
 
 
 class TestYoloClientTypes:

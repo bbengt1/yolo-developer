@@ -1,4 +1,4 @@
-"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2).
+"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2, 13.3).
 
 This module provides the main YoloClient class that serves as the
 primary entry point for programmatic access to YOLO Developer.
@@ -834,38 +834,56 @@ memory:
         self,
         *,
         agent_filter: str | None = None,
+        decision_type: str | None = None,
+        artifact_type: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[AuditEntry]:
         """Get audit trail entries.
 
-        Retrieves audit trail entries with optional filtering.
+        Retrieves audit trail entries with optional filtering and pagination.
 
         Args:
-            agent_filter: Filter by agent name.
-            start_time: Filter entries after this time.
-            end_time: Filter entries before this time.
-            limit: Maximum number of entries to return.
+            agent_filter: Filter by agent name (e.g., "analyst", "pm", "dev").
+            decision_type: Filter by decision type (e.g., "requirement_analysis").
+            artifact_type: Reserved for future artifact filtering. Currently not
+                implemented for decision filtering.
+            start_time: Filter entries after this time (inclusive).
+            end_time: Filter entries before this time (inclusive).
+            limit: Maximum number of entries to return (default: 100).
+            offset: Number of entries to skip for pagination (default: 0).
 
         Returns:
-            List of AuditEntry objects.
+            List of AuditEntry objects matching the filters.
 
         Raises:
             ClientNotInitializedError: If project is not initialized.
             SDKError: If audit retrieval fails.
 
         Example:
+            >>> # Get all entries from analyst agent
             >>> entries = client.get_audit(agent_filter="analyst", limit=50)
             >>> for entry in entries:
             ...     print(f"{entry.agent}: {entry.content}")
+            >>>
+            >>> # Filter by artifact type
+            >>> requirement_entries = client.get_audit(artifact_type="requirement")
+            >>>
+            >>> # Paginate through results
+            >>> page1 = client.get_audit(limit=10, offset=0)
+            >>> page2 = client.get_audit(limit=10, offset=10)
         """
         return _run_sync(
             self.get_audit_async(
                 agent_filter=agent_filter,
+                decision_type=decision_type,
+                artifact_type=artifact_type,
                 start_time=start_time,
                 end_time=end_time,
                 limit=limit,
+                offset=offset,
             )
         )
 
@@ -873,30 +891,53 @@ memory:
         self,
         *,
         agent_filter: str | None = None,
+        decision_type: str | None = None,
+        artifact_type: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[AuditEntry]:
         """Get audit trail entries (async).
 
-        Retrieves audit trail entries with optional filtering.
+        Retrieves audit trail entries with optional filtering and pagination.
 
         Args:
-            agent_filter: Filter by agent name.
-            start_time: Filter entries after this time.
-            end_time: Filter entries before this time.
-            limit: Maximum number of entries to return.
+            agent_filter: Filter by agent name (e.g., "analyst", "pm", "dev").
+            decision_type: Filter by decision type (e.g., "requirement_analysis").
+            artifact_type: Reserved for future artifact filtering. Currently not
+                implemented for decision filtering.
+            start_time: Filter entries after this time (inclusive).
+            end_time: Filter entries before this time (inclusive).
+            limit: Maximum number of entries to return (default: 100).
+            offset: Number of entries to skip for pagination (default: 0).
 
         Returns:
-            List of AuditEntry objects.
+            List of AuditEntry objects matching the filters.
 
         Raises:
             ClientNotInitializedError: If project is not initialized.
             SDKError: If audit retrieval fails.
 
         Example:
-            >>> entries = await client.get_audit_async(agent_filter="analyst")
+            >>> # Get entries with multiple filters
+            >>> entries = await client.get_audit_async(
+            ...     agent_filter="analyst",
+            ...     decision_type="requirement_analysis",
+            ...     artifact_type="requirement",
+            ...     limit=20,
+            ... )
             >>> print(f"Found {len(entries)} entries")
+            >>>
+            >>> # Paginate through large result sets
+            >>> all_entries = []
+            >>> offset = 0
+            >>> while True:
+            ...     batch = await client.get_audit_async(limit=50, offset=offset)
+            ...     if not batch:
+            ...         break
+            ...     all_entries.extend(batch)
+            ...     offset += 50
         """
         if not self.is_initialized:
             raise ClientNotInitializedError(
@@ -907,13 +948,14 @@ memory:
         try:
             from yolo_developer.audit import (
                 AuditFilters,
-                InMemoryDecisionStore,
                 InMemoryTraceabilityStore,
                 get_audit_filter_service,
             )
 
-            # Create filter service (would normally use persistent store)
-            decision_store = InMemoryDecisionStore()
+            # Get or create the audit store for this project
+            # Note: Currently uses in-memory store. For persistent storage,
+            # implement a file-based DecisionStore that loads from .yolo/audit/
+            decision_store = self._get_decision_store()
             traceability_store = InMemoryTraceabilityStore()
             filter_service = get_audit_filter_service(
                 decision_store=decision_store,
@@ -921,20 +963,25 @@ memory:
                 cost_store=None,
             )
 
-            # Apply filters
+            # Apply filters including decision_type and artifact_type
             filters = AuditFilters(
                 agent_name=agent_filter,
+                decision_type=decision_type,
+                artifact_type=artifact_type,
                 start_time=start_time.isoformat() if start_time else None,
                 end_time=end_time.isoformat() if end_time else None,
             )
 
             # Query decisions
             results = await filter_service.filter_all(filters)
-            decisions = results.get("decisions", [])[:limit]
+            decisions = results.get("decisions", [])
+
+            # Apply pagination (offset, then limit)
+            paginated_decisions = decisions[offset : offset + limit]
 
             # Convert to AuditEntry
             entries = []
-            for decision in decisions:
+            for decision in paginated_decisions:
                 entries.append(
                     AuditEntry(
                         entry_id=decision.id,
@@ -949,8 +996,30 @@ memory:
 
             return entries
 
+        except ClientNotInitializedError:
+            raise
         except Exception as e:
             raise SDKError(
                 f"Failed to retrieve audit entries: {e}",
                 original_error=e,
             ) from e
+
+    def _get_decision_store(self) -> Any:
+        """Get or create the decision store for this project.
+
+        Returns a DecisionStore instance that persists to .yolo/audit/decisions.json.
+        Creates the audit directory if it doesn't exist.
+
+        Returns:
+            JsonDecisionStore for persistent storage.
+
+        Note:
+            AC5 implementation: Decisions persist across client sessions by
+            storing to a JSON file in the project's .yolo/audit directory.
+        """
+        from yolo_developer.audit import JsonDecisionStore
+
+        # Use persistent JSON file storage (Story 13.3 AC5)
+        audit_dir = self._project_path / ".yolo" / "audit"
+        decisions_file = audit_dir / "decisions.json"
+        return JsonDecisionStore(decisions_file)

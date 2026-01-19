@@ -194,7 +194,7 @@ development_status:
   epic-13: in-progress
   13-1-sdk-client-class: done
   13-2-programmatic-init-seed-run: done
-  13-3-audit-trail-access: backlog
+  13-3-audit-trail-access: done
   13-4-configuration-api: backlog
   13-5-agent-hooks: backlog
   13-6-event-emission: backlog

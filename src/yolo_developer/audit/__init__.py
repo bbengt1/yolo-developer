@@ -374,6 +374,9 @@ from yolo_developer.audit.formatter_types import (
     FormatterStyle,
 )
 
+# JSON file-based decision store (Story 13.3)
+from yolo_developer.audit.json_decision_store import JsonDecisionStore
+
 # JSON exporter
 from yolo_developer.audit.json_exporter import JsonAuditExporter
 
@@ -500,6 +503,7 @@ __all__ = [
     "InMemoryCorrelationStore",
     "InMemoryCostStore",
     "InMemoryDecisionStore",
+    "JsonDecisionStore",
     "InMemoryTraceabilityStore",
     "JsonAuditExporter",
     "LinkType",
