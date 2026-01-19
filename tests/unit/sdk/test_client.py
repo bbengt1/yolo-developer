@@ -164,7 +164,7 @@ class TestYoloClientInit:
         assert (tmp_path / ".yolo" / "audit").exists()
 
     def test_init_creates_config_file(self, tmp_path: Path) -> None:
-        """Test init() creates yolo.yaml config file."""
+        """Test init() creates yolo.yaml config file with comprehensive settings."""
         client = YoloClient(project_path=tmp_path)
         result = client.init(project_name="new-project")
 
@@ -172,7 +172,15 @@ class TestYoloClientInit:
         config_file = tmp_path / "yolo.yaml"
         assert config_file.exists()
         content = config_file.read_text()
-        assert "new-project" in content
+        # Verify comprehensive config matching CLI format
+        assert "project_name: new-project" in content
+        assert "llm:" in content
+        assert "cheap_model: gpt-4o-mini" in content
+        assert "premium_model: claude-sonnet-4-20250514" in content
+        assert "quality:" in content
+        assert "test_coverage_threshold: 0.80" in content
+        assert "memory:" in content
+        assert "vector_store_type: chromadb" in content
 
     def test_init_uses_directory_name(self, tmp_path: Path) -> None:
         """Test init() uses directory name as default project name."""
@@ -223,10 +231,12 @@ class TestYoloClientSeed:
         assert result.feature_count == 3
         assert result.status == "accepted"
         assert result.seed_id.startswith("seed-")
+        # Quality score should be 1.0 for seeds with goals, features, and no ambiguities
+        assert result.quality_score == 1.0
 
     @pytest.mark.asyncio
     async def test_seed_async_handles_ambiguities(self, tmp_path: Path) -> None:
-        """Test seed_async() handles ambiguous content."""
+        """Test seed_async() handles ambiguous content and uses config thresholds."""
         client = YoloClient(project_path=tmp_path)
 
         with patch("yolo_developer.seed.parse_seed") as mock_parse:
@@ -238,13 +248,41 @@ class TestYoloClientSeed:
             mock_result.feature_count = 1
             mock_result.constraint_count = 0
             mock_result.has_ambiguities = True
-            mock_result.ambiguities = [mock_ambiguity] * 10  # Many ambiguities
+            # 5 ambiguities: ambiguity_score = 1.0 - 0.5 = 0.5 < 0.6 threshold = pending
+            mock_result.ambiguities = [mock_ambiguity] * 5
             mock_parse.return_value = mock_result
 
             result = await client.seed_async(content="Vague requirements")
 
-        assert result.status == "pending"
-        assert len(result.ambiguities) == 10
+        assert result.status == "pending"  # Below ambiguity threshold (0.6)
+        assert len(result.ambiguities) == 5
+        # Quality score reduced by ambiguities (5 * 0.05 = 0.25)
+        assert result.quality_score == 0.75
+
+    @pytest.mark.asyncio
+    async def test_seed_async_rejected_below_threshold(self, tmp_path: Path) -> None:
+        """Test seed_async() rejects seeds below quality threshold."""
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.seed.parse_seed") as mock_parse:
+            mock_ambiguity = MagicMock()
+            mock_ambiguity.description = "Missing info"
+
+            mock_result = MagicMock()
+            mock_result.goal_count = 0  # No goals: -0.2
+            mock_result.feature_count = 0  # No features: -0.1
+            mock_result.constraint_count = 0
+            mock_result.has_ambiguities = True
+            mock_result.ambiguities = [mock_ambiguity] * 6  # 6 ambiguities: -0.3
+            mock_parse.return_value = mock_result
+
+            result = await client.seed_async(content="Bad seed")
+
+        # Quality score: 1.0 - 0.2 - 0.1 - 0.3 = 0.4 < 0.7 threshold
+        assert result.status == "rejected"
+        assert abs(result.quality_score - 0.4) < 0.01  # Float comparison with tolerance
+        assert any("goals" in w.lower() for w in result.warnings)
+        assert any("features" in w.lower() for w in result.warnings)
 
     @pytest.mark.asyncio
     async def test_seed_async_raises_on_error(self, tmp_path: Path) -> None:
@@ -258,6 +296,26 @@ class TestYoloClientSeed:
                 await client.seed_async(content="Invalid content")
 
             assert "Failed to process seed" in str(exc_info.value)
+
+    def test_seed_sync_processes_content(self, tmp_path: Path) -> None:
+        """Test sync seed() method processes content correctly."""
+        client = YoloClient(project_path=tmp_path)
+
+        with patch("yolo_developer.seed.parse_seed") as mock_parse:
+            mock_result = MagicMock()
+            mock_result.goal_count = 1
+            mock_result.feature_count = 2
+            mock_result.constraint_count = 0
+            mock_result.has_ambiguities = False
+            mock_result.ambiguities = []
+            mock_parse.return_value = mock_result
+
+            result = client.seed(content="Build a web app")
+
+        assert isinstance(result, SeedResult)
+        assert result.status == "accepted"
+        assert result.goal_count == 1
+        assert result.feature_count == 2
 
 
 class TestYoloClientRun:
@@ -281,6 +339,19 @@ class TestYoloClientRun:
             await client.run_async()
 
         assert "seed_id or seed_content" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_run_async_seed_id_not_implemented(self, tmp_path: Path) -> None:
+        """Test run_async() raises SDKError when only seed_id is provided."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+
+        with pytest.raises(SDKError) as exc_info:
+            await client.run_async(seed_id="seed-123")
+
+        assert "seed_id lookup is not yet implemented" in str(exc_info.value)
+        assert exc_info.value.details is not None
+        assert exc_info.value.details.get("seed_id") == "seed-123"
 
     @pytest.mark.asyncio
     async def test_run_async_executes_workflow(self, tmp_path: Path) -> None:
