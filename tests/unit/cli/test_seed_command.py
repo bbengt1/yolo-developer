@@ -35,6 +35,7 @@ from yolo_developer.seed.ambiguity import (
     Resolution,
     ResolutionPrompt,
 )
+from yolo_developer.seed.report import QualityMetrics, ValidationReport
 from yolo_developer.seed.types import (
     ConstraintCategory,
     SeedConstraint,
@@ -847,6 +848,19 @@ class TestSeedCommandReportFormat:
         """Test --report-format json outputs JSON validation report."""
         mock_asyncio_run.return_value = sample_parse_result
         mock_format_json.return_value = '{"test": "json"}'
+        # Must return proper ValidationReport with QualityMetrics for threshold validation
+        mock_report = ValidationReport(
+            parse_result=sample_parse_result,
+            quality_metrics=QualityMetrics(
+                ambiguity_score=1.0,
+                sop_score=1.0,
+                extraction_score=1.0,
+                overall_score=1.0,
+            ),
+            report_id="test-123",
+            source_file=str(temp_seed_file),
+        )
+        mock_generate_report.return_value = mock_report
 
         seed_command(
             temp_seed_file,
@@ -874,6 +888,19 @@ class TestSeedCommandReportFormat:
         """Test --report-format markdown outputs markdown report."""
         mock_asyncio_run.return_value = sample_parse_result
         mock_format_markdown.return_value = "# Report"
+        # Must return proper ValidationReport with QualityMetrics for threshold validation
+        mock_report = ValidationReport(
+            parse_result=sample_parse_result,
+            quality_metrics=QualityMetrics(
+                ambiguity_score=1.0,
+                sop_score=1.0,
+                extraction_score=1.0,
+                overall_score=1.0,
+            ),
+            report_id="test-123",
+            source_file=str(temp_seed_file),
+        )
+        mock_generate_report.return_value = mock_report
 
         seed_command(
             temp_seed_file,
@@ -900,6 +927,19 @@ class TestSeedCommandReportFormat:
     ) -> None:
         """Test --report-format rich outputs rich console report."""
         mock_asyncio_run.return_value = sample_parse_result
+        # Must return proper ValidationReport with QualityMetrics for threshold validation
+        mock_report = ValidationReport(
+            parse_result=sample_parse_result,
+            quality_metrics=QualityMetrics(
+                ambiguity_score=1.0,
+                sop_score=1.0,
+                extraction_score=1.0,
+                overall_score=1.0,
+            ),
+            report_id="test-123",
+            source_file=str(temp_seed_file),
+        )
+        mock_generate_report.return_value = mock_report
 
         seed_command(
             temp_seed_file,
@@ -924,8 +964,6 @@ class TestSeedCommandReportFormat:
         tmp_path: Path,
     ) -> None:
         """Test --report-output writes report to file."""
-        from yolo_developer.seed.report import QualityMetrics, ValidationReport
-
         mock_asyncio_run.return_value = sample_parse_result
         mock_report = ValidationReport(
             parse_result=sample_parse_result,
@@ -952,3 +990,107 @@ class TestSeedCommandReportFormat:
         assert output_file.exists()
         content = output_file.read_text()
         assert "test-123" in content
+
+
+# ============================================================================
+# CLI Integration Tests (Story 12.3)
+# ============================================================================
+
+
+class TestSeedCLIIntegration:
+    """Integration tests for seed command via Typer CLI runner."""
+
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    def test_cli_seed_command_basic(
+        self,
+        mock_asyncio_run: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test seed command via CLI runner - basic invocation."""
+        from typer.testing import CliRunner
+
+        from yolo_developer.cli.main import app
+
+        mock_asyncio_run.return_value = sample_parse_result
+        runner = CliRunner()
+
+        result = runner.invoke(app, ["seed", str(temp_seed_file)])
+
+        # Command should succeed (exit code 0)
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+        # Output should contain parsing success message
+        assert "Seed parsing complete" in result.output or "Goals" in result.output
+
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    def test_cli_seed_command_verbose(
+        self,
+        mock_asyncio_run: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test seed command via CLI runner - verbose flag."""
+        from typer.testing import CliRunner
+
+        from yolo_developer.cli.main import app
+
+        mock_asyncio_run.return_value = sample_parse_result
+        runner = CliRunner()
+
+        result = runner.invoke(app, ["seed", str(temp_seed_file), "--verbose"])
+
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+
+    @patch("yolo_developer.cli.commands.seed.asyncio.run")
+    def test_cli_seed_command_json(
+        self,
+        mock_asyncio_run: MagicMock,
+        temp_seed_file: Path,
+        sample_parse_result: SeedParseResult,
+    ) -> None:
+        """Test seed command via CLI runner - JSON output flag."""
+        from typer.testing import CliRunner
+
+        from yolo_developer.cli.main import app
+
+        mock_asyncio_run.return_value = sample_parse_result
+        runner = CliRunner()
+
+        result = runner.invoke(app, ["seed", str(temp_seed_file), "--json"])
+
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+        # Output should contain JSON with goals key (Rich may add formatting)
+        assert '"goals"' in result.output
+
+    def test_cli_seed_command_file_not_found(self) -> None:
+        """Test seed command via CLI runner - file not found error."""
+        from typer.testing import CliRunner
+
+        from yolo_developer.cli.main import app
+
+        runner = CliRunner()
+
+        result = runner.invoke(app, ["seed", "/nonexistent/path/to/file.md"])
+
+        # Command should fail with exit code 1
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "error" in result.output.lower()
+
+    def test_cli_seed_help(self) -> None:
+        """Test seed command help displays all flags."""
+        from typer.testing import CliRunner
+
+        from yolo_developer.cli.main import app
+
+        runner = CliRunner()
+
+        result = runner.invoke(app, ["seed", "--help"])
+
+        assert result.exit_code == 0
+        # Verify all expected flags are documented
+        assert "--verbose" in result.output
+        assert "--json" in result.output
+        assert "--interactive" in result.output
+        assert "--validate-sop" in result.output
+        assert "--report-format" in result.output
+        assert "--force" in result.output
