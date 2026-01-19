@@ -174,5 +174,74 @@ def seed(
     )
 
 
+@app.command("run")
+def run() -> None:
+    """Execute an autonomous sprint.
+
+    Starts the multi-agent orchestration system to autonomously
+    develop features based on the current sprint backlog.
+
+    This command will be fully implemented in Story 12.4.
+    """
+    from yolo_developer.cli.commands.run import run_command
+
+    run_command()
+
+
+@app.command("status")
+def status() -> None:
+    """Show sprint progress and status.
+
+    Displays the current sprint status including completed stories,
+    in-progress work, and any blocked items.
+
+    This command will be fully implemented in Story 12.5.
+    """
+    from yolo_developer.cli.commands.status import status_command
+
+    status_command()
+
+
+@app.command("logs")
+def logs() -> None:
+    """Browse decision audit trail.
+
+    View the history of agent decisions with filtering and
+    search capabilities.
+
+    This command will be fully implemented in Story 12.6.
+    """
+    from yolo_developer.cli.commands.logs import logs_command
+
+    logs_command()
+
+
+@app.command("tune")
+def tune() -> None:
+    """Customize agent behavior.
+
+    Modify agent templates and decision-making parameters
+    to tune how agents approach development tasks.
+
+    This command will be fully implemented in Story 12.7.
+    """
+    from yolo_developer.cli.commands.tune import tune_command
+
+    tune_command()
+
+
+@app.command("config")
+def config() -> None:
+    """Manage project configuration.
+
+    View, set, import, or export project configuration values.
+
+    This command will be fully implemented in Story 12.8.
+    """
+    from yolo_developer.cli.commands.config import config_command
+
+    config_command()
+
+
 if __name__ == "__main__":
     app()

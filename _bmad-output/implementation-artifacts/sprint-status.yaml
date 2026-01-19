@@ -178,8 +178,8 @@ development_status:
   epic-11-retrospective: optional
 
   # Epic 12: CLI Interface (9 stories)
-  epic-12: backlog
-  12-1-typer-cli-setup: backlog
+  epic-12: in-progress
+  12-1-typer-cli-setup: done
   12-2-yolo-init-command: backlog
   12-3-yolo-seed-command: backlog
   12-4-yolo-run-command: backlog

@@ -173,8 +173,7 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
     """
     if not ambiguity_result.has_ambiguities:
         console.print(
-            "[green]No ambiguities detected![/green] "
-            "[dim]The seed document appears clear.[/dim]"
+            "[green]No ambiguities detected![/green] [dim]The seed document appears clear.[/dim]"
         )
         return
 
@@ -223,9 +222,11 @@ def _display_ambiguities(ambiguity_result: AmbiguityResult, verbose: bool = Fals
     # Confidence summary
     console.print()
     confidence_style = (
-        "green" if ambiguity_result.overall_confidence >= 0.8 else
-        "yellow" if ambiguity_result.overall_confidence >= 0.5 else
-        "red"
+        "green"
+        if ambiguity_result.overall_confidence >= 0.8
+        else "yellow"
+        if ambiguity_result.overall_confidence >= 0.5
+        else "red"
     )
     console.print(
         f"[bold]Ambiguity Confidence:[/bold] "
@@ -324,13 +325,13 @@ def _display_sop_conflicts(
         console.print()
         console.print("[dim]Conflict Details (Verbose):[/dim]")
         for i, conflict in enumerate(sop_result.conflicts, 1):
-            severity_color = (
-                "red" if conflict.severity == ConflictSeverity.HARD else "yellow"
+            severity_color = "red" if conflict.severity == ConflictSeverity.HARD else "yellow"
+            console.print(
+                f"\n  [{severity_color}]{i}. {conflict.severity.value.upper()}[/{severity_color}]"
             )
-            console.print(f"\n  [{severity_color}]{i}. {conflict.severity.value.upper()}[/{severity_color}]")
             console.print(f"     [bold]Rule:[/bold] {conflict.constraint.rule_text}")
             console.print(f"     [bold]Source:[/bold] {conflict.constraint.source}")
-            console.print(f"     [bold]Seed text:[/bold] \"{conflict.seed_text}\"")
+            console.print(f'     [bold]Seed text:[/bold] "{conflict.seed_text}"')
             console.print(f"     [bold]Description:[/bold] {conflict.description}")
             if conflict.resolution_options:
                 console.print("     [bold]Resolution options:[/bold]")
@@ -423,7 +424,7 @@ def _prompt_for_sop_override(
         f"[bold]Rule:[/bold] {conflict.constraint.rule_text}\n"
         f"[bold]Category:[/bold] {conflict.constraint.category.value.title()}\n"
         f"[bold]Source:[/bold] {conflict.constraint.source}\n\n"
-        f"[yellow]Conflicting text:[/yellow] \"{conflict.seed_text}\"\n"
+        f'[yellow]Conflicting text:[/yellow] "{conflict.seed_text}"\n'
         f"[yellow]Why it conflicts:[/yellow] {conflict.description}"
     )
 
@@ -432,9 +433,7 @@ def _prompt_for_sop_override(
         for opt in conflict.resolution_options:
             panel_content += f"\n  - {opt}"
 
-    console.print(
-        Panel(panel_content, title=f"SOP Conflict #{index}", border_style="yellow")
-    )
+    console.print(Panel(panel_content, title=f"SOP Conflict #{index}", border_style="yellow"))
 
     # Prompt for override
     response = Prompt.ask(
@@ -493,15 +492,11 @@ def _load_sop_store(store_path: Path | None) -> SOPStore:
     except json.JSONDecodeError as e:
         logger.error("sop_store_parse_error", path=str(store_path), error=str(e))
         console.print(
-            f"[red]Error:[/red] Failed to parse SOP store: {store_path}\n"
-            f"[dim]{e!s}[/dim]"
+            f"[red]Error:[/red] Failed to parse SOP store: {store_path}\n[dim]{e!s}[/dim]"
         )
     except Exception as e:
         logger.error("sop_store_load_error", path=str(store_path), error=str(e))
-        console.print(
-            f"[red]Error:[/red] Failed to load SOP store: {store_path}\n"
-            f"[dim]{e!s}[/dim]"
-        )
+        console.print(f"[red]Error:[/red] Failed to load SOP store: {store_path}\n[dim]{e!s}[/dim]")
 
     return store
 
@@ -543,7 +538,7 @@ def _prompt_for_resolution(
     panel_content = (
         f"[bold]{amb.ambiguity_type.value.title()}[/bold] "
         f"([{amb.severity.value}] severity){priority_indicator}\n\n"
-        f"[yellow]Source text:[/yellow] \"{amb.source_text}\"\n"
+        f'[yellow]Source text:[/yellow] "{amb.source_text}"\n'
         f"[yellow]Location:[/yellow] {amb.location}\n"
         f"[yellow]Issue:[/yellow] {amb.description}"
     )
@@ -634,8 +629,7 @@ def _validate_format_response(response: str, prompt: ResolutionPrompt) -> str | 
             return "no"
         else:
             console.print(
-                "[yellow]Note:[/yellow] Expected yes/no answer. "
-                f"Keeping original: '{response}'"
+                f"[yellow]Note:[/yellow] Expected yes/no answer. Keeping original: '{response}'"
             )
 
     elif prompt.answer_format == AnswerFormat.NUMERIC:
@@ -646,8 +640,7 @@ def _validate_format_response(response: str, prompt: ResolutionPrompt) -> str | 
             float(cleaned)  # Just validate it's a number
         except ValueError:
             console.print(
-                "[yellow]Note:[/yellow] Expected numeric answer. "
-                f"Keeping original: '{response}'"
+                f"[yellow]Note:[/yellow] Expected numeric answer. Keeping original: '{response}'"
             )
 
     elif prompt.answer_format == AnswerFormat.DATE:
@@ -822,9 +815,7 @@ def _apply_resolutions_to_content(
         amb_idx = int(resolution.ambiguity_id.split("-")[1]) - 1
         if 0 <= amb_idx < len(ambiguity_result.ambiguities):
             amb = ambiguity_result.ambiguities[amb_idx]
-            clarification_lines.append(
-                f"- **{amb.source_text}**: {resolution.user_response}\n"
-            )
+            clarification_lines.append(f"- **{amb.source_text}**: {resolution.user_response}\n")
 
     return content + "".join(clarification_lines)
 
@@ -916,7 +907,11 @@ def seed_command(
 
                 # Build a mapping from sorted ambiguities to their original prompts
                 amb_to_prompt = dict(
-                    zip(ambiguity_result.ambiguities, ambiguity_result.resolution_prompts, strict=False)
+                    zip(
+                        ambiguity_result.ambiguities,
+                        ambiguity_result.resolution_prompts,
+                        strict=False,
+                    )
                 )
 
                 for i, amb in enumerate(sorted_ambiguities, 1):
@@ -940,12 +935,8 @@ def seed_command(
                 # Apply resolutions to content
                 if resolutions:
                     console.print()
-                    console.print(
-                        f"[green]Applied {len(resolutions)} clarification(s)[/green]"
-                    )
-                    content = _apply_resolutions_to_content(
-                        content, ambiguity_result, resolutions
-                    )
+                    console.print(f"[green]Applied {len(resolutions)} clarification(s)[/green]")
+                    content = _apply_resolutions_to_content(content, ambiguity_result, resolutions)
                     console.print()
                     console.print("[blue]Re-parsing with clarifications...[/blue]")
                     console.print()
@@ -954,8 +945,7 @@ def seed_command(
                 unresolved = len(ambiguity_result.ambiguities) - len(resolutions)
                 if unresolved > 0:
                     console.print(
-                        f"[yellow]Note:[/yellow] {unresolved} ambiguity(ies) "
-                        f"were not resolved."
+                        f"[yellow]Note:[/yellow] {unresolved} ambiguity(ies) were not resolved."
                     )
                     console.print()
 
@@ -1053,9 +1043,7 @@ def seed_command(
             elif not json_output:
                 # Interactive override prompt for SOFT conflicts
                 console.print()
-                console.print(
-                    "[bold]Would you like to override SOFT conflicts?[/bold]"
-                )
+                console.print("[bold]Would you like to override SOFT conflicts?[/bold]")
                 console.print()
 
                 overrides_applied = 0
@@ -1072,9 +1060,7 @@ def seed_command(
                     console.print()
 
                 if overrides_applied > 0:
-                    console.print(
-                        f"[green]Overrode {overrides_applied} SOFT conflict(s)[/green]"
-                    )
+                    console.print(f"[green]Overrode {overrides_applied} SOFT conflict(s)[/green]")
                     result.sop_validation.override_applied = True
 
     # Exit if blocked by HARD conflicts
@@ -1177,9 +1163,7 @@ def seed_command(
             if result.sop_validation.passed:
                 console.print("[green]SOP validation passed![/green]")
             elif result.sop_validation.override_applied:
-                console.print(
-                    "[yellow]SOP validation passed with overrides[/yellow]"
-                )
+                console.print("[yellow]SOP validation passed with overrides[/yellow]")
 
         console.print()
         console.print(

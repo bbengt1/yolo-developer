@@ -1,0 +1,174 @@
+"""Tests for placeholder command modules (Story 12.1).
+
+Tests cover:
+- Each placeholder command module calls coming_soon
+- Each placeholder command module logs debug message
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+
+class TestRunCommand:
+    """Tests for run command module."""
+
+    @patch("yolo_developer.cli.commands.run.coming_soon")
+    @patch("yolo_developer.cli.commands.run.logger")
+    def test_run_command_calls_coming_soon(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test run_command calls coming_soon with 'run'."""
+        from yolo_developer.cli.commands.run import run_command
+
+        run_command()
+
+        mock_coming_soon.assert_called_once_with("run")
+
+    @patch("yolo_developer.cli.commands.run.coming_soon")
+    @patch("yolo_developer.cli.commands.run.logger")
+    def test_run_command_logs_invocation(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test run_command logs debug message."""
+        from yolo_developer.cli.commands.run import run_command
+
+        run_command()
+
+        mock_logger.debug.assert_called_once_with("run_command_invoked")
+
+
+class TestStatusCommand:
+    """Tests for status command module."""
+
+    @patch("yolo_developer.cli.commands.status.coming_soon")
+    @patch("yolo_developer.cli.commands.status.logger")
+    def test_status_command_calls_coming_soon(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test status_command calls coming_soon with 'status'."""
+        from yolo_developer.cli.commands.status import status_command
+
+        status_command()
+
+        mock_coming_soon.assert_called_once_with("status")
+
+    @patch("yolo_developer.cli.commands.status.coming_soon")
+    @patch("yolo_developer.cli.commands.status.logger")
+    def test_status_command_logs_invocation(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test status_command logs debug message."""
+        from yolo_developer.cli.commands.status import status_command
+
+        status_command()
+
+        mock_logger.debug.assert_called_once_with("status_command_invoked")
+
+
+class TestLogsCommand:
+    """Tests for logs command module."""
+
+    @patch("yolo_developer.cli.commands.logs.coming_soon")
+    @patch("yolo_developer.cli.commands.logs.logger")
+    def test_logs_command_calls_coming_soon(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test logs_command calls coming_soon with 'logs'."""
+        from yolo_developer.cli.commands.logs import logs_command
+
+        logs_command()
+
+        mock_coming_soon.assert_called_once_with("logs")
+
+    @patch("yolo_developer.cli.commands.logs.coming_soon")
+    @patch("yolo_developer.cli.commands.logs.logger")
+    def test_logs_command_logs_invocation(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test logs_command logs debug message."""
+        from yolo_developer.cli.commands.logs import logs_command
+
+        logs_command()
+
+        mock_logger.debug.assert_called_once_with("logs_command_invoked")
+
+
+class TestTuneCommand:
+    """Tests for tune command module."""
+
+    @patch("yolo_developer.cli.commands.tune.coming_soon")
+    @patch("yolo_developer.cli.commands.tune.logger")
+    def test_tune_command_calls_coming_soon(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test tune_command calls coming_soon with 'tune'."""
+        from yolo_developer.cli.commands.tune import tune_command
+
+        tune_command()
+
+        mock_coming_soon.assert_called_once_with("tune")
+
+    @patch("yolo_developer.cli.commands.tune.coming_soon")
+    @patch("yolo_developer.cli.commands.tune.logger")
+    def test_tune_command_logs_invocation(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test tune_command logs debug message."""
+        from yolo_developer.cli.commands.tune import tune_command
+
+        tune_command()
+
+        mock_logger.debug.assert_called_once_with("tune_command_invoked")
+
+
+class TestConfigCommand:
+    """Tests for config command module."""
+
+    @patch("yolo_developer.cli.commands.config.coming_soon")
+    @patch("yolo_developer.cli.commands.config.logger")
+    def test_config_command_calls_coming_soon(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test config_command calls coming_soon with 'config'."""
+        from yolo_developer.cli.commands.config import config_command
+
+        config_command()
+
+        mock_coming_soon.assert_called_once_with("config")
+
+    @patch("yolo_developer.cli.commands.config.coming_soon")
+    @patch("yolo_developer.cli.commands.config.logger")
+    def test_config_command_logs_invocation(
+        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
+    ) -> None:
+        """Test config_command logs debug message."""
+        from yolo_developer.cli.commands.config import config_command
+
+        config_command()
+
+        mock_logger.debug.assert_called_once_with("config_command_invoked")
+
+
+class TestCommandModuleExports:
+    """Tests for commands module exports."""
+
+    def test_all_commands_exported(self) -> None:
+        """Test all command functions are exported from commands module."""
+        from yolo_developer.cli.commands import (
+            config_command,
+            init_command,
+            logs_command,
+            run_command,
+            seed_command,
+            status_command,
+            tune_command,
+        )
+
+        assert callable(config_command)
+        assert callable(init_command)
+        assert callable(logs_command)
+        assert callable(run_command)
+        assert callable(seed_command)
+        assert callable(status_command)
+        assert callable(tune_command)

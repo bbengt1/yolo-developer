@@ -709,9 +709,7 @@ class TestApplyResolutionsToContent:
                 timestamp="2026-01-08T10:00:00",
             )
         ]
-        result = _apply_resolutions_to_content(
-            content, sample_ambiguity_result, resolutions
-        )
+        result = _apply_resolutions_to_content(content, sample_ambiguity_result, resolutions)
         assert "## Clarifications (User-Provided)" in result
         assert "fast response times" in result
         assert "< 100ms response time" in result
@@ -778,9 +776,7 @@ class TestSeedCommandInteractive:
         # First call is ambiguity detection, second is parsing
         mock_asyncio_run.side_effect = [empty_ambiguity_result, sample_parse_result]
 
-        seed_command(
-            temp_seed_file, verbose=False, json_output=False, interactive=True
-        )
+        seed_command(temp_seed_file, verbose=False, json_output=False, interactive=True)
 
         # Should call asyncio.run twice (ambiguity detection + parsing)
         assert mock_asyncio_run.call_count == 2
@@ -804,9 +800,7 @@ class TestSeedCommandInteractive:
         mock_asyncio_run.side_effect = [sample_ambiguity_result, sample_parse_result]
         mock_prompt.return_value = None  # Skip all
 
-        seed_command(
-            temp_seed_file, verbose=False, json_output=False, interactive=True
-        )
+        seed_command(temp_seed_file, verbose=False, json_output=False, interactive=True)
 
         assert mock_asyncio_run.call_count == 2
 
