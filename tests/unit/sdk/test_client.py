@@ -1048,3 +1048,731 @@ class TestYoloClientConfigAsyncSync:
         sync_result = client.save_config()
 
         assert sync_result.success
+
+
+# ============================================================================
+# Agent Hooks Tests (Story 13.5)
+# ============================================================================
+
+
+class TestYoloClientHookRegistration:
+    """Tests for hook registration (AC1)."""
+
+    def test_register_hook_returns_hook_id(self, tmp_path: Path) -> None:
+        """Test register_hook returns a unique hook ID."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+
+        assert hook_id.startswith("hook-")
+        assert len(hook_id) > 5
+
+    def test_register_hook_stores_registration(self, tmp_path: Path) -> None:
+        """Test register_hook stores the registration."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="pm", phase="pre", callback=my_hook)
+
+        hooks = client.list_hooks()
+        assert len(hooks) == 1
+        assert hooks[0].hook_id == hook_id
+        assert hooks[0].agent == "pm"
+        assert hooks[0].phase == "pre"
+
+    def test_register_hook_wildcard_agent(self, tmp_path: Path) -> None:
+        """Test register_hook with wildcard agent '*'."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="*", phase="pre", callback=my_hook)
+
+        hooks = client.list_hooks()
+        assert hooks[0].agent == "*"
+
+    def test_register_multiple_hooks_same_agent(self, tmp_path: Path) -> None:
+        """Test registering multiple hooks for the same agent/phase."""
+        client = YoloClient(project_path=tmp_path)
+
+        def hook1(agent: str, state: dict) -> dict | None:
+            return {"from": "hook1"}
+
+        def hook2(agent: str, state: dict) -> dict | None:
+            return {"from": "hook2"}
+
+        id1 = client.register_hook(agent="analyst", phase="pre", callback=hook1)
+        id2 = client.register_hook(agent="analyst", phase="pre", callback=hook2)
+
+        hooks = client.list_hooks()
+        assert len(hooks) == 2
+        assert id1 != id2
+
+    def test_register_hook_post_phase(self, tmp_path: Path) -> None:
+        """Test register_hook with post phase."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict, output: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="dev", phase="post", callback=my_hook)
+
+        hooks = client.list_hooks()
+        assert hooks[0].phase == "post"
+
+
+class TestYoloClientHookUnregistration:
+    """Tests for hook unregistration (AC6)."""
+
+    def test_unregister_hook_removes_hook(self, tmp_path: Path) -> None:
+        """Test unregister_hook removes the hook."""
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+        assert len(client.list_hooks()) == 1
+
+        result = client.unregister_hook(hook_id)
+
+        assert result is True
+        assert len(client.list_hooks()) == 0
+
+    def test_unregister_hook_not_found(self, tmp_path: Path) -> None:
+        """Test unregister_hook returns False for non-existent hook."""
+        client = YoloClient(project_path=tmp_path)
+
+        result = client.unregister_hook("hook-nonexistent")
+
+        assert result is False
+
+    def test_list_hooks_reflects_removal(self, tmp_path: Path) -> None:
+        """Test list_hooks reflects hook removal."""
+        client = YoloClient(project_path=tmp_path)
+
+        def hook1(agent: str, state: dict) -> dict | None:
+            return None
+
+        def hook2(agent: str, state: dict) -> dict | None:
+            return None
+
+        id1 = client.register_hook(agent="analyst", phase="pre", callback=hook1)
+        id2 = client.register_hook(agent="pm", phase="pre", callback=hook2)
+
+        assert len(client.list_hooks()) == 2
+
+        client.unregister_hook(id1)
+
+        hooks = client.list_hooks()
+        assert len(hooks) == 1
+        assert hooks[0].hook_id == id2
+
+
+class TestYoloClientPreHookExecution:
+    """Tests for pre-execution hooks (AC2)."""
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_fires_before_agent(self, tmp_path: Path) -> None:
+        """Test pre-hooks fire before agent execution."""
+        client = YoloClient(project_path=tmp_path)
+        called_with = []
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            called_with.append((agent, dict(state)))
+            return None
+
+        client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+
+        modifications, results = await client._execute_pre_hooks(
+            "analyst", {"existing": "data"}
+        )
+
+        assert len(called_with) == 1
+        assert called_with[0][0] == "analyst"
+        assert called_with[0][1] == {"existing": "data"}
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_returns_modifications(self, tmp_path: Path) -> None:
+        """Test pre-hooks can return state modifications."""
+        client = YoloClient(project_path=tmp_path)
+
+        def inject_context(agent: str, state: dict) -> dict | None:
+            return {"custom_context": "injected"}
+
+        client.register_hook(agent="analyst", phase="pre", callback=inject_context)
+
+        modifications, results = await client._execute_pre_hooks("analyst", {})
+
+        assert modifications == {"custom_context": "injected"}
+        assert results[0].success is True
+        assert results[0].modifications == {"custom_context": "injected"}
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_none_means_no_modification(self, tmp_path: Path) -> None:
+        """Test pre-hooks returning None means no modifications."""
+        client = YoloClient(project_path=tmp_path)
+
+        def no_change(agent: str, state: dict) -> dict | None:
+            return None
+
+        client.register_hook(agent="analyst", phase="pre", callback=no_change)
+
+        modifications, results = await client._execute_pre_hooks("analyst", {})
+
+        assert modifications is None
+        assert results[0].success is True
+
+    @pytest.mark.asyncio
+    async def test_pre_hooks_fire_in_registration_order(self, tmp_path: Path) -> None:
+        """Test pre-hooks fire in registration order."""
+        client = YoloClient(project_path=tmp_path)
+        order = []
+
+        def hook1(agent: str, state: dict) -> dict | None:
+            order.append("hook1")
+            return {"first": True}
+
+        def hook2(agent: str, state: dict) -> dict | None:
+            order.append("hook2")
+            return {"second": True}
+
+        client.register_hook(agent="analyst", phase="pre", callback=hook1)
+        client.register_hook(agent="analyst", phase="pre", callback=hook2)
+
+        modifications, results = await client._execute_pre_hooks("analyst", {})
+
+        assert order == ["hook1", "hook2"]
+        # Modifications should be merged
+        assert modifications == {"first": True, "second": True}
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_wildcard_matches_all(self, tmp_path: Path) -> None:
+        """Test wildcard '*' hooks match all agents."""
+        client = YoloClient(project_path=tmp_path)
+        called_agents = []
+
+        def global_hook(agent: str, state: dict) -> dict | None:
+            called_agents.append(agent)
+            return None
+
+        client.register_hook(agent="*", phase="pre", callback=global_hook)
+
+        await client._execute_pre_hooks("analyst", {})
+        await client._execute_pre_hooks("pm", {})
+        await client._execute_pre_hooks("dev", {})
+
+        assert called_agents == ["analyst", "pm", "dev"]
+
+
+class TestYoloClientPostHookExecution:
+    """Tests for post-execution hooks (AC3)."""
+
+    @pytest.mark.asyncio
+    async def test_post_hook_fires_after_agent(self, tmp_path: Path) -> None:
+        """Test post-hooks fire after agent execution."""
+        client = YoloClient(project_path=tmp_path)
+        called_with = []
+
+        def my_hook(agent: str, state: dict, output: dict) -> dict | None:
+            called_with.append((agent, dict(state), dict(output)))
+            return None
+
+        client.register_hook(agent="analyst", phase="post", callback=my_hook)
+
+        modifications, results = await client._execute_post_hooks(
+            "analyst", {"input": "state"}, {"agent": "output"}
+        )
+
+        assert len(called_with) == 1
+        assert called_with[0][0] == "analyst"
+        assert called_with[0][1] == {"input": "state"}
+        assert called_with[0][2] == {"agent": "output"}
+
+    @pytest.mark.asyncio
+    async def test_post_hook_can_modify_output(self, tmp_path: Path) -> None:
+        """Test post-hooks can modify agent output."""
+        client = YoloClient(project_path=tmp_path)
+
+        def modify_output(agent: str, state: dict, output: dict) -> dict | None:
+            return {**output, "modified": True}
+
+        client.register_hook(agent="analyst", phase="post", callback=modify_output)
+
+        modifications, results = await client._execute_post_hooks(
+            "analyst", {}, {"original": "data"}
+        )
+
+        assert modifications == {"original": "data", "modified": True}
+
+    @pytest.mark.asyncio
+    async def test_post_hook_none_uses_original(self, tmp_path: Path) -> None:
+        """Test post-hooks returning None uses original output."""
+        client = YoloClient(project_path=tmp_path)
+
+        def no_change(agent: str, state: dict, output: dict) -> dict | None:
+            return None
+
+        client.register_hook(agent="analyst", phase="post", callback=no_change)
+
+        modifications, results = await client._execute_post_hooks(
+            "analyst", {}, {"original": "data"}
+        )
+
+        assert modifications is None
+        assert results[0].success is True
+
+    @pytest.mark.asyncio
+    async def test_post_hooks_chain_modifications(self, tmp_path: Path) -> None:
+        """Test post-hooks chain their modifications."""
+        client = YoloClient(project_path=tmp_path)
+
+        def hook1(agent: str, state: dict, output: dict) -> dict | None:
+            return {**output, "from_hook1": True}
+
+        def hook2(agent: str, state: dict, output: dict) -> dict | None:
+            return {**output, "from_hook2": True}
+
+        client.register_hook(agent="analyst", phase="post", callback=hook1)
+        client.register_hook(agent="analyst", phase="post", callback=hook2)
+
+        modifications, results = await client._execute_post_hooks(
+            "analyst", {}, {"original": True}
+        )
+
+        # Hook2 should see hook1's modifications
+        assert modifications == {"original": True, "from_hook1": True, "from_hook2": True}
+
+
+class TestYoloClientHookTypeSafety:
+    """Tests for hook type safety (AC4)."""
+
+    def test_pre_hook_protocol_type(self, tmp_path: Path) -> None:
+        """Test PreHook protocol is properly defined."""
+        from yolo_developer.sdk.types import PreHook
+
+        # Functions matching the protocol should work
+        def my_pre_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        # Should be an instance of PreHook protocol
+        assert isinstance(my_pre_hook, PreHook)
+
+    def test_post_hook_protocol_type(self, tmp_path: Path) -> None:
+        """Test PostHook protocol is properly defined."""
+        from yolo_developer.sdk.types import PostHook
+
+        # Functions matching the protocol should work
+        def my_post_hook(agent: str, state: dict, output: dict) -> dict | None:
+            return None
+
+        # Should be an instance of PostHook protocol
+        assert isinstance(my_post_hook, PostHook)
+
+    def test_hook_registration_dataclass(self, tmp_path: Path) -> None:
+        """Test HookRegistration dataclass has all fields."""
+        from yolo_developer.sdk.types import HookRegistration
+
+        client = YoloClient(project_path=tmp_path)
+
+        def my_hook(agent: str, state: dict) -> dict | None:
+            return None
+
+        hook_id = client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+        hooks = client.list_hooks()
+
+        assert len(hooks) == 1
+        hook = hooks[0]
+
+        assert isinstance(hook, HookRegistration)
+        assert hasattr(hook, "hook_id")
+        assert hasattr(hook, "agent")
+        assert hasattr(hook, "phase")
+        assert hasattr(hook, "callback")
+        assert hasattr(hook, "timestamp")
+
+
+class TestYoloClientHookErrorHandling:
+    """Tests for graceful error handling (AC5)."""
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_error_continues_execution(self, tmp_path: Path) -> None:
+        """Test pre-hook errors don't block workflow."""
+        client = YoloClient(project_path=tmp_path)
+        hook2_called = []
+
+        def failing_hook(agent: str, state: dict) -> dict | None:
+            raise ValueError("Hook error!")
+
+        def succeeding_hook(agent: str, state: dict) -> dict | None:
+            hook2_called.append(True)
+            return {"success": True}
+
+        client.register_hook(agent="analyst", phase="pre", callback=failing_hook)
+        client.register_hook(agent="analyst", phase="pre", callback=succeeding_hook)
+
+        modifications, results = await client._execute_pre_hooks("analyst", {})
+
+        # Second hook should still be called
+        assert len(hook2_called) == 1
+        # Modifications from second hook should still apply
+        assert modifications == {"success": True}
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_error_recorded_in_result(self, tmp_path: Path) -> None:
+        """Test pre-hook errors are recorded in HookResult."""
+        client = YoloClient(project_path=tmp_path)
+
+        def failing_hook(agent: str, state: dict) -> dict | None:
+            raise ValueError("Test error")
+
+        client.register_hook(agent="analyst", phase="pre", callback=failing_hook)
+
+        modifications, results = await client._execute_pre_hooks("analyst", {})
+
+        assert len(results) == 1
+        assert results[0].success is False
+        assert results[0].error == "Test error"
+
+    @pytest.mark.asyncio
+    async def test_post_hook_error_continues_execution(self, tmp_path: Path) -> None:
+        """Test post-hook errors don't block workflow."""
+        client = YoloClient(project_path=tmp_path)
+        hook2_called = []
+
+        def failing_hook(agent: str, state: dict, output: dict) -> dict | None:
+            raise RuntimeError("Post hook failed")
+
+        def succeeding_hook(agent: str, state: dict, output: dict) -> dict | None:
+            hook2_called.append(True)
+            return {**output, "from_hook2": True}
+
+        client.register_hook(agent="analyst", phase="post", callback=failing_hook)
+        client.register_hook(agent="analyst", phase="post", callback=succeeding_hook)
+
+        modifications, results = await client._execute_post_hooks(
+            "analyst", {}, {"original": True}
+        )
+
+        # Second hook should still be called
+        assert len(hook2_called) == 1
+        # First result should show failure
+        assert results[0].success is False
+        # Second result should show success
+        assert results[1].success is True
+
+    @pytest.mark.asyncio
+    async def test_hook_execution_error_type_available(self, tmp_path: Path) -> None:
+        """Test HookExecutionError is available for inspection."""
+        from yolo_developer.sdk.exceptions import HookExecutionError
+
+        # Verify the error type exists and has expected attributes
+        error = HookExecutionError(
+            "Test error",
+            hook_id="hook-123",
+            agent="analyst",
+            phase="pre",
+        )
+
+        assert error.hook_id == "hook-123"
+        assert error.agent == "analyst"
+        assert error.phase == "pre"
+        assert str(error) == "Test error"
+
+
+class TestYoloClientListHooks:
+    """Tests for list_hooks method."""
+
+    def test_list_hooks_returns_sorted_by_timestamp(self, tmp_path: Path) -> None:
+        """Test list_hooks returns hooks sorted by registration time."""
+        import time
+
+        client = YoloClient(project_path=tmp_path)
+
+        def hook1(agent: str, state: dict) -> dict | None:
+            return None
+
+        def hook2(agent: str, state: dict) -> dict | None:
+            return None
+
+        def hook3(agent: str, state: dict) -> dict | None:
+            return None
+
+        id1 = client.register_hook(agent="analyst", phase="pre", callback=hook1)
+        time.sleep(0.01)  # Small delay to ensure different timestamps
+        id2 = client.register_hook(agent="pm", phase="pre", callback=hook2)
+        time.sleep(0.01)
+        id3 = client.register_hook(agent="dev", phase="pre", callback=hook3)
+
+        hooks = client.list_hooks()
+
+        assert len(hooks) == 3
+        assert hooks[0].hook_id == id1
+        assert hooks[1].hook_id == id2
+        assert hooks[2].hook_id == id3
+
+    def test_list_hooks_empty_initially(self, tmp_path: Path) -> None:
+        """Test list_hooks returns empty list initially."""
+        client = YoloClient(project_path=tmp_path)
+
+        hooks = client.list_hooks()
+
+        assert hooks == []
+
+
+class TestYoloClientHookResult:
+    """Tests for HookResult dataclass."""
+
+    def test_hook_result_structure(self, tmp_path: Path) -> None:
+        """Test HookResult has all expected fields."""
+        from yolo_developer.sdk.types import HookResult
+
+        result = HookResult(
+            hook_id="hook-123",
+            agent="analyst",
+            phase="pre",
+            success=True,
+            modifications={"key": "value"},
+        )
+
+        assert result.hook_id == "hook-123"
+        assert result.agent == "analyst"
+        assert result.phase == "pre"
+        assert result.success is True
+        assert result.modifications == {"key": "value"}
+        assert result.error is None
+        assert result.timestamp is not None
+
+    def test_hook_result_with_error(self, tmp_path: Path) -> None:
+        """Test HookResult with error."""
+        from yolo_developer.sdk.types import HookResult
+
+        result = HookResult(
+            hook_id="hook-123",
+            agent="analyst",
+            phase="pre",
+            success=False,
+            error="Something went wrong",
+        )
+
+        assert result.success is False
+        assert result.error == "Something went wrong"
+        assert result.modifications is None
+
+
+class TestYoloClientHookIntegration:
+    """Tests for hook integration with run_async (Story 13.5 fix)."""
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_fires_during_run_async(self, tmp_path: Path) -> None:
+        """Test pre-hooks fire during workflow execution."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        hook_calls: list[tuple[str, dict]] = []
+
+        def capture_pre_hook(agent: str, state: dict) -> dict | None:
+            hook_calls.append((agent, dict(state)))
+            return {"injected": "data"}
+
+        client.register_hook(agent="analyst", phase="pre", callback=capture_pre_hook)
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "analyst",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Verify pre-hook was called
+        assert len(hook_calls) == 1
+        assert hook_calls[0][0] == "analyst"
+
+    @pytest.mark.asyncio
+    async def test_post_hook_fires_during_run_async(self, tmp_path: Path) -> None:
+        """Test post-hooks fire during workflow execution."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        hook_calls: list[tuple[str, dict, dict]] = []
+
+        def capture_post_hook(agent: str, state: dict, output: dict) -> dict | None:
+            hook_calls.append((agent, dict(state), dict(output)))
+            return None
+
+        client.register_hook(agent="analyst", phase="post", callback=capture_post_hook)
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "analyst",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Verify post-hook was called
+        assert len(hook_calls) == 1
+        assert hook_calls[0][0] == "analyst"
+        # Output should contain workflow results
+        assert "decisions" in hook_calls[0][2]
+
+    @pytest.mark.asyncio
+    async def test_wildcard_hooks_fire_during_run_async(self, tmp_path: Path) -> None:
+        """Test wildcard '*' hooks fire during workflow execution."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        pre_calls: list[str] = []
+        post_calls: list[str] = []
+
+        def wildcard_pre(agent: str, state: dict) -> dict | None:
+            pre_calls.append(agent)
+            return None
+
+        def wildcard_post(agent: str, state: dict, output: dict) -> dict | None:
+            post_calls.append(agent)
+            return None
+
+        client.register_hook(agent="*", phase="pre", callback=wildcard_pre)
+        client.register_hook(agent="*", phase="post", callback=wildcard_post)
+
+        # Mock orchestrator
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+        mock_orchestrator.run_workflow = AsyncMock(
+            return_value={
+                "decisions": [],
+                "messages": [],
+                "current_agent": "pm",
+            }
+        )
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Wildcard hooks should fire for any agent
+        assert len(pre_calls) == 1
+        assert pre_calls[0] == "analyst"  # Entry agent
+        assert len(post_calls) == 1
+        assert post_calls[0] == "pm"  # Last agent from workflow
+
+    @pytest.mark.asyncio
+    async def test_pre_hook_modifications_injected(self, tmp_path: Path) -> None:
+        """Test pre-hook modifications are injected into initial state."""
+        (tmp_path / ".yolo").mkdir()
+        client = YoloClient(project_path=tmp_path)
+        captured_state: list[dict] = []
+
+        def inject_hook(agent: str, state: dict) -> dict | None:
+            return {"custom_context": "injected_value"}
+
+        client.register_hook(agent="analyst", phase="pre", callback=inject_hook)
+
+        # Mock orchestrator to capture the state passed to run_workflow
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.WorkflowConfig = MagicMock()
+        mock_orchestrator.WorkflowConfig.return_value.entry_point = "analyst"
+        mock_orchestrator.create_initial_state = MagicMock(
+            return_value={"messages": [], "decisions": []}
+        )
+
+        async def capture_run_workflow(initial_state, config):
+            captured_state.append(dict(initial_state))
+            return {
+                "decisions": [],
+                "messages": [],
+                "current_agent": "analyst",
+            }
+
+        mock_orchestrator.run_workflow = capture_run_workflow
+
+        with (
+            patch("yolo_developer.seed.parse_seed") as mock_parse,
+            patch.dict(
+                "sys.modules",
+                {"yolo_developer.orchestrator": mock_orchestrator},
+            ),
+        ):
+            mock_seed_result = MagicMock()
+            mock_seed_result.goal_count = 1
+            mock_seed_result.feature_count = 1
+            mock_seed_result.constraint_count = 0
+            mock_seed_result.has_ambiguities = False
+            mock_seed_result.ambiguities = []
+            mock_parse.return_value = mock_seed_result
+
+            await client.run_async(seed_content="Build something")
+
+        # Verify injected data was passed to workflow
+        assert len(captured_state) == 1
+        assert captured_state[0].get("custom_context") == "injected_value"

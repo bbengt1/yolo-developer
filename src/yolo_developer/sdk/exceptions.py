@@ -1,4 +1,4 @@
-"""SDK-specific exception hierarchy (Story 13.1).
+"""SDK-specific exception hierarchy (Stories 13.1, 13.5).
 
 This module provides SDK-specific exception types that wrap and enhance
 underlying errors with helpful messages while preserving the original
@@ -19,6 +19,7 @@ Example:
 References:
     - FR106-FR111: Python SDK requirements
     - AC5: SDK-specific exceptions with helpful error messages
+    - Story 13.5: Agent hooks and HookExecutionError
 """
 
 from __future__ import annotations
@@ -260,3 +261,52 @@ class ProjectNotFoundError(SDKError):
         """
         super().__init__(message, original_error=original_error, details=details)
         self.project_path = project_path
+
+
+class HookExecutionError(SDKError):
+    """Raised when a hook execution fails.
+
+    This error is raised when a registered hook (pre or post execution)
+    raises an exception during workflow execution. Hook errors are logged
+    and recorded in the audit trail but do not block workflow execution.
+
+    Attributes:
+        hook_id: The ID of the hook that failed.
+        agent: The agent the hook was executing for.
+        phase: The execution phase ("pre" or "post").
+
+    Example:
+        >>> # Hooks don't block workflow, but you can inspect failures
+        >>> try:
+        ...     result = await client.run_async(seed_content="Build a REST API")
+        ... except WorkflowExecutionError as e:
+        ...     # Check if any hook errors were recorded
+        ...     for result in hook_results:
+        ...         if not result.success:
+        ...             print(f"Hook {result.hook_id} failed: {result.error}")
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        hook_id: str | None = None,
+        agent: str | None = None,
+        phase: str | None = None,
+        original_error: Exception | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize HookExecutionError.
+
+        Args:
+            message: Human-readable error description.
+            hook_id: The ID of the hook that failed.
+            agent: The agent the hook was executing for.
+            phase: The execution phase ("pre" or "post").
+            original_error: The underlying exception that caused this error.
+            details: Additional context about the error.
+        """
+        super().__init__(message, original_error=original_error, details=details)
+        self.hook_id = hook_id
+        self.agent = agent
+        self.phase = phase

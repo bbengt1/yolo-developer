@@ -1,4 +1,4 @@
-"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2, 13.3).
+"""YoloClient class for programmatic SDK access (Stories 13.1, 13.2, 13.3, 13.5).
 
 This module provides the main YoloClient class that serves as the
 primary entry point for programmatic access to YOLO Developer.
@@ -22,6 +22,7 @@ References:
     - FR107: Developers can provide seeds and execute runs via SDK
     - FR108: Developers can access audit trail data via SDK
     - FR109: Developers can configure all project settings via SDK
+    - FR110: Developers can extend agent behavior via SDK hooks
     - AC1: YoloClient instantiation with configuration
     - AC2: Full functionality access
 """
@@ -50,7 +51,11 @@ from yolo_developer.sdk.types import (
     ConfigUpdateResult,
     ConfigValidationIssue,
     ConfigValidationResult,
+    HookRegistration,
+    HookResult,
     InitResult,
+    PostHook,
+    PreHook,
     RunResult,
     SeedResult,
     StatusResult,
@@ -150,6 +155,7 @@ class YoloClient:
             >>> client = YoloClient(project_path="/path/to/project")
         """
         self._project_path = Path(project_path) if project_path else Path.cwd()
+        self._hooks: dict[str, HookRegistration] = {}  # hook_id -> registration
 
         try:
             if config is not None:
@@ -1013,11 +1019,39 @@ memory:
                 starting_agent="analyst",
             )
 
+            # Execute pre-hooks before workflow starts (Story 13.5)
+            # Note: Per-agent hooks require orchestrator-level integration.
+            # Currently hooks fire at workflow boundaries (start/end).
+            entry_agent = workflow_config.entry_point
+            pre_modifications, _pre_results = await self._execute_pre_hooks(
+                entry_agent, dict(initial_state)
+            )
+            if pre_modifications:
+                # Merge hook modifications into initial state.
+                # Hooks can inject additional context beyond the TypedDict schema.
+                state_dict: dict[str, Any] = dict(initial_state)
+                state_dict.update(pre_modifications)
+                initial_state = state_dict  # type: ignore[assignment]
+
             # Run workflow
             final_state = await run_workflow(
                 initial_state=initial_state,
                 config=workflow_config,
             )
+
+            # Execute post-hooks after workflow completes (Story 13.5)
+            last_agent = final_state.get("current_agent", entry_agent)
+            workflow_output = {
+                "decisions": final_state.get("decisions", []),
+                "messages": final_state.get("messages", []),
+                "current_agent": last_agent,
+            }
+            post_modifications, _post_results = await self._execute_post_hooks(
+                last_agent, dict(initial_state), workflow_output
+            )
+            if post_modifications:
+                # Post-hooks can modify the workflow output
+                workflow_output = post_modifications
 
             # Extract results from final state
             # Note: YoloState has messages, current_agent, handoff_context, decisions
@@ -1320,3 +1354,282 @@ memory:
         audit_dir = self._project_path / ".yolo" / "audit"
         decisions_file = audit_dir / "decisions.json"
         return JsonDecisionStore(decisions_file)
+
+    # =========================================================================
+    # Hook Registration API (Story 13.5)
+    # =========================================================================
+
+    def register_hook(
+        self,
+        *,
+        agent: str,
+        phase: Literal["pre", "post"],
+        callback: PreHook | PostHook,
+    ) -> str:
+        """Register a hook for agent execution.
+
+        Hooks extend agent behavior by executing custom code before or after
+        agent execution. Multiple hooks can be registered for the same agent
+        and phase, and they execute in registration order.
+
+        Args:
+            agent: Target agent name (e.g., "analyst", "pm", "dev") or "*" for all agents.
+            phase: Execution phase - "pre" (before agent) or "post" (after agent).
+            callback: The hook function to execute. For pre-hooks, signature is
+                `(agent: str, state: dict) -> dict | None`. For post-hooks,
+                signature is `(agent: str, state: dict, output: dict) -> dict | None`.
+
+        Returns:
+            Hook ID string that can be used to unregister the hook.
+
+        Example:
+            >>> # Pre-hook to inject context
+            >>> def inject_context(agent: str, state: dict) -> dict | None:
+            ...     return {"custom_context": "my data"}
+            >>>
+            >>> hook_id = client.register_hook(
+            ...     agent="analyst",
+            ...     phase="pre",
+            ...     callback=inject_context,
+            ... )
+            >>>
+            >>> # Post-hook for all agents
+            >>> def log_output(agent: str, state: dict, output: dict) -> dict | None:
+            ...     print(f"{agent} completed")
+            ...     return None
+            >>>
+            >>> hook_id = client.register_hook(
+            ...     agent="*",
+            ...     phase="post",
+            ...     callback=log_output,
+            ... )
+        """
+        import uuid
+        from datetime import datetime, timezone
+
+        hook_id = f"hook-{uuid.uuid4().hex[:8]}"
+
+        registration = HookRegistration(
+            hook_id=hook_id,
+            agent=agent,
+            phase=phase,
+            callback=callback,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        self._hooks[hook_id] = registration
+
+        logger.info(
+            "hook_registered",
+            hook_id=hook_id,
+            agent=agent,
+            phase=phase,
+        )
+
+        return hook_id
+
+    def unregister_hook(self, hook_id: str) -> bool:
+        """Unregister a previously registered hook.
+
+        Removes the hook from the registry so it won't fire on subsequent
+        agent executions.
+
+        Args:
+            hook_id: The hook ID returned from register_hook().
+
+        Returns:
+            True if the hook was found and removed, False if not found.
+
+        Example:
+            >>> hook_id = client.register_hook(agent="analyst", phase="pre", callback=my_hook)
+            >>> # ... later ...
+            >>> client.unregister_hook(hook_id)
+            True
+        """
+        if hook_id in self._hooks:
+            del self._hooks[hook_id]
+            logger.info("hook_unregistered", hook_id=hook_id)
+            return True
+        return False
+
+    def list_hooks(self) -> list[HookRegistration]:
+        """List all registered hooks.
+
+        Returns a list of all currently registered hooks, sorted by registration
+        time (oldest first).
+
+        Returns:
+            List of HookRegistration objects.
+
+        Example:
+            >>> hooks = client.list_hooks()
+            >>> for hook in hooks:
+            ...     print(f"{hook.hook_id}: {hook.agent} ({hook.phase})")
+        """
+        return sorted(self._hooks.values(), key=lambda h: h.timestamp)
+
+    # =========================================================================
+    # Hook Execution (Story 13.5)
+    # =========================================================================
+
+    async def _execute_pre_hooks(
+        self,
+        agent: str,
+        state: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, list[HookResult]]:
+        """Execute all matching pre-hooks for an agent.
+
+        Finds all pre-hooks that match the agent (exact match or wildcard "*")
+        and executes them in registration order. Hook errors are caught and
+        logged but don't block execution.
+
+        Args:
+            agent: Name of the agent about to execute.
+            state: Current workflow state (passed as read-only snapshot).
+
+        Returns:
+            Tuple of (merged modifications dict or None, list of HookResults).
+        """
+        from datetime import datetime, timezone
+
+        matching_hooks = [
+            h
+            for h in self.list_hooks()
+            if h.phase == "pre" and (h.agent == agent or h.agent == "*")
+        ]
+
+        merged_modifications: dict[str, Any] = {}
+        results: list[HookResult] = []
+
+        for hook in matching_hooks:
+            try:
+                # Create read-only snapshot by copying
+                state_snapshot = dict(state)
+                result = hook.callback(agent, state_snapshot)  # type: ignore[call-arg]
+
+                if result is not None:
+                    merged_modifications.update(result)
+
+                results.append(
+                    HookResult(
+                        hook_id=hook.hook_id,
+                        agent=agent,
+                        phase="pre",
+                        success=True,
+                        modifications=result,
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
+
+                logger.debug(
+                    "pre_hook_executed",
+                    hook_id=hook.hook_id,
+                    agent=agent,
+                    has_modifications=result is not None,
+                )
+
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(
+                    "hook_execution_failed",
+                    hook_id=hook.hook_id,
+                    agent=agent,
+                    phase="pre",
+                    error=error_msg,
+                )
+
+                results.append(
+                    HookResult(
+                        hook_id=hook.hook_id,
+                        agent=agent,
+                        phase="pre",
+                        success=False,
+                        error=error_msg,
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
+
+        return merged_modifications if merged_modifications else None, results
+
+    async def _execute_post_hooks(
+        self,
+        agent: str,
+        state: dict[str, Any],
+        output: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, list[HookResult]]:
+        """Execute all matching post-hooks for an agent.
+
+        Finds all post-hooks that match the agent (exact match or wildcard "*")
+        and executes them in registration order. Each hook receives the previous
+        hook's modified output (if any). Hook errors are caught and logged but
+        don't block execution.
+
+        Args:
+            agent: Name of the agent that executed.
+            state: Input state the agent received.
+            output: Output from the agent.
+
+        Returns:
+            Tuple of (final modified output or None, list of HookResults).
+        """
+        from datetime import datetime, timezone
+
+        matching_hooks = [
+            h
+            for h in self.list_hooks()
+            if h.phase == "post" and (h.agent == agent or h.agent == "*")
+        ]
+
+        current_output = output
+        final_modifications: dict[str, Any] | None = None
+        results: list[HookResult] = []
+
+        for hook in matching_hooks:
+            try:
+                # Pass current output (which may have been modified by previous hooks)
+                result = hook.callback(agent, state, current_output)  # type: ignore[call-arg]
+
+                if result is not None:
+                    current_output = result
+                    final_modifications = result
+
+                results.append(
+                    HookResult(
+                        hook_id=hook.hook_id,
+                        agent=agent,
+                        phase="post",
+                        success=True,
+                        modifications=result,
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
+
+                logger.debug(
+                    "post_hook_executed",
+                    hook_id=hook.hook_id,
+                    agent=agent,
+                    has_modifications=result is not None,
+                )
+
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(
+                    "hook_execution_failed",
+                    hook_id=hook.hook_id,
+                    agent=agent,
+                    phase="post",
+                    error=error_msg,
+                )
+
+                results.append(
+                    HookResult(
+                        hook_id=hook.hook_id,
+                        agent=agent,
+                        phase="post",
+                        success=False,
+                        error=error_msg,
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                )
+
+        return final_modifications, results

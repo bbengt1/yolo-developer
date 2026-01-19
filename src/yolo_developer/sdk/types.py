@@ -1,4 +1,4 @@
-"""SDK-specific type definitions (Stories 13.1, 13.4).
+"""SDK-specific type definitions (Stories 13.1, 13.4, 13.5).
 
 This module provides type definitions for SDK operation results,
 enabling full type safety for SDK consumers.
@@ -15,18 +15,147 @@ References:
     - FR106-FR111: Python SDK requirements
     - AC3: Complete type hints for all SDK operations
     - Story 13.4: Configuration API types
+    - Story 13.5: Agent hooks
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 
 
 def _utc_now() -> datetime:
     """Return current UTC datetime for default factory."""
     return datetime.now(timezone.utc)
+
+
+# =============================================================================
+# Hook Protocols (Story 13.5)
+# =============================================================================
+
+
+@runtime_checkable
+class PreHook(Protocol):
+    """Protocol for pre-execution hooks.
+
+    Pre-hooks fire before an agent begins execution, receiving a read-only
+    snapshot of the current workflow state. They can return state modifications
+    to inject into the workflow.
+
+    Example:
+        >>> def inject_context(agent: str, state: dict) -> dict | None:
+        ...     '''Inject custom context before agent runs.'''
+        ...     return {"custom_context": "my data"}
+        >>>
+        >>> # Or return None for no modifications
+        >>> def log_state(agent: str, state: dict) -> dict | None:
+        ...     '''Log state without modifications.'''
+        ...     print(f"Agent {agent} starting with state keys: {state.keys()}")
+        ...     return None
+    """
+
+    def __call__(self, agent: str, state: dict[str, Any]) -> dict[str, Any] | None:
+        """Execute before agent runs.
+
+        Args:
+            agent: Name of the agent about to execute (e.g., "analyst", "pm").
+            state: Current workflow state (read-only snapshot).
+
+        Returns:
+            Dict of state modifications to inject, or None for no changes.
+        """
+        ...
+
+
+@runtime_checkable
+class PostHook(Protocol):
+    """Protocol for post-execution hooks.
+
+    Post-hooks fire after an agent completes execution, receiving both the
+    input state and the agent's output. They can modify the output before
+    it's applied to the workflow state.
+
+    Example:
+        >>> def log_decisions(agent: str, state: dict, output: dict) -> dict | None:
+        ...     '''Log agent decisions without modifications.'''
+        ...     print(f"Agent {agent} made decisions: {output.get('decisions', [])}")
+        ...     return None  # Don't modify output
+        >>>
+        >>> def filter_output(agent: str, state: dict, output: dict) -> dict | None:
+        ...     '''Modify agent output.'''
+        ...     if agent == "dev":
+        ...         output["additional_checks"] = True
+        ...     return output
+    """
+
+    def __call__(
+        self, agent: str, state: dict[str, Any], output: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Execute after agent completes.
+
+        Args:
+            agent: Name of the agent that executed.
+            state: Input state the agent received.
+            output: Output from the agent.
+
+        Returns:
+            Modified output dict, or None to use original output.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class HookRegistration:
+    """Registration record for an agent hook.
+
+    Attributes:
+        hook_id: Unique identifier for this hook registration.
+        agent: Target agent name or "*" for all agents.
+        phase: Execution phase ("pre" or "post").
+        callback: The hook function to execute.
+        timestamp: When the hook was registered.
+
+    Example:
+        >>> registration = client.list_hooks()[0]
+        >>> print(f"Hook {registration.hook_id} targets {registration.agent}")
+        >>> print(f"Phase: {registration.phase}")
+    """
+
+    hook_id: str
+    agent: str
+    phase: Literal["pre", "post"]
+    callback: PreHook | PostHook
+    timestamp: datetime = field(default_factory=_utc_now)
+
+
+@dataclass(frozen=True)
+class HookResult:
+    """Result of hook execution for a single hook.
+
+    Attributes:
+        hook_id: ID of the hook that executed.
+        agent: Agent the hook was executed for.
+        phase: Execution phase ("pre" or "post").
+        success: Whether the hook executed without error.
+        modifications: State/output modifications returned by the hook.
+        error: Error message if hook failed.
+        timestamp: When the hook executed.
+
+    Example:
+        >>> # After workflow run, inspect hook execution results
+        >>> for result in hook_results:
+        ...     if not result.success:
+        ...         print(f"Hook {result.hook_id} failed: {result.error}")
+    """
+
+    hook_id: str
+    agent: str
+    phase: Literal["pre", "post"]
+    success: bool
+    modifications: dict[str, Any] | None = None
+    error: str | None = None
+    timestamp: datetime = field(default_factory=_utc_now)
 
 
 @dataclass(frozen=True)
