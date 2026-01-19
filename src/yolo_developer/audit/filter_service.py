@@ -1,7 +1,7 @@
 """Audit filter service for unified filtering across all stores (Story 11.7).
 
 This module provides the AuditFilterService class that coordinates
-filtering across all audit stores (decisions, traceability, costs).
+filtering across all audit stores (decisions, traceability, costs, ADRs).
 
 The service enables unified querying of audit data with consistent
 filter semantics across different store implementations.
@@ -17,6 +17,7 @@ Example:
     ...     decision_store=decision_store,
     ...     traceability_store=traceability_store,
     ...     cost_store=cost_store,
+    ...     adr_store=adr_store,
     ... )
     >>>
     >>> filters = AuditFilters(agent_name="analyst")
@@ -24,12 +25,15 @@ Example:
     >>> results["decisions"]  # Decision records for analyst
     >>> results["artifacts"]  # Traceable artifacts
     >>> results["costs"]  # Cost records for analyst
+    >>> results["adrs"]  # Auto-generated ADRs
 
 References:
     - FR87: Users can filter audit trail by agent, time range, or artifact
+    - FR88: System can generate Architecture Decision Records automatically
     - Story 11.1: DecisionStore pattern
     - Story 11.2: TraceabilityStore pattern
     - Story 11.6: CostStore pattern
+    - Story 11.8: ADRStore pattern
 """
 
 from __future__ import annotations
@@ -39,6 +43,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+    from yolo_developer.audit.adr_store import ADRStore
+    from yolo_developer.audit.adr_types import AutoADR
     from yolo_developer.audit.cost_store import CostStore
     from yolo_developer.audit.cost_types import CostRecord
     from yolo_developer.audit.filter_types import AuditFilters
@@ -54,7 +60,7 @@ class AuditFilterService:
     """Service for filtering audit data across all stores.
 
     Provides unified filtering interface that queries decisions,
-    traceability, and cost data with combined filters.
+    traceability, cost, and ADR data with combined filters.
 
     The service coordinates filtering across multiple audit stores,
     converting unified AuditFilters to store-specific filter types.
@@ -63,12 +69,14 @@ class AuditFilterService:
         _decision_store: Store for decision records
         _traceability_store: Store for traceable artifacts
         _cost_store: Optional store for cost records
+        _adr_store: Optional store for auto-generated ADRs
 
     Example:
         >>> service = AuditFilterService(
         ...     decision_store=decision_store,
         ...     traceability_store=traceability_store,
         ...     cost_store=cost_store,
+        ...     adr_store=adr_store,
         ... )
         >>> filters = AuditFilters(agent_name="analyst")
         >>> decisions = await service.filter_decisions(filters)
@@ -79,6 +87,7 @@ class AuditFilterService:
         decision_store: DecisionStore,
         traceability_store: TraceabilityStore,
         cost_store: CostStore | None = None,
+        adr_store: ADRStore | None = None,
     ) -> None:
         """Initialize the audit filter service.
 
@@ -86,13 +95,16 @@ class AuditFilterService:
             decision_store: Store for decision records.
             traceability_store: Store for traceable artifacts.
             cost_store: Optional store for cost records.
+            adr_store: Optional store for auto-generated ADRs.
         """
         self._decision_store = decision_store
         self._traceability_store = traceability_store
         self._cost_store = cost_store
+        self._adr_store = adr_store
         _logger.debug(
             "audit_filter_service_initialized",
             has_cost_store=cost_store is not None,
+            has_adr_store=adr_store is not None,
         )
 
     async def filter_decisions(
@@ -177,6 +189,48 @@ class AuditFilterService:
         )
         return await self._cost_store.get_costs(cost_filters)
 
+    async def filter_adrs(
+        self,
+        filters: AuditFilters,
+    ) -> list[AutoADR]:
+        """Filter ADRs using unified filters.
+
+        Uses story_id and time range filters from AuditFilters
+        to query the ADR store. Returns empty list if no ADR store
+        is configured.
+
+        Args:
+            filters: Unified filters to apply.
+
+        Returns:
+            List of AutoADR records matching the filters,
+            or empty list if no ADR store is configured.
+        """
+        if self._adr_store is None:
+            _logger.debug("adr_store_not_configured")
+            return []
+
+        _logger.debug(
+            "filtering_adrs",
+            story_id=filters.story_id,
+            start_time=filters.start_time,
+            end_time=filters.end_time,
+        )
+
+        # Use story_id filter if specified
+        if filters.story_id is not None:
+            return await self._adr_store.get_adrs_by_story(filters.story_id)
+
+        # Use time range filter if specified
+        if filters.start_time is not None or filters.end_time is not None:
+            return await self._adr_store.get_adrs_by_time_range(
+                start_time=filters.start_time,
+                end_time=filters.end_time,
+            )
+
+        # Return all ADRs if no specific filters
+        return await self._adr_store.get_all_adrs()
+
     async def filter_all(
         self,
         filters: AuditFilters,
@@ -194,6 +248,7 @@ class AuditFilterService:
                 - 'decisions': List of matching Decision records
                 - 'artifacts': List of matching TraceableArtifact records
                 - 'costs': List of matching CostRecord records
+                - 'adrs': List of matching AutoADR records
                 - 'filters_applied': Dictionary of filter values used
         """
         _logger.info(
@@ -207,18 +262,21 @@ class AuditFilterService:
         decisions = await self.filter_decisions(filters)
         artifacts = await self.filter_artifacts(filters)
         costs = await self.filter_costs(filters)
+        adrs = await self.filter_adrs(filters)
 
         _logger.info(
             "filter_results",
             decision_count=len(decisions),
             artifact_count=len(artifacts),
             cost_count=len(costs),
+            adr_count=len(adrs),
         )
 
         return {
             "decisions": decisions,
             "artifacts": artifacts,
             "costs": costs,
+            "adrs": adrs,
             "filters_applied": filters.to_dict(),
         }
 
@@ -227,6 +285,7 @@ def get_audit_filter_service(
     decision_store: DecisionStore,
     traceability_store: TraceabilityStore,
     cost_store: CostStore | None = None,
+    adr_store: ADRStore | None = None,
 ) -> AuditFilterService:
     """Factory function to create AuditFilterService.
 
@@ -236,6 +295,7 @@ def get_audit_filter_service(
         decision_store: Store for decision records.
         traceability_store: Store for traceable artifacts.
         cost_store: Optional store for cost records.
+        adr_store: Optional store for auto-generated ADRs.
 
     Returns:
         Configured AuditFilterService instance.
@@ -244,10 +304,12 @@ def get_audit_filter_service(
         >>> service = get_audit_filter_service(
         ...     decision_store=decision_store,
         ...     traceability_store=traceability_store,
+        ...     adr_store=adr_store,
         ... )
     """
     return AuditFilterService(
         decision_store=decision_store,
         traceability_store=traceability_store,
         cost_store=cost_store,
+        adr_store=adr_store,
     )

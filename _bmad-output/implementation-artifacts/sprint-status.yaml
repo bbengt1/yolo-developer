@@ -166,7 +166,7 @@ development_status:
   epic-10-retrospective: optional
 
   # Epic 11: Audit Trail & Observability (8 stories)
-  epic-11: in-progress
+  epic-11: done
   11-1-decision-logging: done
   11-2-requirement-traceability: done
   11-3-human-readable-audit-view: done
@@ -174,7 +174,7 @@ development_status:
   11-5-cross-agent-correlation: done
   11-6-token-cost-tracking: done
   11-7-audit-filtering: done
-  11-8-auto-adr-generation: backlog
+  11-8-auto-adr-generation: done
   epic-11-retrospective: optional
 
   # Epic 12: CLI Interface (9 stories)

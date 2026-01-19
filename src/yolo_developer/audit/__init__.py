@@ -8,6 +8,7 @@ This module provides functionality for:
 - Correlating decisions across agent boundaries (FR85: Story 11.5)
 - Tracking token usage and costs per operation (FR86: Story 11.6)
 - Filtering audit data by agent, time range, or artifact (FR87: Story 11.7)
+- Auto-generating ADRs from architectural decisions (FR88: Story 11.8)
 
 Components:
     Decision Logging (Story 11.1):
@@ -53,6 +54,12 @@ Components:
     Audit Filtering (Story 11.7):
         - Filter types: AuditFilters for unified filtering across all stores
         - Filter service: AuditFilterService for coordinated querying
+
+    Auto ADR Generation (Story 11.8):
+        - ADR types: AutoADR for auto-generated Architecture Decision Records
+        - Store protocol: ADRStore for pluggable ADR storage backends
+        - In-memory store: InMemoryADRStore for testing and single-session use
+        - Service: ADRGenerationService for generating ADRs from decisions
 
 Example (Decision Logging):
     >>> from yolo_developer.audit import (
@@ -215,6 +222,24 @@ Example (Audit Filtering):
     ... )
     >>> artifacts = await service.filter_artifacts(filters)
 
+Example (Auto ADR Generation):
+    >>> from yolo_developer.audit import (
+    ...     ADRGenerationService,
+    ...     InMemoryDecisionStore,
+    ...     InMemoryADRStore,
+    ...     get_adr_generation_service,
+    ... )
+    >>>
+    >>> # Create stores and service
+    >>> decision_store = InMemoryDecisionStore()
+    >>> adr_store = InMemoryADRStore()
+    >>> service = get_adr_generation_service(decision_store, adr_store)
+    >>>
+    >>> # Generate ADRs from architectural decisions
+    >>> adrs = await service.generate_adrs_for_session("session-123")
+    >>> for adr in adrs:
+    ...     print(f"{adr.id}: {adr.title}")
+
 References:
     - FR81: System can log all agent decisions with rationale
     - FR82: System can generate decision traceability from requirement to code
@@ -223,10 +248,30 @@ References:
     - FR85: System can correlate decisions across agent boundaries
     - FR86: System can track token usage and cost per operation
     - FR87: Users can filter audit trail by agent, time range, or artifact
+    - FR88: System can generate Architecture Decision Records automatically
     - ADR-001: TypedDict for graph state, frozen dataclasses for internal types
 """
 
 from __future__ import annotations
+
+# ADR generation in-memory store (Story 11.8)
+from yolo_developer.audit.adr_memory_store import InMemoryADRStore
+
+# ADR generation service (Story 11.8)
+from yolo_developer.audit.adr_service import (
+    ADRGenerationService,
+    get_adr_generation_service,
+)
+
+# ADR store protocol (Story 11.8)
+from yolo_developer.audit.adr_store import ADRStore
+
+# ADR types (Story 11.8)
+from yolo_developer.audit.adr_types import (
+    VALID_ADR_STATUSES,
+    ADRStatus,
+    AutoADR,
+)
 
 # Correlation service
 from yolo_developer.audit.correlation import (
@@ -401,6 +446,7 @@ __all__ = [
     "DEFAULT_EXPORT_OPTIONS",
     "DEFAULT_FORMAT_OPTIONS",
     "DEFAULT_REDACTION_CONFIG",
+    "VALID_ADR_STATUSES",
     "VALID_ARTIFACT_TYPES",
     "VALID_CORRELATION_TYPES",
     "VALID_DECISION_SEVERITIES",
@@ -411,10 +457,14 @@ __all__ = [
     "VALID_LINK_TYPES",
     "VALID_TIER_VALUES",
     # Types
+    "ADRStatus",
     "AgentIdentity",
     "AgentTransition",
     "ArtifactType",
+    "AutoADR",
     # Services and Stores
+    "ADRGenerationService",
+    "ADRStore",
     "AuditExportService",
     "AuditExporter",
     "AuditFilters",
@@ -446,6 +496,7 @@ __all__ = [
     "ExportOptions",
     "FormatOptions",
     "FormatterStyle",
+    "InMemoryADRStore",
     "InMemoryCorrelationStore",
     "InMemoryCostStore",
     "InMemoryDecisionStore",
@@ -466,6 +517,7 @@ __all__ = [
     "calculate_cost_if_missing",
     "extract_cost",
     "extract_token_usage",
+    "get_adr_generation_service",
     "get_audit_export_service",
     "get_audit_filter_service",
     "get_audit_view_service",

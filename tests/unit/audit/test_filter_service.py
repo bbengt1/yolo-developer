@@ -1,17 +1,20 @@
-"""Tests for AuditFilterService (Story 11.7).
+"""Tests for AuditFilterService (Story 11.7, updated for Story 11.8).
 
 Tests cover:
 - filter_decisions() with various filters
 - filter_artifacts() with type and time filters
 - filter_costs() with agent and session filters
+- filter_adrs() with story_id and time range filters
 - filter_all() combined results
-- filter service with None cost_store
+- filter service with None cost_store and adr_store
 """
 
 from __future__ import annotations
 
 import pytest
 
+from yolo_developer.audit.adr_memory_store import InMemoryADRStore
+from yolo_developer.audit.adr_types import AutoADR
 from yolo_developer.audit.filter_service import (
     AuditFilterService,
     get_audit_filter_service,
@@ -61,6 +64,26 @@ def _make_artifact(
         artifact_type=artifact_type,
         name=f"Test {artifact_type} {artifact_id}",
         description=f"Description for {artifact_id}",
+        created_at=created_at,
+    )
+
+
+def _make_adr(
+    adr_id: str = "ADR-001",
+    title: str = "Test ADR",
+    story_ids: tuple[str, ...] = (),
+    created_at: str = "2026-01-18T12:00:00Z",
+) -> AutoADR:
+    """Helper to create test ADRs."""
+    return AutoADR(
+        id=adr_id,
+        title=title,
+        status="proposed",
+        context="Test context",
+        decision="Test decision",
+        consequences="Test consequences",
+        source_decision_id=f"dec-{adr_id}",
+        story_ids=story_ids,
         created_at=created_at,
     )
 
@@ -435,3 +458,146 @@ class TestFilterAll:
         assert results["decisions"] == []
         assert results["artifacts"] == []
         assert results["costs"] == []
+
+    @pytest.mark.asyncio
+    async def test_filter_all_includes_adrs(self) -> None:
+        """Test that filter_all includes ADRs in results."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        adr_store = InMemoryADRStore()
+
+        # Add test data
+        await decision_store.log_decision(_make_decision("dec-1"))
+        await adr_store.store_adr(_make_adr("ADR-001"))
+
+        service = AuditFilterService(
+            decision_store, traceability_store, adr_store=adr_store
+        )
+        filters = AuditFilters()
+
+        results = await service.filter_all(filters)
+
+        assert "adrs" in results
+        assert len(results["adrs"]) == 1
+        assert results["adrs"][0].id == "ADR-001"
+
+
+class TestFilterADRs:
+    """Tests for filter_adrs method."""
+
+    @pytest.mark.asyncio
+    async def test_filter_adrs_without_adr_store_returns_empty(self) -> None:
+        """Test that filter_adrs returns empty list when no ADR store."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+
+        service = AuditFilterService(decision_store, traceability_store, adr_store=None)
+        filters = AuditFilters()
+
+        results = await service.filter_adrs(filters)
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_filter_adrs_by_story_id(self) -> None:
+        """Test filtering ADRs by story_id."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        adr_store = InMemoryADRStore()
+
+        # Add ADRs linked to different stories
+        await adr_store.store_adr(_make_adr("ADR-001", story_ids=("story-1",)))
+        await adr_store.store_adr(_make_adr("ADR-002", story_ids=("story-2",)))
+        await adr_store.store_adr(_make_adr("ADR-003", story_ids=("story-1",)))
+
+        service = AuditFilterService(
+            decision_store, traceability_store, adr_store=adr_store
+        )
+        filters = AuditFilters(story_id="story-1")
+
+        results = await service.filter_adrs(filters)
+
+        assert len(results) == 2
+        adr_ids = {adr.id for adr in results}
+        assert adr_ids == {"ADR-001", "ADR-003"}
+
+    @pytest.mark.asyncio
+    async def test_filter_adrs_by_time_range(self) -> None:
+        """Test filtering ADRs by time range."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        adr_store = InMemoryADRStore()
+
+        await adr_store.store_adr(_make_adr("ADR-001", created_at="2026-01-01T00:00:00Z"))
+        await adr_store.store_adr(_make_adr("ADR-002", created_at="2026-01-15T00:00:00Z"))
+        await adr_store.store_adr(_make_adr("ADR-003", created_at="2026-01-31T00:00:00Z"))
+
+        service = AuditFilterService(
+            decision_store, traceability_store, adr_store=adr_store
+        )
+        filters = AuditFilters(
+            start_time="2026-01-10T00:00:00Z",
+            end_time="2026-01-20T00:00:00Z",
+        )
+
+        results = await service.filter_adrs(filters)
+
+        assert len(results) == 1
+        assert results[0].id == "ADR-002"
+
+    @pytest.mark.asyncio
+    async def test_filter_adrs_no_filters_returns_all(self) -> None:
+        """Test that no filters returns all ADRs."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        adr_store = InMemoryADRStore()
+
+        await adr_store.store_adr(_make_adr("ADR-001"))
+        await adr_store.store_adr(_make_adr("ADR-002"))
+        await adr_store.store_adr(_make_adr("ADR-003"))
+
+        service = AuditFilterService(
+            decision_store, traceability_store, adr_store=adr_store
+        )
+        filters = AuditFilters()
+
+        results = await service.filter_adrs(filters)
+
+        assert len(results) == 3
+
+    @pytest.mark.asyncio
+    async def test_filter_adrs_story_id_takes_precedence_over_time_range(self) -> None:
+        """Test that story_id filter takes precedence when both are specified."""
+        decision_store = InMemoryDecisionStore()
+        traceability_store = InMemoryTraceabilityStore()
+        adr_store = InMemoryADRStore()
+
+        # ADR matches both story and time range
+        await adr_store.store_adr(
+            _make_adr("ADR-001", story_ids=("story-1",), created_at="2026-01-15T00:00:00Z")
+        )
+        # ADR matches time but not story
+        await adr_store.store_adr(
+            _make_adr("ADR-002", story_ids=("story-2",), created_at="2026-01-15T00:00:00Z")
+        )
+        # ADR matches story but not time
+        await adr_store.store_adr(
+            _make_adr("ADR-003", story_ids=("story-1",), created_at="2026-01-31T00:00:00Z")
+        )
+
+        service = AuditFilterService(
+            decision_store, traceability_store, adr_store=adr_store
+        )
+        # Both story and time filters
+        filters = AuditFilters(
+            story_id="story-1",
+            start_time="2026-01-10T00:00:00Z",
+            end_time="2026-01-20T00:00:00Z",
+        )
+
+        results = await service.filter_adrs(filters)
+
+        # story_id filter takes precedence, so both ADRs for story-1 are returned
+        assert len(results) == 2
+        adr_ids = {adr.id for adr in results}
+        assert adr_ids == {"ADR-001", "ADR-003"}
