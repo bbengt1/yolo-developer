@@ -398,17 +398,74 @@ def logs(
 
 
 @app.command("tune")
-def tune() -> None:
+def tune(
+    agent_name: str | None = typer.Argument(
+        None,
+        help="Agent to view/modify (analyst, pm, architect, dev, sm, tea).",
+    ),
+    list_agents: bool = typer.Option(
+        False,
+        "--list",
+        "-l",
+        help="List all configurable agents with their status.",
+    ),
+    edit: bool = typer.Option(
+        False,
+        "--edit",
+        "-e",
+        help="Edit the agent's template using $EDITOR.",
+    ),
+    reset: bool = typer.Option(
+        False,
+        "--reset",
+        "-r",
+        help="Reset agent template to default.",
+    ),
+    export_path: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--export",
+        help="Export agent template to file.",
+    ),
+    import_path: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--import",
+        help="Import agent template from file.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output results as JSON instead of formatted display.",
+    ),
+) -> None:
     """Customize agent behavior.
 
     Modify agent templates and decision-making parameters
     to tune how agents approach development tasks.
 
-    This command will be fully implemented in Story 12.7.
+    View an agent's current template, modify it with your preferred editor,
+    or export/import templates for sharing or backup.
+
+    Examples:
+        yolo tune --list                    # List all configurable agents
+        yolo tune analyst                   # View analyst agent template
+        yolo tune analyst --edit            # Edit analyst template in $EDITOR
+        yolo tune analyst --reset           # Reset analyst to default
+        yolo tune analyst --export out.yaml # Export template to file
+        yolo tune analyst --import my.yaml  # Import template from file
+        yolo tune analyst --json            # Output as JSON
     """
     from yolo_developer.cli.commands.tune import tune_command
 
-    tune_command()
+    tune_command(
+        agent_name=agent_name,
+        list_agents=list_agents,
+        edit=edit,
+        reset=reset,
+        export_path=export_path,
+        import_path=import_path,
+        json_output=json_output,
+    )
 
 
 @app.command("config")
