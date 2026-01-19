@@ -178,7 +178,7 @@ development_status:
   epic-11-retrospective: optional
 
   # Epic 12: CLI Interface (9 stories)
-  epic-12: in-progress
+  epic-12: done
   12-1-typer-cli-setup: done
   12-2-yolo-init-command: done
   12-3-yolo-seed-command: done
@@ -187,7 +187,7 @@ development_status:
   12-6-yolo-logs-command: done
   12-7-yolo-tune-command: done
   12-8-yolo-config-command: done
-  12-9-real-time-activity-display: backlog
+  12-9-real-time-activity-display: done
   epic-12-retrospective: optional
 
   # Epic 13: Python SDK (6 stories)

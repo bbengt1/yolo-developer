@@ -1,10 +1,11 @@
-"""YOLO run command implementation (Story 12.4).
+"""YOLO run command implementation (Story 12.4, 12.9).
 
 This module provides the yolo run command which executes autonomous sprints
 using the multi-agent orchestration system.
 
 The command supports:
-- Real-time progress display with Rich
+- Real-time activity display with Rich Live (Story 12.9)
+- Agent transition visualization
 - Interrupt handling with graceful shutdown
 - Resume from checkpoint
 - JSON output for automation
@@ -30,9 +31,9 @@ import structlog
 from langchain_core.messages import BaseMessage, HumanMessage
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
+from yolo_developer.cli.activity import ActivityDisplay
 from yolo_developer.cli.display import error_panel, info_panel, success_panel
 from yolo_developer.config import ConfigurationError, load_config
 
@@ -44,6 +45,29 @@ console = Console()
 # commands run as single processes. For library usage, consider using
 # threading.Event or a context-based approach.
 _interrupted = False
+
+# Agent descriptions for activity display (Story 12.9)
+AGENT_DESCRIPTIONS: dict[str, str] = {
+    "analyst": "Analyzing requirements and extracting insights",
+    "pm": "Creating stories and managing backlog",
+    "architect": "Designing system architecture",
+    "dev": "Implementing code changes",
+    "tea": "Validating quality and test coverage",
+    "sm": "Orchestrating sprint activities",
+    "escalate": "Escalating to human for review",
+}
+
+
+def _get_agent_description(agent_name: str) -> str:
+    """Get a human-readable description for an agent.
+
+    Args:
+        agent_name: Name of the agent.
+
+    Returns:
+        Description of what the agent is doing.
+    """
+    return AGENT_DESCRIPTIONS.get(agent_name, f"Running {agent_name} agent")
 
 
 def check_seed_exists() -> bool:
@@ -181,16 +205,9 @@ async def execute_workflow(
         )
 
     try:
-        # Create progress display
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            TimeElapsedColumn(),
-            console=console,
-            disable=json_output,
-        ) as progress:
-            task = progress.add_task(f"Running agent: {current_agent}", total=None)
-
+        # Create activity display (Story 12.9)
+        if json_output:
+            # JSON mode: simple event processing without display
             async for event in stream_workflow(
                 initial_state,
                 config=config,
@@ -208,15 +225,52 @@ async def execute_workflow(
                     agents_executed.append(agent_name)
                     current_agent = agent_name
 
-                # Update progress
-                progress.update(task, description=f"Running agent: {current_agent}")
-
                 # Store latest state
                 if agent_name in event:
                     final_state = event[agent_name]
+        else:
+            # Rich activity display (Story 12.9)
+            with ActivityDisplay(verbose=verbose) as activity:
+                async for event in stream_workflow(
+                    initial_state,
+                    config=config,
+                    thread_id=effective_thread_id,
+                ):
+                    if _interrupted:
+                        logger.info("workflow_interrupted", thread_id=effective_thread_id)
+                        break
 
-                if verbose and not json_output:
-                    console.print(f"  [dim]Event {event_count}: {agent_name}[/dim]")
+                    event_count += 1
+                    elapsed = time.time() - start_time
+
+                    # Extract agent name from event
+                    agent_name = next(iter(event.keys())) if event else "unknown"
+
+                    # Detect agent transition
+                    if agent_name != current_agent:
+                        if current_agent:  # Not first agent
+                            activity.add_transition(
+                                from_agent=current_agent,
+                                to_agent=agent_name,
+                                reason="handoff",
+                                elapsed=elapsed,
+                            )
+                        agents_executed.append(agent_name)
+                        current_agent = agent_name
+
+                    # Get description from state
+                    description = _get_agent_description(agent_name)
+
+                    # Update activity display
+                    activity.update(
+                        agent=agent_name,
+                        description=description,
+                        elapsed=elapsed,
+                    )
+
+                    # Store latest state
+                    if agent_name in event:
+                        final_state = event[agent_name]
 
     except KeyboardInterrupt:
         _interrupted = True

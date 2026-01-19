@@ -478,6 +478,99 @@ class TestHelperFunctions:
 
 
 # =============================================================================
+# Task 8: Activity Display Integration Tests (Story 12.9)
+# =============================================================================
+
+
+class TestActivityDisplayIntegration:
+    """Test ActivityDisplay integration with run command (Story 12.9)."""
+
+    def test_activity_display_used_in_workflow(self) -> None:
+        """Test that ActivityDisplay is used instead of basic Progress spinner."""
+        with (
+            patch(
+                "yolo_developer.cli.commands.run.load_config",
+                return_value=MagicMock(project_name="test-project"),
+            ),
+            patch("yolo_developer.cli.commands.run.check_seed_exists", return_value=True),
+            patch("yolo_developer.cli.commands.run.ActivityDisplay") as mock_display_class,
+            patch("yolo_developer.orchestrator.stream_workflow") as mock_stream,
+            patch("yolo_developer.cli.commands.run.display_summary"),
+        ):
+            # Mock the activity display
+            mock_display = MagicMock()
+            mock_display.__enter__ = MagicMock(return_value=mock_display)
+            mock_display.__exit__ = MagicMock(return_value=None)
+            mock_display_class.return_value = mock_display
+
+            # Mock stream to return async generator
+            async def empty_stream():
+                return
+                yield  # Make it a generator
+
+            mock_stream.return_value = empty_stream()
+
+            runner.invoke(app, ["run"])
+
+            # Verify ActivityDisplay was created
+            mock_display_class.assert_called()
+
+    def test_verbose_flag_enables_verbose_display(self) -> None:
+        """Test that --verbose flag enables verbose mode in ActivityDisplay."""
+        with (
+            patch(
+                "yolo_developer.cli.commands.run.load_config",
+                return_value=MagicMock(project_name="test-project"),
+            ),
+            patch("yolo_developer.cli.commands.run.check_seed_exists", return_value=True),
+            patch("yolo_developer.cli.commands.run.ActivityDisplay") as mock_display_class,
+            patch("yolo_developer.orchestrator.stream_workflow") as mock_stream,
+            patch("yolo_developer.cli.commands.run.display_summary"),
+        ):
+            mock_display = MagicMock()
+            mock_display.__enter__ = MagicMock(return_value=mock_display)
+            mock_display.__exit__ = MagicMock(return_value=None)
+            mock_display_class.return_value = mock_display
+
+            # Mock stream to return async generator
+            async def empty_stream():
+                return
+                yield  # Make it a generator
+
+            mock_stream.return_value = empty_stream()
+
+            runner.invoke(app, ["run", "--verbose"])
+
+            # Verify verbose=True was passed
+            call_kwargs = mock_display_class.call_args.kwargs
+            assert call_kwargs.get("verbose") is True
+
+    def test_json_output_disables_activity_display(self) -> None:
+        """Test that --json flag disables rich ActivityDisplay."""
+        with (
+            patch(
+                "yolo_developer.cli.commands.run.load_config",
+                return_value=MagicMock(project_name="test-project"),
+            ),
+            patch("yolo_developer.cli.commands.run.check_seed_exists", return_value=True),
+            patch("yolo_developer.cli.commands.run.run_async_workflow") as mock_run,
+            patch("yolo_developer.cli.commands.run.display_summary"),
+        ):
+            mock_run.return_value = {
+                "thread_id": "test-123",
+                "elapsed_time": 1.5,
+                "event_count": 5,
+                "agents_executed": [],
+                "interrupted": False,
+                "final_state": {},
+                "decisions": [],
+            }
+            result = runner.invoke(app, ["run", "--json"])
+            # JSON output should not show Rich panels
+            assert "Agent Activity" not in result.output
+
+
+# =============================================================================
 # Integration Tests
 # =============================================================================
 
