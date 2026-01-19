@@ -1,6 +1,6 @@
 # Story 12.2: yolo init Command
 
-Status: review
+Status: done
 
 ## Story
 
