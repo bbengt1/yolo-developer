@@ -42,13 +42,45 @@ def init(
         "-e",
         help="Author email for pyproject.toml.",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Prompt for project details interactively.",
+    ),
+    no_input: bool = typer.Option(
+        False,
+        "--no-input",
+        help="Use all defaults without prompting.",
+    ),
+    existing: bool = typer.Option(
+        False,
+        "--existing",
+        help="Add YOLO to an existing project (brownfield mode).",
+    ),
 ) -> None:
     """Initialize a new YOLO Developer project.
 
     Creates a new Python project with all required dependencies for
     autonomous multi-agent development using the BMad Method.
+
+    In interactive mode (-i), prompts for project name, author, and email
+    with sensible defaults from git config.
+
+    Use --no-input to skip all prompts and use defaults.
+
+    Use --existing for brownfield projects to add YOLO without
+    overwriting existing files.
     """
-    init_command(path=path, name=name, author=author, email=email)
+    init_command(
+        path=path,
+        name=name,
+        author=author,
+        email=email,
+        interactive=interactive,
+        no_input=no_input,
+        existing=existing,
+    )
 
 
 @app.command("version")

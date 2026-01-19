@@ -359,7 +359,11 @@ class TestInitCommand:
         """Test that init_command uses default author info when not provided."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir) / "default-project"
-            with patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True):
+            # Mock git config to return empty (no git config set)
+            with (
+                patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True),
+                patch("yolo_developer.cli.commands.init.get_git_config", return_value=""),
+            ):
                 init_command(path=str(project_path))
 
             content = (project_path / "pyproject.toml").read_text()
