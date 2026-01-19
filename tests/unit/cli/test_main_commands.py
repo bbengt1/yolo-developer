@@ -99,12 +99,12 @@ class TestTuneCommand:
 class TestConfigCommand:
     """Tests for config command."""
 
-    @patch("yolo_developer.cli.commands.config.config_command")
-    def test_config_command_invokes_function(self, mock_config_command: MagicMock) -> None:
-        """Test yolo config invokes config_command function."""
+    @patch("yolo_developer.cli.commands.config.show_config")
+    def test_config_command_invokes_function(self, mock_show_config: MagicMock) -> None:
+        """Test yolo config invokes show_config function."""
         result = runner.invoke(app, ["config"])
 
-        mock_config_command.assert_called_once()
+        mock_show_config.assert_called_once()
         assert result.exit_code == 0
 
     def test_config_command_has_help(self) -> None:
@@ -145,9 +145,12 @@ class TestAppCommands:
 
     def test_app_has_all_commands(self) -> None:
         """Test all expected commands are registered."""
-        # Get registered command names
+        # Get registered command names (direct commands)
         command_names = [cmd.name for cmd in app.registered_commands]
+        # Get registered group names (sub-apps like config)
+        group_names = [group.name for group in app.registered_groups]
 
+        # Commands registered directly
         expected_commands = [
             "init",
             "version",
@@ -156,10 +159,14 @@ class TestAppCommands:
             "status",
             "logs",
             "tune",
-            "config",
         ]
         for cmd in expected_commands:
             assert cmd in command_names, f"Command '{cmd}' not registered"
+
+        # Commands registered as groups (sub-apps)
+        expected_groups = ["config"]
+        for grp in expected_groups:
+            assert grp in group_names, f"Command group '{grp}' not registered"
 
     def test_app_help_lists_all_commands(self) -> None:
         """Test yolo --help lists all commands."""

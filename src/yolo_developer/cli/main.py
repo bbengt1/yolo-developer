@@ -468,17 +468,138 @@ def tune(
     )
 
 
-@app.command("config")
-def config() -> None:
-    """Manage project configuration.
+# Config subcommand group
+config_app = typer.Typer(
+    name="config",
+    help="Manage project configuration.",
+    no_args_is_help=False,
+)
+app.add_typer(config_app, name="config")
 
-    View, set, import, or export project configuration values.
 
-    This command will be fully implemented in Story 12.8.
+@config_app.callback(invoke_without_command=True)
+def config_show(
+    ctx: typer.Context,
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output as JSON instead of formatted display.",
+    ),
+    no_mask: bool = typer.Option(
+        False,
+        "--no-mask",
+        help="Show API keys unmasked (for debugging).",
+    ),
+) -> None:
+    """Show current project configuration.
+
+    Displays the current configuration from yolo.yaml,
+    including LLM settings, quality thresholds, and memory configuration.
+
+    Sensitive values (API keys) are masked by default.
+
+    Examples:
+        yolo config                  # Show config with Rich formatting
+        yolo config --json           # Show config as JSON
+        yolo config --no-mask        # Show API keys unmasked
     """
-    from yolo_developer.cli.commands.config import config_command
+    if ctx.invoked_subcommand is None:
+        from yolo_developer.cli.commands.config import show_config
 
-    config_command()
+        show_config(json_output=json_output, no_mask=no_mask)
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(
+        ...,
+        help="Configuration key (supports dotted notation, e.g., 'llm.cheap_model').",
+    ),
+    value: str = typer.Argument(
+        ...,
+        help="Value to set.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output as JSON instead of formatted display.",
+    ),
+) -> None:
+    """Set a configuration value.
+
+    Updates a specific configuration value in yolo.yaml.
+    Supports nested keys using dot notation.
+
+    Examples:
+        yolo config set project_name my-project
+        yolo config set llm.cheap_model gpt-4o
+        yolo config set quality.test_coverage_threshold 0.85
+        yolo config set quality.seed_thresholds.overall 0.75
+    """
+    from yolo_developer.cli.commands.config import set_config_value
+
+    set_config_value(key=key, value=value, json_output=json_output)
+
+
+@config_app.command("export")
+def config_export(
+    output: Path = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        "-o",
+        help="Output file path. Defaults to 'yolo-config-export.yaml'.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output as JSON instead of formatted display.",
+    ),
+) -> None:
+    """Export configuration to a portable YAML file.
+
+    Creates a YAML file containing the current configuration.
+    API keys are excluded for security.
+
+    Examples:
+        yolo config export                        # Export to yolo-config-export.yaml
+        yolo config export -o backup.yaml         # Export to custom path
+        yolo config export --json                 # JSON output for scripting
+    """
+    from yolo_developer.cli.commands.config import export_config_command
+
+    export_config_command(output_path=output, json_output=json_output)
+
+
+@config_app.command("import")
+def config_import(
+    file: Path = typer.Argument(  # noqa: B008
+        ...,
+        help="Path to the configuration file to import.",
+        exists=False,  # We handle existence check for better error messages
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output as JSON instead of formatted display.",
+    ),
+) -> None:
+    """Import configuration from a YAML file.
+
+    Imports configuration from an exported YAML file.
+    The configuration is validated before being applied.
+
+    Examples:
+        yolo config import backup.yaml            # Import from file
+        yolo config import shared-config.yaml     # Import shared config
+        yolo config import backup.yaml --json     # JSON output for scripting
+    """
+    from yolo_developer.cli.commands.config import import_config_command
+
+    import_config_command(source_path=file, json_output=json_output)
 
 
 if __name__ == "__main__":

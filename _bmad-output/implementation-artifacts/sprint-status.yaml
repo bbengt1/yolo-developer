@@ -186,7 +186,7 @@ development_status:
   12-5-yolo-status-command: done
   12-6-yolo-logs-command: done
   12-7-yolo-tune-command: done
-  12-8-yolo-config-command: backlog
+  12-8-yolo-config-command: done
   12-9-real-time-activity-display: backlog
   epic-12-retrospective: optional
 

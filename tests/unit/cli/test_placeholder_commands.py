@@ -1,46 +1,16 @@
 """Tests for placeholder command modules (Story 12.1).
 
 Tests cover:
-- Each placeholder command module calls coming_soon
-- Each placeholder command module logs debug message
+- Command module exports are available
 
 Note: run_command tests moved to test_run_command.py after Story 12.4 implementation.
 Note: status_command tests moved to test_status_command.py after Story 12.5 implementation.
 Note: logs_command tests moved to test_logs_command.py after Story 12.6 implementation.
 Note: tune_command tests moved to test_tune_command.py after Story 12.7 implementation.
+Note: config_command tests moved to test_config_command.py after Story 12.8 implementation.
 """
 
 from __future__ import annotations
-
-from unittest.mock import MagicMock, patch
-
-
-class TestConfigCommand:
-    """Tests for config command module."""
-
-    @patch("yolo_developer.cli.commands.config.coming_soon")
-    @patch("yolo_developer.cli.commands.config.logger")
-    def test_config_command_calls_coming_soon(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test config_command calls coming_soon with 'config'."""
-        from yolo_developer.cli.commands.config import config_command
-
-        config_command()
-
-        mock_coming_soon.assert_called_once_with("config")
-
-    @patch("yolo_developer.cli.commands.config.coming_soon")
-    @patch("yolo_developer.cli.commands.config.logger")
-    def test_config_command_logs_invocation(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test config_command logs debug message."""
-        from yolo_developer.cli.commands.config import config_command
-
-        config_command()
-
-        mock_logger.debug.assert_called_once_with("config_command_invoked")
 
 
 class TestCommandModuleExports:
