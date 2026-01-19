@@ -185,6 +185,48 @@ class SeedValidationError(SDKError):
         self.validation_errors = validation_errors or []
 
 
+class ConfigurationAPIError(SDKError):
+    """Raised when configuration API operations fail.
+
+    This error occurs when update_config(), validate_config(), or save_config()
+    methods encounter an error.
+
+    Attributes:
+        field: The configuration field that caused the error, if applicable.
+        validation_errors: List of validation error messages.
+
+    Example:
+        >>> try:
+        ...     client.update_config(quality={"test_coverage_threshold": 2.0})
+        ... except ConfigurationAPIError as e:
+        ...     print(f"Config error: {e.message}")
+        ...     for error in e.validation_errors:
+        ...         print(f"  - {error}")
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        field: str | None = None,
+        validation_errors: list[str] | None = None,
+        original_error: Exception | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize ConfigurationAPIError.
+
+        Args:
+            message: Human-readable error description.
+            field: The configuration field that caused the error.
+            validation_errors: List of validation error messages.
+            original_error: The underlying exception that caused this error.
+            details: Additional context about the error.
+        """
+        super().__init__(message, original_error=original_error, details=details)
+        self.field = field
+        self.validation_errors = validation_errors or []
+
+
 class ProjectNotFoundError(SDKError):
     """Raised when a project cannot be found.
 

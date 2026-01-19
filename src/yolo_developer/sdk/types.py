@@ -1,4 +1,4 @@
-"""SDK-specific type definitions (Story 13.1).
+"""SDK-specific type definitions (Stories 13.1, 13.4).
 
 This module provides type definitions for SDK operation results,
 enabling full type safety for SDK consumers.
@@ -14,6 +14,7 @@ Example:
 References:
     - FR106-FR111: Python SDK requirements
     - AC3: Complete type hints for all SDK operations
+    - Story 13.4: Configuration API types
 """
 
 from __future__ import annotations
@@ -172,4 +173,111 @@ class InitResult:
     project_name: str
     config_created: bool = False
     directories_created: list[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=_utc_now)
+
+
+@dataclass(frozen=True)
+class ConfigValidationIssue:
+    """A single configuration validation issue.
+
+    Attributes:
+        field: The field path that has an issue (e.g., "quality.test_coverage_threshold").
+        message: Human-readable description of the issue.
+        severity: Whether this is an 'error' (fatal) or 'warning' (non-fatal).
+
+    Example:
+        >>> result = client.validate_config()
+        >>> for issue in result.issues:
+        ...     print(f"[{issue.severity}] {issue.field}: {issue.message}")
+    """
+
+    field: str
+    message: str
+    severity: Literal["error", "warning"] = "warning"
+
+
+@dataclass(frozen=True)
+class ConfigValidationResult:
+    """Result of configuration validation.
+
+    Attributes:
+        is_valid: True if no fatal errors exist (warnings are OK).
+        issues: List of validation issues (both errors and warnings).
+        timestamp: When validation occurred.
+
+    Example:
+        >>> result = client.validate_config()
+        >>> if result.is_valid:
+        ...     print("Configuration is valid")
+        ... else:
+        ...     for issue in result.issues:
+        ...         if issue.severity == "error":
+        ...             print(f"Error: {issue.message}")
+    """
+
+    is_valid: bool
+    issues: list[ConfigValidationIssue] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=_utc_now)
+
+    @property
+    def errors(self) -> list[ConfigValidationIssue]:
+        """Return only error-level issues."""
+        return [i for i in self.issues if i.severity == "error"]
+
+    @property
+    def warnings(self) -> list[ConfigValidationIssue]:
+        """Return only warning-level issues."""
+        return [i for i in self.issues if i.severity == "warning"]
+
+
+@dataclass(frozen=True)
+class ConfigUpdateResult:
+    """Result of a configuration update operation.
+
+    Attributes:
+        success: Whether the update was successful.
+        previous_values: Dictionary of previous values for changed fields.
+        new_values: Dictionary of new values for changed fields.
+        persisted: Whether changes were persisted to disk.
+        validation: Validation result for the new configuration.
+        timestamp: When the update occurred.
+
+    Example:
+        >>> result = client.update_config(
+        ...     quality={"test_coverage_threshold": 0.85},
+        ...     persist=True
+        ... )
+        >>> if result.success:
+        ...     print("Configuration updated")
+        ...     if result.persisted:
+        ...         print("Changes saved to yolo.yaml")
+    """
+
+    success: bool
+    previous_values: dict[str, Any] = field(default_factory=dict)
+    new_values: dict[str, Any] = field(default_factory=dict)
+    persisted: bool = False
+    validation: ConfigValidationResult | None = None
+    timestamp: datetime = field(default_factory=_utc_now)
+
+
+@dataclass(frozen=True)
+class ConfigSaveResult:
+    """Result of saving configuration to disk.
+
+    Attributes:
+        success: Whether the save was successful.
+        config_path: Path where the configuration was saved.
+        secrets_excluded: List of secret fields that were excluded from the file.
+        timestamp: When the save occurred.
+
+    Example:
+        >>> result = client.save_config()
+        >>> if result.success:
+        ...     print(f"Configuration saved to {result.config_path}")
+    """
+
+    success: bool
+    config_path: str
+    secrets_excluded: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=_utc_now)

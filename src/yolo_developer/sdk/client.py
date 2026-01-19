@@ -38,6 +38,7 @@ import structlog
 from yolo_developer.config import ConfigurationError, YoloConfig, load_config
 from yolo_developer.sdk.exceptions import (
     ClientNotInitializedError,
+    ConfigurationAPIError,
     ProjectNotFoundError,
     SDKError,
     SeedValidationError,
@@ -45,6 +46,10 @@ from yolo_developer.sdk.exceptions import (
 )
 from yolo_developer.sdk.types import (
     AuditEntry,
+    ConfigSaveResult,
+    ConfigUpdateResult,
+    ConfigValidationIssue,
+    ConfigValidationResult,
     InitResult,
     RunResult,
     SeedResult,
@@ -246,6 +251,298 @@ class YoloClient:
         yolo_dir = self._project_path / ".yolo"
         yolo_config = self._project_path / "yolo.yaml"
         return yolo_dir.exists() or yolo_config.exists()
+
+    # =========================================================================
+    # Configuration API Methods (Story 13.4)
+    # =========================================================================
+
+    def update_config(
+        self,
+        *,
+        llm: dict[str, Any] | None = None,
+        quality: dict[str, Any] | None = None,
+        memory: dict[str, Any] | None = None,
+        project_name: str | None = None,
+        persist: bool = False,
+    ) -> ConfigUpdateResult:
+        """Update configuration settings.
+
+        Updates the in-memory configuration with the provided partial settings.
+        Only specified fields are updated; unspecified fields retain their values.
+        Validation runs before applying changes.
+
+        Args:
+            llm: Partial LLM configuration to update (e.g., {"cheap_model": "gpt-4o"}).
+            quality: Partial quality configuration to update.
+            memory: Partial memory configuration to update.
+            project_name: New project name.
+            persist: If True, save changes to yolo.yaml after updating.
+
+        Returns:
+            ConfigUpdateResult with update status and validation results.
+
+        Raises:
+            ConfigurationAPIError: If validation fails with errors.
+
+        Example:
+            >>> # Update quality thresholds
+            >>> result = client.update_config(
+            ...     quality={"test_coverage_threshold": 0.85},
+            ...     persist=True
+            ... )
+            >>> if result.success:
+            ...     print("Configuration updated")
+            >>>
+            >>> # Update multiple sections
+            >>> result = client.update_config(
+            ...     llm={"cheap_model": "gpt-4o"},
+            ...     quality={"confidence_threshold": 0.95}
+            ... )
+        """
+        return _run_sync(
+            self.update_config_async(
+                llm=llm,
+                quality=quality,
+                memory=memory,
+                project_name=project_name,
+                persist=persist,
+            )
+        )
+
+    async def update_config_async(
+        self,
+        *,
+        llm: dict[str, Any] | None = None,
+        quality: dict[str, Any] | None = None,
+        memory: dict[str, Any] | None = None,
+        project_name: str | None = None,
+        persist: bool = False,
+    ) -> ConfigUpdateResult:
+        """Update configuration settings (async version).
+
+        Updates the in-memory configuration with the provided partial settings.
+        Only specified fields are updated; unspecified fields retain their values.
+        Validation runs before applying changes.
+
+        Args:
+            llm: Partial LLM configuration to update.
+            quality: Partial quality configuration to update.
+            memory: Partial memory configuration to update.
+            project_name: New project name.
+            persist: If True, save changes to yolo.yaml after updating.
+
+        Returns:
+            ConfigUpdateResult with update status and validation results.
+
+        Raises:
+            ConfigurationAPIError: If validation fails with errors.
+        """
+        from pydantic import ValidationError as PydanticValidationError
+
+        # Track previous values
+        previous_values: dict[str, Any] = {}
+        new_values: dict[str, Any] = {}
+
+        # Build updates dict
+        current_data = self._config.model_dump()
+
+        if project_name is not None:
+            previous_values["project_name"] = current_data["project_name"]
+            new_values["project_name"] = project_name
+            current_data["project_name"] = project_name
+
+        if llm is not None:
+            previous_values["llm"] = {
+                k: current_data["llm"][k] for k in llm if k in current_data["llm"]
+            }
+            new_values["llm"] = llm
+            current_data["llm"] = {**current_data["llm"], **llm}
+
+        if quality is not None:
+            previous_values["quality"] = {
+                k: current_data["quality"][k] for k in quality if k in current_data["quality"]
+            }
+            new_values["quality"] = quality
+            current_data["quality"] = {**current_data["quality"], **quality}
+
+        if memory is not None:
+            previous_values["memory"] = {
+                k: current_data["memory"][k] for k in memory if k in current_data["memory"]
+            }
+            new_values["memory"] = memory
+            current_data["memory"] = {**current_data["memory"], **memory}
+
+        # Validate new configuration
+        try:
+            new_config = YoloConfig(**current_data)
+        except PydanticValidationError as e:
+            error_messages = [f"{err['loc']}: {err['msg']}" for err in e.errors()]
+            raise ConfigurationAPIError(
+                f"Configuration validation failed: {'; '.join(error_messages)}",
+                validation_errors=error_messages,
+                original_error=e,
+            ) from e
+
+        # Run additional validation
+        validation_result = await self.validate_config_async(config=new_config)
+
+        # Check for fatal errors
+        if not validation_result.is_valid:
+            error_messages = [issue.message for issue in validation_result.errors]
+            raise ConfigurationAPIError(
+                f"Configuration validation failed: {'; '.join(error_messages)}",
+                validation_errors=error_messages,
+            )
+
+        # Apply the new configuration
+        self._config = new_config
+
+        # Persist if requested
+        persisted = False
+        if persist:
+            save_result = await self.save_config_async()
+            persisted = save_result.success
+
+        logger.info(
+            "config_updated",
+            updated_fields=list(new_values.keys()),
+            persisted=persisted,
+        )
+
+        return ConfigUpdateResult(
+            success=True,
+            previous_values=previous_values,
+            new_values=new_values,
+            persisted=persisted,
+            validation=validation_result,
+        )
+
+    def validate_config(
+        self,
+        *,
+        config: YoloConfig | None = None,
+    ) -> ConfigValidationResult:
+        """Validate configuration settings.
+
+        Runs all validation checks on the configuration and returns
+        a result with any errors or warnings found.
+
+        Args:
+            config: Configuration to validate. Defaults to current config.
+
+        Returns:
+            ConfigValidationResult with validation status and issues.
+
+        Example:
+            >>> result = client.validate_config()
+            >>> if result.is_valid:
+            ...     print("Configuration is valid")
+            >>> for issue in result.warnings:
+            ...     print(f"Warning: {issue.message}")
+        """
+        return _run_sync(self.validate_config_async(config=config))
+
+    async def validate_config_async(
+        self,
+        *,
+        config: YoloConfig | None = None,
+    ) -> ConfigValidationResult:
+        """Validate configuration settings (async version).
+
+        Runs all validation checks on the configuration and returns
+        a result with any errors or warnings found.
+
+        Args:
+            config: Configuration to validate. Defaults to current config.
+
+        Returns:
+            ConfigValidationResult with validation status and issues.
+        """
+        from yolo_developer.config import validate_config as _validate_config
+
+        config_to_validate = config or self._config
+        result = _validate_config(config_to_validate)
+
+        # Convert to SDK types
+        issues: list[ConfigValidationIssue] = []
+
+        for error in result.errors:
+            issues.append(
+                ConfigValidationIssue(
+                    field=error.field,
+                    message=error.message,
+                    severity="error",
+                )
+            )
+
+        for warning in result.warnings:
+            issues.append(
+                ConfigValidationIssue(
+                    field=warning.field,
+                    message=warning.message,
+                    severity="warning",
+                )
+            )
+
+        return ConfigValidationResult(
+            is_valid=result.is_valid,
+            issues=issues,
+        )
+
+    def save_config(self) -> ConfigSaveResult:
+        """Save configuration to yolo.yaml.
+
+        Persists the current configuration to the project's yolo.yaml file.
+        API keys are excluded from the saved file for security.
+
+        Returns:
+            ConfigSaveResult with save status and file path.
+
+        Raises:
+            ConfigurationAPIError: If save operation fails.
+
+        Example:
+            >>> result = client.save_config()
+            >>> if result.success:
+            ...     print(f"Config saved to {result.config_path}")
+        """
+        return _run_sync(self.save_config_async())
+
+    async def save_config_async(self) -> ConfigSaveResult:
+        """Save configuration to yolo.yaml (async version).
+
+        Persists the current configuration to the project's yolo.yaml file.
+        API keys are excluded from the saved file for security.
+
+        Returns:
+            ConfigSaveResult with save status and file path.
+
+        Raises:
+            ConfigurationAPIError: If save operation fails.
+        """
+        from yolo_developer.config import export_config
+
+        config_path = self._project_path / "yolo.yaml"
+
+        try:
+            export_config(self._config, config_path)
+        except Exception as e:
+            raise ConfigurationAPIError(
+                f"Failed to save configuration: {e}",
+                original_error=e,
+                details={"config_path": str(config_path)},
+            ) from e
+
+        logger.info(
+            "config_saved",
+            config_path=str(config_path),
+        )
+
+        return ConfigSaveResult(
+            success=True,
+            config_path=str(config_path),
+            secrets_excluded=["openai_api_key", "anthropic_api_key"],
+        )
 
     def init(
         self,

@@ -195,7 +195,7 @@ development_status:
   13-1-sdk-client-class: done
   13-2-programmatic-init-seed-run: done
   13-3-audit-trail-access: done
-  13-4-configuration-api: backlog
+  13-4-configuration-api: done
   13-5-agent-hooks: backlog
   13-6-event-emission: backlog
   epic-13-retrospective: optional

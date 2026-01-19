@@ -717,3 +717,334 @@ class TestYoloClientTypes:
         initialized = client.is_initialized
 
         assert isinstance(initialized, bool)
+
+
+# ============================================================================
+# Configuration API Tests (Story 13.4)
+# ============================================================================
+
+
+class TestYoloClientConfigRead:
+    """Tests for configuration read access (AC1)."""
+
+    def test_config_returns_yoloconfig(self, tmp_path: Path) -> None:
+        """Test client.config returns complete YoloConfig object."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.config
+
+        assert isinstance(result, YoloConfig)
+        assert result.project_name == "test-project"
+
+    def test_config_nested_access(self, tmp_path: Path) -> None:
+        """Test accessing nested configuration settings."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        # Access nested llm settings
+        assert client.config.llm.cheap_model == "gpt-4o-mini"
+        assert client.config.llm.premium_model == "claude-sonnet-4-20250514"
+
+        # Access nested quality settings
+        assert client.config.quality.test_coverage_threshold == 0.80
+        assert client.config.quality.confidence_threshold == 0.90
+
+        # Access nested memory settings
+        assert client.config.memory.persist_path == ".yolo/memory"
+        assert client.config.memory.vector_store_type == "chromadb"
+
+    def test_config_reflects_current_state(self, tmp_path: Path) -> None:
+        """Test config reflects current in-memory state."""
+        config = YoloConfig(project_name="initial")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        assert client.config.project_name == "initial"
+
+        # Update config
+        client.update_config(project_name="updated")
+
+        # Should reflect new state
+        assert client.config.project_name == "updated"
+
+
+class TestYoloClientConfigUpdate:
+    """Tests for configuration update (AC2)."""
+
+    def test_update_config_partial_update(self, tmp_path: Path) -> None:
+        """Test update_config with partial settings."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config(
+            quality={"test_coverage_threshold": 0.85}
+        )
+
+        assert result.success
+        assert client.config.quality.test_coverage_threshold == 0.85
+        # Other settings unchanged
+        assert client.config.quality.confidence_threshold == 0.90
+
+    def test_update_config_multiple_sections(self, tmp_path: Path) -> None:
+        """Test update_config with multiple sections."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config(
+            llm={"cheap_model": "gpt-4o"},
+            quality={"test_coverage_threshold": 0.90}
+        )
+
+        assert result.success
+        assert client.config.llm.cheap_model == "gpt-4o"
+        assert client.config.quality.test_coverage_threshold == 0.90
+
+    def test_update_config_project_name(self, tmp_path: Path) -> None:
+        """Test update_config can change project name."""
+        config = YoloConfig(project_name="old-name")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config(project_name="new-name")
+
+        assert result.success
+        assert client.config.project_name == "new-name"
+        assert result.previous_values["project_name"] == "old-name"
+        assert result.new_values["project_name"] == "new-name"
+
+    def test_update_config_tracks_changes(self, tmp_path: Path) -> None:
+        """Test update_config tracks previous and new values."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config(
+            quality={"test_coverage_threshold": 0.85}
+        )
+
+        assert "quality" in result.previous_values
+        assert "quality" in result.new_values
+        assert result.previous_values["quality"]["test_coverage_threshold"] == 0.80
+        assert result.new_values["quality"]["test_coverage_threshold"] == 0.85
+
+    def test_update_config_validation_error(self, tmp_path: Path) -> None:
+        """Test update_config raises error on invalid values."""
+        from yolo_developer.sdk.exceptions import ConfigurationAPIError
+
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        with pytest.raises(ConfigurationAPIError):
+            # test_coverage_threshold must be 0.0-1.0
+            client.update_config(
+                quality={"test_coverage_threshold": 2.0}
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_config_async(self, tmp_path: Path) -> None:
+        """Test update_config_async works correctly."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = await client.update_config_async(
+            quality={"confidence_threshold": 0.95}
+        )
+
+        assert result.success
+        assert client.config.quality.confidence_threshold == 0.95
+
+    def test_update_config_empty_update(self, tmp_path: Path) -> None:
+        """Test update_config with no parameters returns success."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config()
+
+        assert result.success
+        assert result.previous_values == {}
+        assert result.new_values == {}
+        # Config should remain unchanged
+        assert client.config.project_name == "test-project"
+
+
+class TestYoloClientConfigValidation:
+    """Tests for configuration validation (AC3)."""
+
+    def test_validate_config_returns_result(self, tmp_path: Path) -> None:
+        """Test validate_config returns ConfigValidationResult."""
+        from yolo_developer.sdk.types import ConfigValidationResult
+
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.validate_config()
+
+        assert isinstance(result, ConfigValidationResult)
+        assert result.is_valid  # Default config should be valid
+
+    def test_validate_config_reports_warnings(self, tmp_path: Path) -> None:
+        """Test validate_config reports warnings."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.validate_config()
+
+        # Should have warnings about missing API keys
+        assert len(result.warnings) > 0
+        api_key_warning = any(
+            "api_key" in issue.field.lower() for issue in result.warnings
+        )
+        assert api_key_warning
+
+    def test_validate_config_separates_errors_warnings(self, tmp_path: Path) -> None:
+        """Test validation result separates errors and warnings."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.validate_config()
+
+        # Check errors property
+        assert isinstance(result.errors, list)
+        # Check warnings property
+        assert isinstance(result.warnings, list)
+        # is_valid should be True if no errors
+        assert result.is_valid == (len(result.errors) == 0)
+
+    @pytest.mark.asyncio
+    async def test_validate_config_async(self, tmp_path: Path) -> None:
+        """Test validate_config_async works correctly."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = await client.validate_config_async()
+
+        assert result.is_valid
+
+
+class TestYoloClientConfigPersistence:
+    """Tests for configuration persistence (AC4)."""
+
+    def test_save_config_creates_file(self, tmp_path: Path) -> None:
+        """Test save_config creates yolo.yaml file."""
+        config = YoloConfig(project_name="save-test")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.save_config()
+
+        assert result.success
+        config_file = tmp_path / "yolo.yaml"
+        assert config_file.exists()
+
+    def test_save_config_excludes_secrets(self, tmp_path: Path) -> None:
+        """Test save_config excludes API keys."""
+        config = YoloConfig(project_name="secret-test")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.save_config()
+
+        assert result.success
+        assert "openai_api_key" in result.secrets_excluded
+        assert "anthropic_api_key" in result.secrets_excluded
+
+        # Verify file doesn't contain API key fields
+        config_file = tmp_path / "yolo.yaml"
+        content = config_file.read_text()
+        assert "openai_api_key" not in content
+        assert "anthropic_api_key" not in content
+
+    def test_save_config_preserves_values(self, tmp_path: Path) -> None:
+        """Test saved config can be reloaded correctly."""
+        config = YoloConfig(project_name="persist-test")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        # Update and save
+        client.update_config(quality={"test_coverage_threshold": 0.85})
+        client.save_config()
+
+        # Create new client from same path
+        new_client = YoloClient(project_path=tmp_path)
+
+        assert new_client.config.project_name == "persist-test"
+        assert new_client.config.quality.test_coverage_threshold == 0.85
+
+    def test_update_config_with_persist(self, tmp_path: Path) -> None:
+        """Test update_config with persist=True saves to file."""
+        config = YoloConfig(project_name="auto-persist")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = client.update_config(
+            quality={"confidence_threshold": 0.95},
+            persist=True
+        )
+
+        assert result.success
+        assert result.persisted
+
+        # Verify file was created
+        config_file = tmp_path / "yolo.yaml"
+        assert config_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_save_config_async(self, tmp_path: Path) -> None:
+        """Test save_config_async works correctly."""
+        config = YoloConfig(project_name="async-save")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        result = await client.save_config_async()
+
+        assert result.success
+        config_file = tmp_path / "yolo.yaml"
+        assert config_file.exists()
+
+
+class TestYoloClientConfigAsyncSync:
+    """Tests for async/sync parity (AC5)."""
+
+    def test_sync_methods_exist(self, tmp_path: Path) -> None:
+        """Test sync config methods exist."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        assert hasattr(client, "update_config")
+        assert hasattr(client, "validate_config")
+        assert hasattr(client, "save_config")
+        assert callable(client.update_config)
+        assert callable(client.validate_config)
+        assert callable(client.save_config)
+
+    def test_async_methods_exist(self, tmp_path: Path) -> None:
+        """Test async config methods exist."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        assert hasattr(client, "update_config_async")
+        assert hasattr(client, "validate_config_async")
+        assert hasattr(client, "save_config_async")
+
+    def test_sync_wraps_async_update(self, tmp_path: Path) -> None:
+        """Test sync update_config produces same result as async."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        sync_result = client.update_config(
+            quality={"test_coverage_threshold": 0.85}
+        )
+
+        assert sync_result.success
+        assert client.config.quality.test_coverage_threshold == 0.85
+
+    def test_sync_wraps_async_validate(self, tmp_path: Path) -> None:
+        """Test sync validate_config produces same result as async."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        sync_result = client.validate_config()
+
+        assert sync_result.is_valid
+
+    def test_sync_wraps_async_save(self, tmp_path: Path) -> None:
+        """Test sync save_config produces same result as async."""
+        config = YoloConfig(project_name="test-project")
+        client = YoloClient(config=config, project_path=tmp_path)
+
+        sync_result = client.save_config()
+
+        assert sync_result.success

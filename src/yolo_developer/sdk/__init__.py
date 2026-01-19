@@ -1,4 +1,4 @@
-"""Python SDK for YOLO Developer (Story 13.1).
+"""Python SDK for YOLO Developer (Stories 13.1-13.4).
 
 This module provides the YoloClient class for programmatic access to
 all YOLO Developer functionality including project initialization,
@@ -49,6 +49,7 @@ from __future__ import annotations
 from yolo_developer.sdk.client import YoloClient
 from yolo_developer.sdk.exceptions import (
     ClientNotInitializedError,
+    ConfigurationAPIError,
     ProjectNotFoundError,
     SDKError,
     SeedValidationError,
@@ -56,6 +57,10 @@ from yolo_developer.sdk.exceptions import (
 )
 from yolo_developer.sdk.types import (
     AuditEntry,
+    ConfigSaveResult,
+    ConfigUpdateResult,
+    ConfigValidationIssue,
+    ConfigValidationResult,
     InitResult,
     RunResult,
     SeedResult,
@@ -65,6 +70,11 @@ from yolo_developer.sdk.types import (
 __all__ = [
     "AuditEntry",
     "ClientNotInitializedError",
+    "ConfigSaveResult",
+    "ConfigUpdateResult",
+    "ConfigValidationIssue",
+    "ConfigValidationResult",
+    "ConfigurationAPIError",
     "InitResult",
     "ProjectNotFoundError",
     "RunResult",
