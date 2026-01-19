@@ -6,39 +6,12 @@ Tests cover:
 
 Note: run_command tests moved to test_run_command.py after Story 12.4 implementation.
 Note: status_command tests moved to test_status_command.py after Story 12.5 implementation.
+Note: logs_command tests moved to test_logs_command.py after Story 12.6 implementation.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
-
-
-class TestLogsCommand:
-    """Tests for logs command module."""
-
-    @patch("yolo_developer.cli.commands.logs.coming_soon")
-    @patch("yolo_developer.cli.commands.logs.logger")
-    def test_logs_command_calls_coming_soon(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test logs_command calls coming_soon with 'logs'."""
-        from yolo_developer.cli.commands.logs import logs_command
-
-        logs_command()
-
-        mock_coming_soon.assert_called_once_with("logs")
-
-    @patch("yolo_developer.cli.commands.logs.coming_soon")
-    @patch("yolo_developer.cli.commands.logs.logger")
-    def test_logs_command_logs_invocation(
-        self, mock_logger: MagicMock, mock_coming_soon: MagicMock
-    ) -> None:
-        """Test logs_command logs debug message."""
-        from yolo_developer.cli.commands.logs import logs_command
-
-        logs_command()
-
-        mock_logger.debug.assert_called_once_with("logs_command_invoked")
 
 
 class TestTuneCommand:

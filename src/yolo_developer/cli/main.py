@@ -321,17 +321,80 @@ def status(
 
 
 @app.command("logs")
-def logs() -> None:
+def logs(
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Filter by agent name (case-insensitive). E.g., 'analyst', 'pm', 'dev'.",
+    ),
+    since: str | None = typer.Option(
+        None,
+        "--since",
+        "-s",
+        help="Show decisions after this time. Supports relative (1h, 30m, 7d) or ISO format.",
+    ),
+    decision_type: str | None = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help="Filter by decision type (e.g., 'requirement_analysis', 'architecture_choice').",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        "-l",
+        help="Maximum number of entries to display. Default: 20.",
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        "-A",
+        help="Show all entries without pagination.",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output including rationale and context.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output results as JSON instead of formatted display.",
+    ),
+) -> None:
     """Browse decision audit trail.
 
     View the history of agent decisions with filtering and
     search capabilities.
 
-    This command will be fully implemented in Story 12.6.
+    The command displays recent decisions by default, with options
+    to filter by agent, time range, or decision type.
+
+    Examples:
+        yolo logs                          # Show recent decisions (default 20)
+        yolo logs --agent analyst          # Filter by agent
+        yolo logs --since 1h               # Decisions from last hour
+        yolo logs --since 2026-01-15       # Decisions since date
+        yolo logs --type architecture_choice  # Filter by decision type
+        yolo logs --limit 50               # Show 50 entries
+        yolo logs --all                    # Show all entries
+        yolo logs --verbose                # Show full details
+        yolo logs --json                   # Output as JSON
     """
     from yolo_developer.cli.commands.logs import logs_command
 
-    logs_command()
+    logs_command(
+        agent=agent,
+        since=since,
+        decision_type=decision_type,
+        limit=limit,
+        show_all=show_all,
+        verbose=verbose,
+        json_output=json_output,
+    )
 
 
 @app.command("tune")

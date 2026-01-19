@@ -184,7 +184,7 @@ development_status:
   12-3-yolo-seed-command: done
   12-4-yolo-run-command: done
   12-5-yolo-status-command: done
-  12-6-yolo-logs-command: backlog
+  12-6-yolo-logs-command: done
   12-7-yolo-tune-command: backlog
   12-8-yolo-config-command: backlog
   12-9-real-time-activity-display: backlog
