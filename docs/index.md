@@ -170,6 +170,7 @@ Deep dive into agents, orchestration, memory, and quality gates.
 |:------|:--------|:------------|
 | [#4](https://github.com/bbengt1/yolo-developer/issues/4) | **Token Efficiencies** | Context optimization and deduplication for reduced costs |
 | [#5](https://github.com/bbengt1/yolo-developer/issues/5) | **Large Codebase Support** | Performance optimization for 10,000+ file repositories |
+| [#15](https://github.com/bbengt1/yolo-developer/issues/15) | **Token Limit Scheduler** | Automatic rate limit handling with pause/resume for long sprints |
 
 [View all issues on GitHub](https://github.com/bbengt1/yolo-developer/issues){: .btn .btn-outline .fs-5 }
 

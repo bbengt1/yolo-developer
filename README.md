@@ -402,6 +402,7 @@ tests/
 |-------|---------|--------|
 | [#4](https://github.com/bbengt1/yolo-developer/issues/4) | Context / Token Efficiencies | `enhancement` `performance` |
 | [#5](https://github.com/bbengt1/yolo-developer/issues/5) | Performance Optimization for Large Codebases | `enhancement` `performance` |
+| [#15](https://github.com/bbengt1/yolo-developer/issues/15) | Token Limit Scheduler | `enhancement` `epic` `performance` |
 
 See all issues: [GitHub Issues](https://github.com/bbengt1/yolo-developer/issues)
 
