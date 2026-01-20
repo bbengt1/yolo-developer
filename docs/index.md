@@ -121,6 +121,56 @@ Deep dive into agents, orchestration, memory, and quality gates.
 
 ---
 
+## Roadmap
+
+### Current Status
+
+| Epic | Status | Description |
+|:-----|:-------|:------------|
+| 1-13 | ✅ Complete | Core infrastructure, all agents, CLI, SDK |
+| 14 | 🚧 In Progress | MCP Integration |
+
+### Planned Features
+
+#### LLM Providers
+
+| Issue | Feature | Description |
+|:------|:--------|:------------|
+| [#1](https://github.com/bbengt1/yolo-developer/issues/1) | **Local LLM Support** | Ollama, LM Studio, vLLM integration with hybrid routing |
+| [#8](https://github.com/bbengt1/yolo-developer/issues/8) | **ChatGPT Codex Support** | OpenAI models as LLM provider with Azure support |
+
+#### IDE Integrations
+
+| Issue | Feature | Description |
+|:------|:--------|:------------|
+| [#9](https://github.com/bbengt1/yolo-developer/issues/9) | **Cursor IDE Support** | VS Code extension with MCP integration for Cursor |
+| [#10](https://github.com/bbengt1/yolo-developer/issues/10) | **GitHub Copilot Support** | `@yolo` chat participant and Copilot Workspace integration |
+
+#### User Interfaces
+
+| Issue | Feature | Description |
+|:------|:--------|:------------|
+| [#3](https://github.com/bbengt1/yolo-developer/issues/3) | **Web Interface** | Full web UI with REST API, WebSocket updates, document upload |
+| [#7](https://github.com/bbengt1/yolo-developer/issues/7) | **Sprint Dashboard** | Real-time visualization of sprint progress and agent activity |
+
+#### Core Enhancements
+
+| Issue | Feature | Description |
+|:------|:--------|:------------|
+| [#2](https://github.com/bbengt1/yolo-developer/issues/2) | **Brownfield Support** | Add YOLO to existing projects with deep codebase scanning |
+| [#6](https://github.com/bbengt1/yolo-developer/issues/6) | **Plugin System** | Create and integrate custom agents into the workflow |
+
+#### Performance
+
+| Issue | Feature | Description |
+|:------|:--------|:------------|
+| [#4](https://github.com/bbengt1/yolo-developer/issues/4) | **Token Efficiencies** | Context optimization and deduplication for reduced costs |
+| [#5](https://github.com/bbengt1/yolo-developer/issues/5) | **Large Codebase Support** | Performance optimization for 10,000+ file repositories |
+
+[View all issues on GitHub](https://github.com/bbengt1/yolo-developer/issues){: .btn .btn-outline .fs-5 }
+
+---
+
 ## Getting Help
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/bbengt1/yolo-developer/issues)

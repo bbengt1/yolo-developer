@@ -364,16 +364,42 @@ tests/
 
 | Epic | Status | Description |
 |------|--------|-------------|
-| 1-13 | **Complete** | Core infrastructure, all agents, CLI, SDK |
-| 14 | **In Progress** | MCP Integration (2/6 stories done) |
+| 1-13 | ✅ **Complete** | Core infrastructure, all agents, CLI, SDK |
+| 14 | 🚧 **In Progress** | MCP Integration (2/6 stories done) |
 
-### Upcoming
+### Planned Features
 
-- [ ] Complete MCP tool implementations (`yolo_run`, `yolo_status`, `yolo_audit`)
-- [ ] Claude Code compatibility testing
-- [ ] Performance optimization for large codebases
-- [ ] Plugin system for custom agents
-- [ ] Web dashboard for sprint visualization
+#### LLM Providers
+| Issue | Feature | Labels |
+|-------|---------|--------|
+| [#1](https://github.com/bbengt1/yolo-developer/issues/1) | Local LLM Support (Ollama, LM Studio, vLLM) | `enhancement` `epic` |
+| [#8](https://github.com/bbengt1/yolo-developer/issues/8) | ChatGPT Codex Support | `enhancement` `epic` |
+
+#### IDE Integrations
+| Issue | Feature | Labels |
+|-------|---------|--------|
+| [#9](https://github.com/bbengt1/yolo-developer/issues/9) | Cursor IDE Support | `enhancement` `epic` `ide-integration` |
+| [#10](https://github.com/bbengt1/yolo-developer/issues/10) | GitHub Copilot Support | `enhancement` `epic` `ide-integration` |
+
+#### User Interfaces
+| Issue | Feature | Labels |
+|-------|---------|--------|
+| [#3](https://github.com/bbengt1/yolo-developer/issues/3) | Web Interface | `enhancement` `epic` `frontend` |
+| [#7](https://github.com/bbengt1/yolo-developer/issues/7) | Web Dashboard for Sprint Visualization | `enhancement` `frontend` |
+
+#### Core Enhancements
+| Issue | Feature | Labels |
+|-------|---------|--------|
+| [#2](https://github.com/bbengt1/yolo-developer/issues/2) | Brownfield Project Support | `enhancement` `epic` |
+| [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
+
+#### Performance
+| Issue | Feature | Labels |
+|-------|---------|--------|
+| [#4](https://github.com/bbengt1/yolo-developer/issues/4) | Context / Token Efficiencies | `enhancement` `performance` |
+| [#5](https://github.com/bbengt1/yolo-developer/issues/5) | Performance Optimization for Large Codebases | `enhancement` `performance` |
+
+See all issues: [GitHub Issues](https://github.com/bbengt1/yolo-developer/issues)
 
 ---
 
