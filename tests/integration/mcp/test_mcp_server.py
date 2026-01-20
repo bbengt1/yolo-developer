@@ -1,14 +1,27 @@
 """Integration tests for the MCP server with FastMCP Client.
 
-Tests cover AC6: FastMCP testing patterns with mocked clients.
+Tests cover:
+- Story 14.1 AC6: FastMCP testing patterns with mocked clients
+- Story 14.2 AC7: Integration tests for yolo_seed tool
 """
 
 from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+from typing import Any
 
 import pytest
 from fastmcp import Client
 
 from yolo_developer.mcp import mcp
+from yolo_developer.mcp.tools import clear_seeds, get_seed
+
+
+@pytest.fixture(autouse=True)
+def clear_seed_storage() -> None:
+    """Clear seed storage before each test."""
+    clear_seeds()
 
 
 @pytest.mark.asyncio
@@ -16,17 +29,16 @@ async def test_server_responds_to_client() -> None:
     """Test server can handle client requests via FastMCP Client."""
     async with Client(mcp) as client:
         tools = await client.list_tools()
-        # No tools registered yet in this story (tools added in 14.2-14.5)
         assert isinstance(tools, list)
 
 
 @pytest.mark.asyncio
-async def test_server_returns_empty_tools_list() -> None:
-    """Test server returns empty tools list when no tools registered."""
+async def test_server_lists_yolo_seed_tool() -> None:
+    """Test server includes yolo_seed in available tools."""
     async with Client(mcp) as client:
         tools = await client.list_tools()
-        # Story 14.1 sets up server only - no tools yet
-        assert len(tools) == 0
+        tool_names = [t.name for t in tools]
+        assert "yolo_seed" in tool_names
 
 
 @pytest.mark.asyncio
@@ -37,3 +49,171 @@ async def test_client_can_ping_server() -> None:
         # List resources as a basic connectivity check
         resources = await client.list_resources()
         assert isinstance(resources, list)
+
+
+class TestYoloSeedIntegration:
+    """Integration tests for yolo_seed MCP tool via FastMCP Client."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_via_mcp_client_with_text(self) -> None:
+        """Test yolo_seed through FastMCP Client with text content."""
+        async with Client(mcp) as client:
+            result = await client.call_tool("yolo_seed", {"content": "Build a REST API"})
+
+            # FastMCP returns tool result content
+            assert_result_accepted(result)
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_via_mcp_client_with_file(self) -> None:
+        """Test yolo_seed through FastMCP Client with file input."""
+        # Create a temporary file
+        file_content = "File-based seed requirements"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(file_content)
+            temp_path = f.name
+
+        try:
+            async with Client(mcp) as client:
+                result = await client.call_tool("yolo_seed", {"file_path": temp_path})
+
+                assert_result_accepted(result, source="file")
+
+                # Verify seed was stored correctly (Issue 7 fix)
+                seed_id = extract_seed_id(result)
+                assert seed_id is not None
+                stored_seed = get_seed(seed_id)
+                assert stored_seed is not None
+                assert stored_seed.source == "file"
+                assert stored_seed.file_path == temp_path
+                assert stored_seed.content == file_content
+        finally:
+            Path(temp_path).unlink()
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_full_flow_seed_and_retrieve(self) -> None:
+        """Test full flow: seed via MCP client, then retrieve stored seed."""
+        seed_content = "Complete feature: User authentication with OAuth2"
+
+        async with Client(mcp) as client:
+            # Seed via MCP
+            result = await client.call_tool("yolo_seed", {"content": seed_content})
+
+            # Extract seed_id from result
+            seed_id = extract_seed_id(result)
+            assert seed_id is not None
+
+            # Verify seed was stored correctly
+            stored_seed = get_seed(seed_id)
+            assert stored_seed is not None
+            assert stored_seed.content == seed_content
+            assert stored_seed.source == "text"
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_validation_error_via_client(self) -> None:
+        """Test yolo_seed returns error for invalid input via client."""
+        async with Client(mcp) as client:
+            result = await client.call_tool("yolo_seed", {"content": ""})
+
+            # Should return error status
+            assert_result_error(result)
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_tool_has_parameters(self) -> None:
+        """Test yolo_seed tool exposes parameters for MCP clients."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            yolo_seed_tool = next((t for t in tools if t.name == "yolo_seed"), None)
+
+            assert yolo_seed_tool is not None
+            # Tool should have input schema for parameters
+            assert yolo_seed_tool.inputSchema is not None
+
+
+def assert_result_accepted(result: Any, source: str = "text") -> None:
+    """Assert that the tool result indicates accepted status."""
+    # FastMCP wraps tool results - extract content
+    if hasattr(result, "content"):
+        # Single content item
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    elif isinstance(result, dict):
+        data = result
+    elif isinstance(result, list) and len(result) > 0:
+        # List of content items
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    else:
+        raise AssertionError(f"Unexpected result type: {type(result)}")
+
+    assert data.get("status") == "accepted", f"Expected accepted status, got: {data}"
+    assert "seed_id" in data, f"Expected seed_id in result: {data}"
+    assert data.get("source") == source, f"Expected source={source}, got: {data}"
+
+
+def assert_result_error(result: Any) -> None:
+    """Assert that the tool result indicates error status."""
+    if hasattr(result, "content"):
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    elif isinstance(result, dict):
+        data = result
+    elif isinstance(result, list) and len(result) > 0:
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    else:
+        raise AssertionError(f"Unexpected result type: {type(result)}")
+
+    assert data.get("status") == "error", f"Expected error status, got: {data}"
+    assert "error" in data, f"Expected error message in result: {data}"
+
+
+def extract_seed_id(result: Any) -> str | None:
+    """Extract seed_id from tool result."""
+    if hasattr(result, "content"):
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    elif isinstance(result, dict):
+        data = result
+    elif isinstance(result, list) and len(result) > 0:
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    else:
+        return None
+
+    return data.get("seed_id")

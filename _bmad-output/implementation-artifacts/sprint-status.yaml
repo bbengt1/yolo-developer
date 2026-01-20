@@ -203,7 +203,7 @@ development_status:
   # Epic 14: MCP Integration (6 stories)
   epic-14: in-progress
   14-1-fastmcp-server-setup: done
-  14-2-yolo-seed-mcp-tool: backlog
+  14-2-yolo-seed-mcp-tool: done
   14-3-yolo-run-mcp-tool: backlog
   14-4-yolo-status-mcp-tool: backlog
   14-5-yolo-audit-mcp-tool: backlog

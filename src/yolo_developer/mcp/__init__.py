@@ -20,11 +20,11 @@ The server is configured with:
     - Instructions: Description of available tools
     - Error masking: Enabled for production safety
 
-Tools available (implemented in future stories):
-    - yolo_seed: Provide seed requirements
-    - yolo_run: Execute autonomous sprint
-    - yolo_status: Query sprint status
-    - yolo_audit: Access audit trail
+Tools available:
+    - yolo_seed: Provide seed requirements for development (Story 14.2)
+    - yolo_run: Execute autonomous sprint (coming in Story 14.3)
+    - yolo_status: Query sprint status (coming in Story 14.4)
+    - yolo_audit: Access audit trail (coming in Story 14.5)
 """
 
 from __future__ import annotations
@@ -35,10 +35,30 @@ from yolo_developer.mcp.server import (
     mcp,
     run_server,
 )
+from yolo_developer.mcp.tools import (
+    StoredSeed,
+    clear_seeds,
+    get_seed,
+    store_seed,
+    yolo_seed,
+)
 
 # Public API exports:
 # - mcp: FastMCP server instance for direct use
 # - run_server: Type-safe wrapper for starting the server
 # - TransportType: Enum for transport protocol selection
 # - SERVER_INSTRUCTIONS: Server instructions string for reference
-__all__ = ["SERVER_INSTRUCTIONS", "TransportType", "mcp", "run_server"]
+# - yolo_seed: MCP tool for providing seed requirements
+# - StoredSeed: Dataclass for stored seed objects
+# - store_seed, get_seed, clear_seeds: Seed storage functions
+__all__ = [
+    "SERVER_INSTRUCTIONS",
+    "StoredSeed",
+    "TransportType",
+    "clear_seeds",
+    "get_seed",
+    "mcp",
+    "run_server",
+    "store_seed",
+    "yolo_seed",
+]

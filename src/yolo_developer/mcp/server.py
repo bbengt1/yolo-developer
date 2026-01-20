@@ -54,8 +54,23 @@ fastmcp_settings.mask_error_details = True
 SERVER_INSTRUCTIONS = """
 YOLO Developer MCP Server
 
-Available tools will include:
-- yolo_seed: Provide seed requirements for development
+Available tools:
+
+## yolo_seed
+Provide seed requirements for autonomous development. You can provide requirements
+either as text content or by specifying a file path to read from.
+
+Parameters:
+- content (optional): Seed requirements as plain text
+- file_path (optional): Path to file containing seed requirements
+
+Returns seed_id for tracking, content_length, and source type.
+
+Example:
+  yolo_seed(content="Build a REST API for user management")
+  yolo_seed(file_path="/path/to/requirements.txt")
+
+## Coming Soon
 - yolo_run: Execute autonomous sprint
 - yolo_status: Query sprint status
 - yolo_audit: Access audit trail
@@ -100,3 +115,16 @@ def run_server(
 
 
 __all__ = ["SERVER_INSTRUCTIONS", "TransportType", "mcp", "run_server"]
+
+
+def _register_tools() -> None:
+    """Register MCP tools with the server.
+
+    This function imports the tools module to trigger tool registration
+    via the @mcp.tool decorator. It's called lazily to avoid circular imports.
+    """
+    from yolo_developer.mcp import tools as _tools  # noqa: F401
+
+
+# Register tools when module is fully loaded
+_register_tools()
