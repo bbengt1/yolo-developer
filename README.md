@@ -394,6 +394,7 @@ tests/
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
 | [#12](https://github.com/bbengt1/yolo-developer/issues/12) | GitHub Repository Management | `enhancement` `epic` `github-integration` |
+| [#13](https://github.com/bbengt1/yolo-developer/issues/13) | GitHub Issue to User Story Conversion | `enhancement` `epic` `github-integration` |
 
 #### Performance
 | Issue | Feature | Labels |
