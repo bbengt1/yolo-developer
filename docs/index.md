@@ -162,6 +162,7 @@ Deep dive into agents, orchestration, memory, and quality gates.
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | **Course Correction** | Mid-sprint requirement changes with impact analysis |
 | [#12](https://github.com/bbengt1/yolo-developer/issues/12) | **GitHub Management** | Full Git/GitHub workflow: commits, PRs, issues, releases |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | **Issue Import** | Convert GitHub issues to user stories for development |
+| [#14](https://github.com/bbengt1/yolo-developer/issues/14) | **Requirements Gathering** | Interactive session to elicit and crystallize requirements |
 
 #### Performance
 

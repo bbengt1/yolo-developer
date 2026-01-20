@@ -395,6 +395,7 @@ tests/
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
 | [#12](https://github.com/bbengt1/yolo-developer/issues/12) | GitHub Repository Management | `enhancement` `epic` `github-integration` |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | GitHub Issue to User Story Conversion | `enhancement` `epic` `github-integration` |
+| [#14](https://github.com/bbengt1/yolo-developer/issues/14) | Interactive Requirements Gathering | `enhancement` `epic` |
 
 #### Performance
 | Issue | Feature | Labels |
