@@ -1,0 +1,598 @@
+---
+layout: default
+title: Configuration
+nav_order: 7
+has_children: true
+---
+
+# Configuration
+{: .no_toc }
+
+Complete reference for all YOLO Developer configuration options.
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
+
+## Overview
+
+YOLO Developer uses a three-layer configuration system:
+
+1. **Defaults** - Built-in sensible defaults
+2. **YAML file** - Project-specific `yolo.yaml`
+3. **Environment variables** - Runtime overrides (highest priority)
+
+---
+
+## Configuration File
+
+Create `yolo.yaml` in your project root:
+
+```yaml
+# Project identification
+project_name: my-awesome-api
+
+# LLM configuration
+llm:
+  smart_model: gpt-4o
+  routine_model: gpt-4o-mini
+  temperature: 0.7
+  max_tokens: 4096
+  # API keys should be set via environment variables
+
+# Quality thresholds
+quality:
+  test_coverage_threshold: 0.8
+  gate_pass_threshold: 0.7
+  blocking_gates:
+    - testability
+    - architecture_validation
+    - definition_of_done
+
+# Memory and storage
+memory:
+  vector_store: chromadb
+  persist_directory: .yolo/memory
+  embedding_model: text-embedding-3-small
+
+# Agent configuration
+agents:
+  max_iterations: 10
+  timeout_seconds: 300
+  enable_caching: true
+
+# Orchestration
+orchestrator:
+  max_agent_retries: 3
+  circular_detection_threshold: 5
+  human_escalation_enabled: true
+
+# Audit and logging
+audit:
+  enabled: true
+  log_level: info
+  export_format: json
+  retention_days: 30
+
+# MCP server
+mcp:
+  transport: stdio
+  http:
+    port: 8080
+    host: "127.0.0.1"
+```
+
+---
+
+## Configuration Sections
+
+### project_name
+
+**Type:** `string`
+**Required:** No (defaults to directory name)
+**Environment:** `YOLO_PROJECT_NAME`
+
+The name of your project. Used in logs, audit trail, and generated artifacts.
+
+```yaml
+project_name: my-awesome-api
+```
+
+---
+
+### llm
+
+LLM (Large Language Model) configuration for agent reasoning.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `smart_model` | string | gpt-4o | `YOLO_LLM__SMART_MODEL` | Model for complex reasoning |
+| `routine_model` | string | gpt-4o-mini | `YOLO_LLM__ROUTINE_MODEL` | Model for routine tasks |
+| `temperature` | float | 0.7 | `YOLO_LLM__TEMPERATURE` | Sampling temperature (0.0-2.0) |
+| `max_tokens` | int | 4096 | `YOLO_LLM__MAX_TOKENS` | Maximum response tokens |
+| `openai_api_key` | string | None | `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key |
+| `anthropic_api_key` | string | None | `YOLO_LLM__ANTHROPIC_API_KEY` | Anthropic API key |
+| `request_timeout` | int | 60 | `YOLO_LLM__REQUEST_TIMEOUT` | API request timeout |
+
+{: .warning }
+> Never put API keys in `yolo.yaml`. Always use environment variables.
+
+```yaml
+llm:
+  smart_model: gpt-4o
+  routine_model: gpt-4o-mini
+  temperature: 0.7
+  max_tokens: 4096
+  request_timeout: 60
+```
+
+**Environment Variables:**
+```bash
+export YOLO_LLM__OPENAI_API_KEY=sk-proj-...
+export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
+export YOLO_LLM__SMART_MODEL=claude-3-opus
+```
+
+#### Supported Models
+
+**OpenAI:**
+- `gpt-4o` (recommended for smart)
+- `gpt-4o-mini` (recommended for routine)
+- `gpt-4-turbo`
+- `gpt-3.5-turbo`
+
+**Anthropic:**
+- `claude-3-opus-20240229`
+- `claude-3-sonnet-20240229`
+- `claude-3-haiku-20240307`
+
+---
+
+### quality
+
+Quality gate thresholds and configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `test_coverage_threshold` | float | 0.8 | `YOLO_QUALITY__TEST_COVERAGE_THRESHOLD` | Minimum test coverage (0.0-1.0) |
+| `gate_pass_threshold` | float | 0.7 | `YOLO_QUALITY__GATE_PASS_THRESHOLD` | Minimum gate score (0.0-1.0) |
+| `blocking_gates` | list | [testability, architecture_validation] | `YOLO_QUALITY__BLOCKING_GATES` | Gates that block progress |
+| `warning_gates` | list | [] | `YOLO_QUALITY__WARNING_GATES` | Gates that only warn |
+
+```yaml
+quality:
+  test_coverage_threshold: 0.8
+  gate_pass_threshold: 0.7
+  blocking_gates:
+    - testability
+    - ac_measurability
+    - architecture_validation
+    - definition_of_done
+  warning_gates:
+    - code_complexity
+```
+
+#### Available Gates
+
+| Gate | Description |
+|:-----|:------------|
+| `testability` | Validates stories have testable acceptance criteria |
+| `ac_measurability` | Checks acceptance criteria are measurable |
+| `architecture_validation` | Validates design against patterns and constraints |
+| `definition_of_done` | Checks completed work meets DoD criteria |
+| `code_complexity` | Analyzes cyclomatic complexity |
+| `security_scan` | Runs security checks on generated code |
+
+---
+
+### memory
+
+Memory and vector storage configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `vector_store` | string | chromadb | `YOLO_MEMORY__VECTOR_STORE` | Vector store backend |
+| `persist_directory` | string | .yolo/memory | `YOLO_MEMORY__PERSIST_DIRECTORY` | Storage location |
+| `embedding_model` | string | text-embedding-3-small | `YOLO_MEMORY__EMBEDDING_MODEL` | Embedding model |
+| `collection_name` | string | yolo_decisions | `YOLO_MEMORY__COLLECTION_NAME` | ChromaDB collection |
+| `similarity_threshold` | float | 0.7 | `YOLO_MEMORY__SIMILARITY_THRESHOLD` | Semantic search threshold |
+
+```yaml
+memory:
+  vector_store: chromadb
+  persist_directory: .yolo/memory
+  embedding_model: text-embedding-3-small
+  collection_name: yolo_decisions
+  similarity_threshold: 0.7
+```
+
+#### Vector Store Options
+
+| Backend | Description |
+|:--------|:------------|
+| `chromadb` | Default, local ChromaDB instance |
+| `ephemeral` | In-memory, not persisted (testing) |
+
+---
+
+### agents
+
+Agent execution configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `max_iterations` | int | 10 | `YOLO_AGENTS__MAX_ITERATIONS` | Max iterations per agent |
+| `timeout_seconds` | int | 300 | `YOLO_AGENTS__TIMEOUT_SECONDS` | Agent timeout |
+| `enable_caching` | bool | true | `YOLO_AGENTS__ENABLE_CACHING` | Cache agent responses |
+| `cache_ttl_hours` | int | 24 | `YOLO_AGENTS__CACHE_TTL_HOURS` | Cache expiry time |
+| `parallel_stories` | int | 1 | `YOLO_AGENTS__PARALLEL_STORIES` | Stories to process in parallel |
+
+```yaml
+agents:
+  max_iterations: 10
+  timeout_seconds: 300
+  enable_caching: true
+  cache_ttl_hours: 24
+  parallel_stories: 1
+```
+
+#### Per-Agent Configuration
+
+```yaml
+agents:
+  max_iterations: 10
+
+  analyst:
+    max_iterations: 5
+    timeout_seconds: 120
+
+  dev:
+    max_iterations: 15
+    timeout_seconds: 600
+    parallel_stories: 2
+
+  tea:
+    timeout_seconds: 180
+```
+
+---
+
+### orchestrator
+
+Orchestration and workflow configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `max_agent_retries` | int | 3 | `YOLO_ORCHESTRATOR__MAX_AGENT_RETRIES` | Retries on agent failure |
+| `circular_detection_threshold` | int | 5 | `YOLO_ORCHESTRATOR__CIRCULAR_DETECTION_THRESHOLD` | Detect circular logic after N loops |
+| `human_escalation_enabled` | bool | true | `YOLO_ORCHESTRATOR__HUMAN_ESCALATION_ENABLED` | Allow human escalation |
+| `checkpoint_enabled` | bool | true | `YOLO_ORCHESTRATOR__CHECKPOINT_ENABLED` | Enable checkpoints |
+| `checkpoint_interval` | int | 5 | `YOLO_ORCHESTRATOR__CHECKPOINT_INTERVAL` | Checkpoint every N operations |
+
+```yaml
+orchestrator:
+  max_agent_retries: 3
+  circular_detection_threshold: 5
+  human_escalation_enabled: true
+  checkpoint_enabled: true
+  checkpoint_interval: 5
+```
+
+---
+
+### audit
+
+Audit trail and logging configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `enabled` | bool | true | `YOLO_AUDIT__ENABLED` | Enable audit logging |
+| `log_level` | string | info | `YOLO_AUDIT__LOG_LEVEL` | Log level (debug, info, warn, error) |
+| `export_format` | string | json | `YOLO_AUDIT__EXPORT_FORMAT` | Export format (json, markdown) |
+| `retention_days` | int | 30 | `YOLO_AUDIT__RETENTION_DAYS` | Days to retain logs |
+| `include_tokens` | bool | true | `YOLO_AUDIT__INCLUDE_TOKENS` | Track token usage |
+| `include_costs` | bool | true | `YOLO_AUDIT__INCLUDE_COSTS` | Track API costs |
+
+```yaml
+audit:
+  enabled: true
+  log_level: info
+  export_format: json
+  retention_days: 30
+  include_tokens: true
+  include_costs: true
+```
+
+---
+
+### mcp
+
+MCP server configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `transport` | string | stdio | `YOLO_MCP__TRANSPORT` | Transport type (stdio, http) |
+| `http.port` | int | 8080 | `YOLO_MCP__HTTP__PORT` | HTTP port |
+| `http.host` | string | 127.0.0.1 | `YOLO_MCP__HTTP__HOST` | HTTP host |
+| `mask_errors` | bool | true | `YOLO_MCP__MASK_ERRORS` | Hide internal errors |
+
+```yaml
+mcp:
+  transport: stdio
+  http:
+    port: 8080
+    host: "127.0.0.1"
+  mask_errors: true
+```
+
+---
+
+## Environment Variables
+
+All configuration can be overridden via environment variables using the `YOLO_` prefix with `__` as the nested delimiter.
+
+### Syntax
+
+```
+YOLO_<SECTION>__<KEY>=<VALUE>
+```
+
+### Examples
+
+```bash
+# Project name
+export YOLO_PROJECT_NAME=my-api
+
+# LLM settings
+export YOLO_LLM__SMART_MODEL=gpt-4o
+export YOLO_LLM__OPENAI_API_KEY=sk-proj-...
+export YOLO_LLM__TEMPERATURE=0.5
+
+# Quality thresholds
+export YOLO_QUALITY__TEST_COVERAGE_THRESHOLD=0.9
+export YOLO_QUALITY__GATE_PASS_THRESHOLD=0.8
+
+# Memory
+export YOLO_MEMORY__PERSIST_DIRECTORY=/custom/path
+
+# Agent settings
+export YOLO_AGENTS__MAX_ITERATIONS=15
+export YOLO_AGENTS__TIMEOUT_SECONDS=600
+
+# Orchestrator
+export YOLO_ORCHESTRATOR__HUMAN_ESCALATION_ENABLED=false
+
+# MCP
+export YOLO_MCP__TRANSPORT=http
+export YOLO_MCP__HTTP__PORT=9000
+```
+
+### List Values
+
+For list configuration (like `blocking_gates`), use comma-separated values:
+
+```bash
+export YOLO_QUALITY__BLOCKING_GATES=testability,architecture_validation,definition_of_done
+```
+
+---
+
+## Configuration Priority
+
+When the same setting is defined in multiple places, the priority is:
+
+1. **Environment variables** (highest)
+2. **yolo.yaml**
+3. **Built-in defaults** (lowest)
+
+### Example
+
+```yaml
+# yolo.yaml
+quality:
+  test_coverage_threshold: 0.8
+```
+
+```bash
+# Environment
+export YOLO_QUALITY__TEST_COVERAGE_THRESHOLD=0.9
+```
+
+**Result:** `test_coverage_threshold = 0.9` (environment wins)
+
+---
+
+## Configuration Validation
+
+### Validate Configuration
+
+```bash
+yolo config validate
+```
+
+**Output:**
+```
+Validating yolo.yaml...
+  ✓ Schema valid
+  ✓ API keys configured
+  ✓ Memory directory writable
+  ✓ Models available
+  ✓ All settings valid
+
+Configuration is valid.
+```
+
+### Common Validation Errors
+
+**Invalid threshold:**
+```
+Error: quality.test_coverage_threshold must be between 0.0 and 1.0
+  Current value: 1.5
+  Valid range: 0.0 - 1.0
+```
+
+**Missing API key:**
+```
+Error: No LLM API key configured
+  Set one of:
+    - YOLO_LLM__OPENAI_API_KEY
+    - YOLO_LLM__ANTHROPIC_API_KEY
+```
+
+**Invalid model:**
+```
+Error: Unknown model: gpt-5-turbo
+  Valid OpenAI models: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
+  Valid Anthropic models: claude-3-opus-*, claude-3-sonnet-*, claude-3-haiku-*
+```
+
+---
+
+## Configuration Profiles
+
+### Development Profile
+
+```yaml
+# yolo.dev.yaml
+project_name: my-api-dev
+
+llm:
+  smart_model: gpt-4o-mini  # Cheaper for dev
+  routine_model: gpt-4o-mini
+
+quality:
+  test_coverage_threshold: 0.6  # Relaxed for iteration
+  gate_pass_threshold: 0.5
+
+agents:
+  max_iterations: 5  # Faster iterations
+  timeout_seconds: 120
+
+audit:
+  log_level: debug  # Verbose logging
+```
+
+### Production Profile
+
+```yaml
+# yolo.prod.yaml
+project_name: my-api-prod
+
+llm:
+  smart_model: gpt-4o
+  routine_model: gpt-4o-mini
+  temperature: 0.3  # More deterministic
+
+quality:
+  test_coverage_threshold: 0.95  # Strict
+  gate_pass_threshold: 0.9
+
+agents:
+  max_iterations: 15
+  timeout_seconds: 600
+
+audit:
+  log_level: info
+  retention_days: 90  # Longer retention
+```
+
+### Using Profiles
+
+```bash
+# Use specific config file
+yolo --config yolo.dev.yaml run
+
+# Or via environment
+export YOLO_CONFIG_PATH=yolo.prod.yaml
+yolo run
+```
+
+---
+
+## Complete Example
+
+```yaml
+# yolo.yaml - Complete configuration example
+
+# Project identification
+project_name: user-management-api
+
+# LLM configuration
+llm:
+  smart_model: gpt-4o
+  routine_model: gpt-4o-mini
+  temperature: 0.7
+  max_tokens: 4096
+  request_timeout: 60
+  # API keys via environment variables
+
+# Quality gates
+quality:
+  test_coverage_threshold: 0.85
+  gate_pass_threshold: 0.75
+  blocking_gates:
+    - testability
+    - ac_measurability
+    - architecture_validation
+    - definition_of_done
+  warning_gates:
+    - code_complexity
+
+# Memory configuration
+memory:
+  vector_store: chromadb
+  persist_directory: .yolo/memory
+  embedding_model: text-embedding-3-small
+  similarity_threshold: 0.7
+
+# Agent configuration
+agents:
+  max_iterations: 10
+  timeout_seconds: 300
+  enable_caching: true
+  cache_ttl_hours: 24
+  parallel_stories: 1
+
+  # Per-agent overrides
+  dev:
+    max_iterations: 15
+    timeout_seconds: 600
+
+  tea:
+    timeout_seconds: 180
+
+# Orchestration
+orchestrator:
+  max_agent_retries: 3
+  circular_detection_threshold: 5
+  human_escalation_enabled: true
+  checkpoint_enabled: true
+  checkpoint_interval: 5
+
+# Audit and logging
+audit:
+  enabled: true
+  log_level: info
+  export_format: json
+  retention_days: 30
+  include_tokens: true
+  include_costs: true
+
+# MCP server
+mcp:
+  transport: stdio
+  mask_errors: true
+```
+
+---
+
+## Next Steps
+
+- [CLI Reference](/yolo-developer/cli/) - Command-line usage
+- [Architecture](/yolo-developer/architecture/) - System design
+- [MCP Integration](/yolo-developer/mcp/) - External tool integration
