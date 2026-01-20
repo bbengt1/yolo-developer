@@ -47,9 +47,7 @@ class TestQualityGateDecoration:
         assert callable(tea_node)
 
     @pytest.mark.asyncio
-    async def test_gate_runs_without_blocking(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_gate_runs_without_blocking(self, state_with_artifacts: YoloState) -> None:
         """Test that gate runs in advisory mode (blocking=False)."""
         # Should complete without raising exception even if gate would fail
         result = await tea_node(state_with_artifacts)
@@ -73,9 +71,7 @@ class TestGateResultHandling:
         assert "tea_output" in result
 
     @pytest.mark.asyncio
-    async def test_tea_output_structure_correct(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_tea_output_structure_correct(self, state_with_artifacts: YoloState) -> None:
         """Test that TEA output has correct structure for gate consumption."""
         result = await tea_node(state_with_artifacts)
         tea_output = result["tea_output"]
@@ -122,9 +118,7 @@ class TestGateMocking:
     """Tests with mocked gate behavior."""
 
     @pytest.mark.asyncio
-    async def test_gate_evaluator_called(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_gate_evaluator_called(self, state_with_artifacts: YoloState) -> None:
         """Test that gate evaluator is invoked during tea_node execution."""
         # The gate is registered with blocking=False, so even if evaluation fails,
         # the function should complete
@@ -132,9 +126,7 @@ class TestGateMocking:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_gate_receives_state_context(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_gate_receives_state_context(self, state_with_artifacts: YoloState) -> None:
         """Test that gate receives proper state context."""
         # Run the node to ensure gate context is created properly
         result = await tea_node(state_with_artifacts)
@@ -148,9 +140,7 @@ class TestAdvisoryModeGate:
     """Tests for advisory mode gate behavior."""
 
     @pytest.mark.asyncio
-    async def test_advisory_mode_does_not_block(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_advisory_mode_does_not_block(self, state_with_artifacts: YoloState) -> None:
         """Test that advisory mode doesn't block on gate failure."""
         # Even with potential gate issues, function should complete
         result = await tea_node(state_with_artifacts)

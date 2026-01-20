@@ -55,9 +55,7 @@ class TestGenerateAdrWithLlm:
         decision = _create_test_decision()
         analysis = _create_test_twelve_factor_analysis()
 
-        with patch(
-            "yolo_developer.agents.architect.adr_generator._call_adr_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.adr_generator._call_adr_llm") as mock_llm:
             mock_llm.return_value = {
                 "title": "Use PostgreSQL for persistence",
                 "context": "Database decision needed",
@@ -80,9 +78,7 @@ class TestGenerateAdrWithLlm:
         decision = _create_test_decision()
         analysis = _create_test_twelve_factor_analysis()
 
-        with patch(
-            "yolo_developer.agents.architect.adr_generator._call_adr_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.adr_generator._call_adr_llm") as mock_llm:
             mock_llm.side_effect = Exception("LLM unavailable")
 
             # Should not raise, should return pattern-based content
@@ -113,7 +109,9 @@ class TestCallAdrLlm:
         with patch("litellm.acompletion") as mock_completion:
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
-            mock_response.choices[0].message.content = '{"title": "Test", "context": "Test context", "decision": "Test decision", "consequences": "Test consequences"}'
+            mock_response.choices[
+                0
+            ].message.content = '{"title": "Test", "context": "Test context", "decision": "Test decision", "consequences": "Test consequences"}'
             mock_completion.return_value = mock_response
 
             result = await _call_adr_llm(prompt)
@@ -161,7 +159,11 @@ class TestLlmRetryBehavior:
                 Exception("Transient error"),
                 MagicMock(
                     choices=[
-                        MagicMock(message=MagicMock(content='{"title": "Test", "context": "", "decision": "", "consequences": ""}'))
+                        MagicMock(
+                            message=MagicMock(
+                                content='{"title": "Test", "context": "", "decision": "", "consequences": ""}'
+                            )
+                        )
                     ]
                 ),
             ]

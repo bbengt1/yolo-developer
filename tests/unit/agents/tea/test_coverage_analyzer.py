@@ -119,11 +119,11 @@ def help():
         test_files = [
             {
                 "artifact_id": "tests/test_core.py",
-                "content": '''def test_orchestrate(): assert True''',
+                "content": """def test_orchestrate(): assert True""",
             },
             {
                 "artifact_id": "tests/test_gate.py",
-                "content": '''def test_validate(): assert True''',
+                "content": """def test_validate(): assert True""",
             },
         ]
         report = analyze_coverage(code_files, test_files)
@@ -146,7 +146,7 @@ def help():
         code_files = [
             {
                 "artifact_id": "src/module.py",
-                "content": '''def func(): pass''',
+                "content": """def func(): pass""",
             }
         ]
         test_files: list[dict[str, str]] = []
@@ -158,7 +158,7 @@ def help():
         code_files = [
             {
                 "artifact_id": "src/module.py",
-                "content": '''def func(): pass''',
+                "content": """def func(): pass""",
             }
         ]
         test_files: list[dict[str, str]] = []
@@ -188,7 +188,7 @@ def subtract(a, b):
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''def test_add(): assert True''',
+                "content": """def test_add(): assert True""",
             }
         ]
         report = analyze_coverage(code_files, test_files)
@@ -200,20 +200,20 @@ def subtract(a, b):
         code_files = [
             {
                 "artifact_id": "src/module.py",
-                "content": '''def a(): pass
+                "content": """def a(): pass
 def b(): pass
 def c(): pass
 def d(): pass
-''',
+""",
             }
         ]
         # Test file that tests 2 of 4 functions
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''def test_a(): assert True
+                "content": """def test_a(): assert True
 def test_b(): assert True
-''',
+""",
             }
         ]
         report = analyze_coverage(code_files, test_files)
@@ -230,13 +230,13 @@ class TestAgentsPathDetection:
         code_files = [
             {
                 "artifact_id": "agents/analyst/node.py",
-                "content": '''def analyze(): pass''',
+                "content": """def analyze(): pass""",
             }
         ]
         test_files = [
             {
                 "artifact_id": "tests/test_analyst.py",
-                "content": '''def test_analyze(): assert True''',
+                "content": """def test_analyze(): assert True""",
             }
         ]
         report = analyze_coverage(code_files, test_files)

@@ -63,7 +63,9 @@ class TestAdrStoryLinking:
         decision = _create_test_decision(story_id="story-001")
         analysis = _create_test_analysis()
 
-        adr = await generate_adr(decision, analysis, additional_story_ids=("story-002", "story-003"))
+        adr = await generate_adr(
+            decision, analysis, additional_story_ids=("story-002", "story-003")
+        )
 
         assert "story-001" in adr.story_ids
         assert "story-002" in adr.story_ids
@@ -91,6 +93,7 @@ class TestGenerateAdrsAsync:
         import inspect
 
         from yolo_developer.agents.architect.adr_generator import generate_adrs
+
         assert inspect.iscoroutinefunction(generate_adrs)
 
     @pytest.mark.asyncio

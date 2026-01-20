@@ -314,9 +314,7 @@ def _analyze_cyclomatic_complexity(tree: ast.AST, report: MaintainabilityReport)
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             complexity = _calculate_cyclomatic_complexity(node)
-            report.max_cyclomatic_complexity = max(
-                report.max_cyclomatic_complexity, complexity
-            )
+            report.max_cyclomatic_complexity = max(report.max_cyclomatic_complexity, complexity)
 
             if complexity > 10:
                 report.warnings.append(

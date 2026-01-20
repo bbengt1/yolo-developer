@@ -232,7 +232,10 @@ class TestGenerateTestFindings:
         assert len(findings) == 1
         assert findings[0].remediation != ""
         # Should include the error message or test name
-        assert "test_broken" in findings[0].description or "assertion" in findings[0].remediation.lower()
+        assert (
+            "test_broken" in findings[0].description
+            or "assertion" in findings[0].remediation.lower()
+        )
 
     def test_finding_id_is_unique(self) -> None:
         """Test that each finding has a unique ID."""

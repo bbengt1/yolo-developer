@@ -43,7 +43,6 @@ from yolo_developer.agents.sm.context_injection_types import (
     RetrievedContext,
 )
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -525,9 +524,7 @@ class TestRetrieveRelevantContext:
         sample_config: InjectionConfig,
     ) -> None:
         """Test returns empty tuple for empty state without memory."""
-        contexts = await retrieve_relevant_context(
-            sample_gap, None, empty_state, sample_config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, None, empty_state, sample_config)
         assert contexts == ()
 
     @pytest.mark.asyncio
@@ -545,9 +542,7 @@ class TestRetrieveRelevantContext:
 
         config = InjectionConfig(enabled_sources=("memory",))
 
-        contexts = await retrieve_relevant_context(
-            sample_gap, mock_memory, empty_state, config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, mock_memory, empty_state, config)
 
         assert len(contexts) >= 1
         assert contexts[0].source == "memory"
@@ -575,9 +570,7 @@ class TestRetrieveRelevantContext:
             min_relevance_score=0.5,
         )
 
-        contexts = await retrieve_relevant_context(
-            sample_gap, mock_memory, empty_state, config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, mock_memory, empty_state, config)
 
         assert len(contexts) <= 3
 
@@ -598,9 +591,7 @@ class TestRetrieveRelevantContext:
 
         config = InjectionConfig(enabled_sources=("memory",), min_relevance_score=0.5)
 
-        contexts = await retrieve_relevant_context(
-            sample_gap, mock_memory, empty_state, config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, mock_memory, empty_state, config)
 
         # Should be sorted highest to lowest
         if len(contexts) >= 2:
@@ -633,7 +624,7 @@ class TestBuildInjectionPayload:
         """Test truncates when max size exceeded."""
         # Create large contexts
         large_contexts = []
-        for i in range(10):
+        for _i in range(10):
             large_contexts.append(
                 RetrievedContext(
                     source="memory",
@@ -780,9 +771,7 @@ class TestEdgeCases:
         config = InjectionConfig(enabled_sources=("memory",))
 
         # Should not raise, just return empty
-        contexts = await retrieve_relevant_context(
-            sample_gap, mock_memory, empty_state, config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, mock_memory, empty_state, config)
         assert contexts == ()
 
     @pytest.mark.asyncio
@@ -813,7 +802,5 @@ class TestEdgeCases:
         """Test injection with no enabled sources."""
         config = InjectionConfig(enabled_sources=())
 
-        contexts = await retrieve_relevant_context(
-            sample_gap, None, empty_state, config
-        )
+        contexts = await retrieve_relevant_context(sample_gap, None, empty_state, config)
         assert contexts == ()

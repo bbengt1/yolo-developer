@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
+from yolo_developer.seed.ambiguity import Ambiguity, AmbiguitySeverity, AmbiguityType
 from yolo_developer.seed.rejection import (
     DEFAULT_AMBIGUITY_THRESHOLD,
     DEFAULT_OVERALL_THRESHOLD,
@@ -26,9 +27,7 @@ from yolo_developer.seed.rejection import (
     generate_remediation_steps,
     validate_quality_thresholds,
 )
-from yolo_developer.seed.report import QualityMetrics, ValidationReport, generate_validation_report
-from yolo_developer.seed.types import SeedFeature, SeedGoal, SeedParseResult, SeedSource
-from yolo_developer.seed.ambiguity import Ambiguity, AmbiguitySeverity, AmbiguityType
+from yolo_developer.seed.report import QualityMetrics, generate_validation_report
 from yolo_developer.seed.sop import (
     ConflictSeverity,
     SOPCategory,
@@ -36,7 +35,7 @@ from yolo_developer.seed.sop import (
     SOPConstraint,
     SOPValidationResult,
 )
-
+from yolo_developer.seed.types import SeedFeature, SeedGoal, SeedParseResult, SeedSource
 
 # =============================================================================
 # QualityThreshold Tests
@@ -566,9 +565,7 @@ class TestCreateRejectionWithRemediation:
 
         # Use strict thresholds to force failure
         thresholds = QualityThreshold(ambiguity=0.9)
-        rejection = create_rejection_with_remediation(
-            report.quality_metrics, report, thresholds
-        )
+        rejection = create_rejection_with_remediation(report.quality_metrics, report, thresholds)
 
         assert rejection.passed is False
         assert len(rejection.recommendations) > 0

@@ -470,9 +470,7 @@ class TestFilterAll:
         await decision_store.log_decision(_make_decision("dec-1"))
         await adr_store.store_adr(_make_adr("ADR-001"))
 
-        service = AuditFilterService(
-            decision_store, traceability_store, adr_store=adr_store
-        )
+        service = AuditFilterService(decision_store, traceability_store, adr_store=adr_store)
         filters = AuditFilters()
 
         results = await service.filter_all(filters)
@@ -510,9 +508,7 @@ class TestFilterADRs:
         await adr_store.store_adr(_make_adr("ADR-002", story_ids=("story-2",)))
         await adr_store.store_adr(_make_adr("ADR-003", story_ids=("story-1",)))
 
-        service = AuditFilterService(
-            decision_store, traceability_store, adr_store=adr_store
-        )
+        service = AuditFilterService(decision_store, traceability_store, adr_store=adr_store)
         filters = AuditFilters(story_id="story-1")
 
         results = await service.filter_adrs(filters)
@@ -532,9 +528,7 @@ class TestFilterADRs:
         await adr_store.store_adr(_make_adr("ADR-002", created_at="2026-01-15T00:00:00Z"))
         await adr_store.store_adr(_make_adr("ADR-003", created_at="2026-01-31T00:00:00Z"))
 
-        service = AuditFilterService(
-            decision_store, traceability_store, adr_store=adr_store
-        )
+        service = AuditFilterService(decision_store, traceability_store, adr_store=adr_store)
         filters = AuditFilters(
             start_time="2026-01-10T00:00:00Z",
             end_time="2026-01-20T00:00:00Z",
@@ -556,9 +550,7 @@ class TestFilterADRs:
         await adr_store.store_adr(_make_adr("ADR-002"))
         await adr_store.store_adr(_make_adr("ADR-003"))
 
-        service = AuditFilterService(
-            decision_store, traceability_store, adr_store=adr_store
-        )
+        service = AuditFilterService(decision_store, traceability_store, adr_store=adr_store)
         filters = AuditFilters()
 
         results = await service.filter_adrs(filters)
@@ -585,9 +577,7 @@ class TestFilterADRs:
             _make_adr("ADR-003", story_ids=("story-1",), created_at="2026-01-31T00:00:00Z")
         )
 
-        service = AuditFilterService(
-            decision_store, traceability_store, adr_store=adr_store
-        )
+        service = AuditFilterService(decision_store, traceability_store, adr_store=adr_store)
         # Both story and time filters
         filters = AuditFilters(
             story_id="story-1",

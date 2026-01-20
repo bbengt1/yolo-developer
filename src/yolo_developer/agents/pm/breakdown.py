@@ -245,13 +245,15 @@ def _parse_breakdown_response(response: str) -> list[dict[str, Any]]:
                     if isinstance(item, dict):
                         # Validate required fields
                         if all(k in item for k in ["title", "role", "action", "benefit"]):
-                            valid_stories.append({
-                                "title": str(item.get("title", "")),
-                                "role": str(item.get("role", "")),
-                                "action": str(item.get("action", "")),
-                                "benefit": str(item.get("benefit", "")),
-                                "suggested_ac": list(item.get("suggested_ac", [])),
-                            })
+                            valid_stories.append(
+                                {
+                                    "title": str(item.get("title", "")),
+                                    "role": str(item.get("role", "")),
+                                    "action": str(item.get("action", "")),
+                                    "benefit": str(item.get("benefit", "")),
+                                    "suggested_ac": list(item.get("suggested_ac", [])),
+                                }
+                            )
                 return valid_stories
         logger.warning("breakdown_response_invalid_format", response=response[:200])
         return []
@@ -297,7 +299,9 @@ async def _break_down_story_llm(story: Story) -> list[dict[str, Any]]:
                 {
                     "title": f"{story.title} - Part 2",
                     "role": story.role,
-                    "action": " and ".join(action_parts[1:]).strip() if len(action_parts) > 1 else "complete remaining features",
+                    "action": " and ".join(action_parts[1:]).strip()
+                    if len(action_parts) > 1
+                    else "complete remaining features",
                     "benefit": story.benefit,
                     "suggested_ac": ["Extended functionality works correctly"],
                 },
@@ -311,20 +315,24 @@ async def _break_down_story_llm(story: Story) -> list[dict[str, Any]]:
                     "role": story.role,
                     "action": f"implement core {story.action}",
                     "benefit": story.benefit,
-                    "suggested_ac": [ac.then for ac in story.acceptance_criteria[:2]] if story.acceptance_criteria else ["Core feature works"],
+                    "suggested_ac": [ac.then for ac in story.acceptance_criteria[:2]]
+                    if story.acceptance_criteria
+                    else ["Core feature works"],
                 },
                 {
                     "title": f"{story.title} - Validation",
                     "role": story.role,
                     "action": f"validate and handle edge cases for {story.action}",
                     "benefit": story.benefit,
-                    "suggested_ac": [ac.then for ac in story.acceptance_criteria[2:4]] if len(story.acceptance_criteria) > 2 else ["Edge cases handled"],
+                    "suggested_ac": [ac.then for ac in story.acceptance_criteria[2:4]]
+                    if len(story.acceptance_criteria) > 2
+                    else ["Edge cases handled"],
                 },
             ]
 
     # LLM-powered breakdown
     ac_text = "\n".join(
-        f"- AC{i+1}: Given {ac.given}, When {ac.when}, Then {ac.then}"
+        f"- AC{i + 1}: Given {ac.given}, When {ac.when}, Then {ac.then}"
         for i, ac in enumerate(story.acceptance_criteria)
     )
 
@@ -348,13 +356,15 @@ async def _break_down_story_llm(story: Story) -> list[dict[str, Any]]:
                 parsed = parsed[:5]
             elif len(parsed) < 2:
                 # Add a second sub-story if only one returned
-                parsed.append({
-                    "title": f"{story.title} - Additional",
-                    "role": story.role,
-                    "action": "complete remaining functionality",
-                    "benefit": story.benefit,
-                    "suggested_ac": ["Additional features work correctly"],
-                })
+                parsed.append(
+                    {
+                        "title": f"{story.title} - Additional",
+                        "role": story.role,
+                        "action": "complete remaining functionality",
+                        "benefit": story.benefit,
+                        "suggested_ac": ["Additional features work correctly"],
+                    }
+                )
 
             logger.info(
                 "breakdown_llm_success",
@@ -523,7 +533,8 @@ def _validate_coverage(
         # Extract key terms from original AC for matching
         ac_text = f"{ac.given} {ac.when} {ac.then}".lower()
         ac_keywords = {
-            word for word in ac_text.split()
+            word
+            for word in ac_text.split()
             if len(word) > 3 and word.isalpha()  # Skip short words and non-alpha
         }
 

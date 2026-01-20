@@ -26,7 +26,6 @@ from yolo_developer.agents.pm.types import (
     StoryStatus,
 )
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -72,12 +71,24 @@ def complex_story() -> Story:
         action="manage all user accounts including creation, modification, deletion, role assignment, and audit logging",
         benefit="the system has proper user governance",
         acceptance_criteria=(
-            AcceptanceCriterion(id="AC1", given="admin logged in", when="create user", then="user created"),
-            AcceptanceCriterion(id="AC2", given="admin logged in", when="modify user", then="user modified"),
-            AcceptanceCriterion(id="AC3", given="admin logged in", when="delete user", then="user deleted"),
-            AcceptanceCriterion(id="AC4", given="admin logged in", when="assign role", then="role assigned"),
-            AcceptanceCriterion(id="AC5", given="admin logged in", when="view audit", then="audit shown"),
-            AcceptanceCriterion(id="AC6", given="admin logged in", when="export users", then="users exported"),
+            AcceptanceCriterion(
+                id="AC1", given="admin logged in", when="create user", then="user created"
+            ),
+            AcceptanceCriterion(
+                id="AC2", given="admin logged in", when="modify user", then="user modified"
+            ),
+            AcceptanceCriterion(
+                id="AC3", given="admin logged in", when="delete user", then="user deleted"
+            ),
+            AcceptanceCriterion(
+                id="AC4", given="admin logged in", when="assign role", then="role assigned"
+            ),
+            AcceptanceCriterion(
+                id="AC5", given="admin logged in", when="view audit", then="audit shown"
+            ),
+            AcceptanceCriterion(
+                id="AC6", given="admin logged in", when="export users", then="users exported"
+            ),
         ),
         priority=StoryPriority.CRITICAL,
         status=StoryStatus.DRAFT,
@@ -96,11 +107,21 @@ def medium_complexity_story() -> Story:
         action="update my profile information",
         benefit="my account reflects my current details",
         acceptance_criteria=(
-            AcceptanceCriterion(id="AC1", given="logged in", when="update name", then="name updated"),
-            AcceptanceCriterion(id="AC2", given="logged in", when="update email", then="email updated"),
-            AcceptanceCriterion(id="AC3", given="logged in", when="update avatar", then="avatar updated"),
-            AcceptanceCriterion(id="AC4", given="logged in", when="invalid data", then="error shown"),
-            AcceptanceCriterion(id="AC5", given="logged in", when="save changes", then="changes persisted"),
+            AcceptanceCriterion(
+                id="AC1", given="logged in", when="update name", then="name updated"
+            ),
+            AcceptanceCriterion(
+                id="AC2", given="logged in", when="update email", then="email updated"
+            ),
+            AcceptanceCriterion(
+                id="AC3", given="logged in", when="update avatar", then="avatar updated"
+            ),
+            AcceptanceCriterion(
+                id="AC4", given="logged in", when="invalid data", then="error shown"
+            ),
+            AcceptanceCriterion(
+                id="AC5", given="logged in", when="save changes", then="changes persisted"
+            ),
         ),
         priority=StoryPriority.MEDIUM,
         status=StoryStatus.DRAFT,
@@ -174,25 +195,19 @@ class TestEpicBreakdownTypes:
 class TestNeedsBreakdown:
     """Tests for story size detection (Task 2)."""
 
-    def test_low_complexity_story_does_not_need_breakdown(
-        self, simple_story: Story
-    ) -> None:
+    def test_low_complexity_story_does_not_need_breakdown(self, simple_story: Story) -> None:
         """Test low complexity story returns False."""
         from yolo_developer.agents.pm.breakdown import _needs_breakdown
 
         assert _needs_breakdown(simple_story) is False
 
-    def test_high_complexity_story_needs_breakdown(
-        self, complex_story: Story
-    ) -> None:
+    def test_high_complexity_story_needs_breakdown(self, complex_story: Story) -> None:
         """Test high/XL complexity story returns True."""
         from yolo_developer.agents.pm.breakdown import _needs_breakdown
 
         assert _needs_breakdown(complex_story) is True
 
-    def test_story_with_more_than_5_acs_needs_breakdown(
-        self, complex_story: Story
-    ) -> None:
+    def test_story_with_more_than_5_acs_needs_breakdown(self, complex_story: Story) -> None:
         """Test story with >5 acceptance criteria returns True."""
         from yolo_developer.agents.pm.breakdown import _needs_breakdown
 
@@ -223,9 +238,7 @@ class TestNeedsBreakdown:
             role="user",
             action="create accounts and manage profiles and configure settings and export data",
             benefit="complete control",
-            acceptance_criteria=(
-                AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),
-            ),
+            acceptance_criteria=(AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),),
             priority=StoryPriority.MEDIUM,
             status=StoryStatus.DRAFT,
             estimated_complexity="M",
@@ -279,8 +292,20 @@ class TestGenerateSubStories:
         )
 
         breakdown_data = [
-            {"title": "Sub 1", "role": "user", "action": "action 1", "benefit": "benefit 1", "suggested_ac": ["AC1"]},
-            {"title": "Sub 2", "role": "user", "action": "action 2", "benefit": "benefit 2", "suggested_ac": ["AC2"]},
+            {
+                "title": "Sub 1",
+                "role": "user",
+                "action": "action 1",
+                "benefit": "benefit 1",
+                "suggested_ac": ["AC1"],
+            },
+            {
+                "title": "Sub 2",
+                "role": "user",
+                "action": "action 2",
+                "benefit": "benefit 2",
+                "suggested_ac": ["AC2"],
+            },
         ]
 
         sub_stories = _generate_sub_stories(original, breakdown_data)
@@ -329,7 +354,13 @@ class TestGenerateSubStories:
         )
 
         breakdown_data = [
-            {"title": "Sub 1", "role": "user", "action": "action 1", "benefit": "benefit 1", "suggested_ac": ["Do X", "Verify Y"]},
+            {
+                "title": "Sub 1",
+                "role": "user",
+                "action": "action 1",
+                "benefit": "benefit 1",
+                "suggested_ac": ["Do X", "Verify Y"],
+            },
         ]
 
         sub_stories = _generate_sub_stories(original, breakdown_data)
@@ -432,9 +463,18 @@ class TestValidateCoverage:
             action="do stuff",
             benefit="get value",
             acceptance_criteria=(
-                AcceptanceCriterion(id="AC1", given="authentication database connection", when="login", then="authenticated"),
-                AcceptanceCriterion(id="AC2", given="payment gateway integration", when="checkout", then="processed"),
-                AcceptanceCriterion(id="AC3", given="reporting analytics dashboard", when="export", then="generated"),
+                AcceptanceCriterion(
+                    id="AC1",
+                    given="authentication database connection",
+                    when="login",
+                    then="authenticated",
+                ),
+                AcceptanceCriterion(
+                    id="AC2", given="payment gateway integration", when="checkout", then="processed"
+                ),
+                AcceptanceCriterion(
+                    id="AC3", given="reporting analytics dashboard", when="export", then="generated"
+                ),
             ),
             priority=StoryPriority.HIGH,
             status=StoryStatus.DRAFT,
@@ -449,7 +489,9 @@ class TestValidateCoverage:
                 action="authentication database connection login",
                 benefit="b",
                 acceptance_criteria=(
-                    AcceptanceCriterion(id="AC1", given="database", when="login", then="authenticated"),
+                    AcceptanceCriterion(
+                        id="AC1", given="database", when="login", then="authenticated"
+                    ),
                 ),
                 priority=StoryPriority.MEDIUM,
                 status=StoryStatus.DRAFT,
@@ -476,9 +518,7 @@ class TestValidateCoverage:
             role="user",
             action="do stuff",
             benefit="get value",
-            acceptance_criteria=(
-                AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),
-            ),
+            acceptance_criteria=(AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),),
             priority=StoryPriority.HIGH,
             status=StoryStatus.DRAFT,
         )
@@ -499,9 +539,7 @@ class TestBreakDownEpic:
     """Tests for main epic breakdown function (Task 6)."""
 
     @pytest.mark.asyncio
-    async def test_break_down_epic_returns_valid_result(
-        self, complex_story: Story
-    ) -> None:
+    async def test_break_down_epic_returns_valid_result(self, complex_story: Story) -> None:
         """Test break_down_epic returns EpicBreakdownResult."""
         from yolo_developer.agents.pm.breakdown import break_down_epic
 
@@ -514,9 +552,7 @@ class TestBreakDownEpic:
         assert isinstance(result["is_valid"], bool)
 
     @pytest.mark.asyncio
-    async def test_break_down_epic_generates_2_to_5_sub_stories(
-        self, complex_story: Story
-    ) -> None:
+    async def test_break_down_epic_generates_2_to_5_sub_stories(self, complex_story: Story) -> None:
         """Test breakdown generates between 2-5 sub-stories."""
         from yolo_developer.agents.pm.breakdown import break_down_epic
 
@@ -526,9 +562,7 @@ class TestBreakDownEpic:
         assert 2 <= len(result["sub_stories"]) <= 5
 
     @pytest.mark.asyncio
-    async def test_break_down_epic_includes_rationale(
-        self, complex_story: Story
-    ) -> None:
+    async def test_break_down_epic_includes_rationale(self, complex_story: Story) -> None:
         """Test breakdown includes rationale for audit trail."""
         from yolo_developer.agents.pm.breakdown import break_down_epic
 
@@ -536,7 +570,10 @@ class TestBreakDownEpic:
 
         assert len(result["breakdown_rationale"]) > 0
         # Should mention original story
-        assert complex_story.id in result["breakdown_rationale"] or "story" in result["breakdown_rationale"].lower()
+        assert (
+            complex_story.id in result["breakdown_rationale"]
+            or "story" in result["breakdown_rationale"].lower()
+        )
 
 
 # =============================================================================
@@ -559,9 +596,7 @@ class TestProcessEpicBreakdowns:
                 role="user",
                 action="do simple thing",
                 benefit="get value",
-                acceptance_criteria=(
-                    AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),
-                ),
+                acceptance_criteria=(AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),),
                 priority=StoryPriority.MEDIUM,
                 status=StoryStatus.DRAFT,
                 estimated_complexity="M",
@@ -586,9 +621,7 @@ class TestProcessEpicBreakdowns:
                 role="admin",
                 action="manage users and roles and permissions and audit logs",
                 benefit="governance",
-                acceptance_criteria=(
-                    AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),
-                ),
+                acceptance_criteria=(AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),),
                 priority=StoryPriority.HIGH,
                 status=StoryStatus.DRAFT,
                 estimated_complexity="XL",
@@ -658,9 +691,7 @@ class TestBreakdownFallbackPaths:
             role="user",
             action="view the dashboard",  # No "and" conjunction
             benefit="see data",
-            acceptance_criteria=(
-                AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),
-            ),
+            acceptance_criteria=(AcceptanceCriterion(id="AC1", given="g", when="w", then="t"),),
             priority=StoryPriority.HIGH,
             status=StoryStatus.DRAFT,
             estimated_complexity="XL",
@@ -860,7 +891,9 @@ class TestPmNodeBreakdownIntegration:
         # If breakdown occurred, rationale should mention it
         breakdown_results = result["breakdown_results"]
         if breakdown_results:
-            assert "breakdown" in decision.rationale.lower() or "broken" in decision.rationale.lower()
+            assert (
+                "breakdown" in decision.rationale.lower() or "broken" in decision.rationale.lower()
+            )
 
     @pytest.mark.asyncio
     async def test_pm_node_processing_notes_indicate_breakdown(

@@ -137,9 +137,7 @@ class SOPConstraint:
     category: SOPCategory
     source: str
     severity: ConflictSeverity
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -172,9 +170,7 @@ class SOPConstraint:
             category=SOPCategory(data["category"]),
             source=data["source"],
             severity=ConflictSeverity(data["severity"]),
-            created_at=data.get(
-                "created_at", datetime.now(timezone.utc).isoformat()
-            ),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
         )
 
 
@@ -256,16 +252,12 @@ class SOPValidationResult:
     @property
     def hard_conflict_count(self) -> int:
         """Count of HARD severity conflicts."""
-        return sum(
-            1 for c in self.conflicts if c.severity == ConflictSeverity.HARD
-        )
+        return sum(1 for c in self.conflicts if c.severity == ConflictSeverity.HARD)
 
     @property
     def soft_conflict_count(self) -> int:
         """Count of SOFT severity conflicts."""
-        return sum(
-            1 for c in self.conflicts if c.severity == ConflictSeverity.SOFT
-        )
+        return sum(1 for c in self.conflicts if c.severity == ConflictSeverity.SOFT)
 
     @property
     def hard_conflicts(self) -> list[SOPConflict]:
@@ -596,9 +588,7 @@ def _build_conflict(
         severity = ConflictSeverity(raw_severity.lower())
     except ValueError:
         # Default based on category
-        severity = CATEGORY_SEVERITY_MAP.get(
-            constraint.category, ConflictSeverity.SOFT
-        )
+        severity = CATEGORY_SEVERITY_MAP.get(constraint.category, ConflictSeverity.SOFT)
 
     # Build resolution options tuple
     resolution_options = raw_conflict.get("resolution_options", [])
@@ -664,9 +654,7 @@ async def validate_against_sop(
             conflicts.append(conflict)
 
     # Determine if passed (no HARD conflicts)
-    has_hard_conflicts = any(
-        c.severity == ConflictSeverity.HARD for c in conflicts
-    )
+    has_hard_conflicts = any(c.severity == ConflictSeverity.HARD for c in conflicts)
 
     result = SOPValidationResult(
         conflicts=conflicts,

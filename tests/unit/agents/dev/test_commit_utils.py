@@ -362,9 +362,7 @@ class TestGenerateCommitMessage:
 
         context = CommitMessageContext(
             story_ids=("8-8",),
-            story_titles={
-                "8-8": "A Very Long Story Title That Exceeds The Fifty Character Limit"
-            },
+            story_titles={"8-8": "A Very Long Story Title That Exceeds The Fifty Character Limit"},
         )
         message = generate_commit_message(context)
 
@@ -684,7 +682,7 @@ This follows conventional commit format."""
 
         context = CommitMessageContext(story_ids=("8-8",))
 
-        message, is_valid = await generate_commit_message_with_llm(
+        _message, is_valid = await generate_commit_message_with_llm(
             context, mock_router, max_retries=2
         )
 

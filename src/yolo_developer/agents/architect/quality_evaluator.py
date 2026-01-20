@@ -314,9 +314,7 @@ def _score_scalability(story: dict[str, Any], decisions: list[DesignDecision]) -
     return max(0.0, min(1.0, score))
 
 
-def _score_maintainability(
-    story: dict[str, Any], decisions: list[DesignDecision]
-) -> float:
+def _score_maintainability(story: dict[str, Any], decisions: list[DesignDecision]) -> float:
     """Score a design for maintainability quality attribute.
 
     Evaluates story and design decisions for maintainability-related patterns:
@@ -429,9 +427,7 @@ def _score_integration(story: dict[str, Any], decisions: list[DesignDecision]) -
     return max(0.0, min(1.0, score))
 
 
-def _score_cost_efficiency(
-    story: dict[str, Any], decisions: list[DesignDecision]
-) -> float:
+def _score_cost_efficiency(story: dict[str, Any], decisions: list[DesignDecision]) -> float:
     """Score a design for cost efficiency quality attribute.
 
     Evaluates story and design decisions for cost-related patterns:
@@ -814,9 +810,7 @@ def _identify_risks(
 
             risk = QualityRisk(
                 attribute=attr,
-                description=RISK_DESCRIPTIONS.get(
-                    attr, f"Risk to {attr} quality attribute"
-                ),
+                description=RISK_DESCRIPTIONS.get(attr, f"Risk to {attr} quality attribute"),
                 severity=severity,
                 mitigation=mitigation,
                 mitigation_effort=effort,
@@ -938,8 +932,7 @@ async def _evaluate_quality_with_llm(
     """
     # Build prompt
     decisions_text = "\n".join(
-        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})"
-        for d in decisions
+        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})" for d in decisions
     )
 
     prompt = QUALITY_EVALUATION_PROMPT.format(

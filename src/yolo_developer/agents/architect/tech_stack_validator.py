@@ -610,8 +610,7 @@ async def _analyze_tech_stack_with_llm(
     # Build prompt
     tech_stack_text = json.dumps(tech_stack, indent=2)
     decisions_text = "\n".join(
-        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})"
-        for d in decisions
+        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})" for d in decisions
     )
 
     prompt = TECH_STACK_VALIDATION_PROMPT.format(

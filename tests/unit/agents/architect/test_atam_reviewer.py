@@ -601,9 +601,7 @@ class TestLLMIntegration:
                 raise ConnectionError("Transient failure")
             # Return success on third attempt
             mock_response = AsyncMock()
-            mock_response.choices = [
-                AsyncMock(message=AsyncMock(content='{"result": "success"}'))
-            ]
+            mock_response.choices = [AsyncMock(message=AsyncMock(content='{"result": "success"}'))]
             return mock_response
 
         with patch(
@@ -1056,11 +1054,13 @@ class TestArchitectNodeIntegration:
             quality_eval: object = None,
             risk_report: object = None,
         ) -> ATAMReviewResult:
-            captured_calls.append({
-                "decisions": decisions,
-                "quality_eval": quality_eval,
-                "risk_report": risk_report,
-            })
+            captured_calls.append(
+                {
+                    "decisions": decisions,
+                    "quality_eval": quality_eval,
+                    "risk_report": risk_report,
+                }
+            )
             return ATAMReviewResult(
                 overall_pass=True,
                 confidence=0.8,

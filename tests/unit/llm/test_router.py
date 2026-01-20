@@ -190,9 +190,7 @@ class TestLLMRouterCall:
             assert result == ""
 
     @pytest.mark.asyncio
-    async def test_call_raises_provider_error_on_failure(
-        self, router: LLMRouter
-    ) -> None:
+    async def test_call_raises_provider_error_on_failure(self, router: LLMRouter) -> None:
         """Test that provider errors are raised after retries."""
         mock_acompletion = AsyncMock(side_effect=Exception("API Error"))
 
@@ -236,9 +234,7 @@ class TestLLMRouterCallWithFallback:
             assert result == "Primary response"
 
     @pytest.mark.asyncio
-    async def test_fallback_uses_fallback_tier_on_failure(
-        self, router: LLMRouter
-    ) -> None:
+    async def test_fallback_uses_fallback_tier_on_failure(self, router: LLMRouter) -> None:
         """Test that fallback tier is used when primary fails."""
         models_used: list[str] = []
 
@@ -321,12 +317,10 @@ class TestLLMRouterImportError:
         return LLMRouter(LLMConfig())
 
     @pytest.mark.asyncio
-    async def test_call_raises_configuration_error_on_import_error(
-        self, router: LLMRouter
-    ) -> None:
+    async def test_call_raises_configuration_error_on_import_error(self, router: LLMRouter) -> None:
         """Test that ImportError is converted to LLMConfigurationError."""
-        import sys
         import importlib
+        import sys
 
         # Remove litellm from sys.modules to force re-import
         litellm_module = sys.modules.pop("litellm", None)

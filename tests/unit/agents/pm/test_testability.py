@@ -458,9 +458,7 @@ class TestMainValidation:
         assert isinstance(result["is_valid"], bool)
         assert isinstance(result["vague_terms_found"], list)
         assert isinstance(result["missing_edge_cases"], list)
-        assert result["ac_count_warning"] is None or isinstance(
-            result["ac_count_warning"], str
-        )
+        assert result["ac_count_warning"] is None or isinstance(result["ac_count_warning"], str)
         assert isinstance(result["validation_notes"], list)
 
     def test_vague_terms_found_includes_ac_id(self) -> None:

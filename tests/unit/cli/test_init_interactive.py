@@ -69,9 +69,7 @@ class TestInteractiveMode:
     def test_interactive_uses_git_config_as_defaults(self) -> None:
         """Test that interactive mode uses git config values as defaults."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch(
-                "yolo_developer.cli.commands.init.get_git_config"
-            ) as mock_git:
+            with patch("yolo_developer.cli.commands.init.get_git_config") as mock_git:
                 mock_git.side_effect = lambda key: {
                     "user.name": "Git User",
                     "user.email": "git@user.com",
@@ -120,9 +118,7 @@ class TestNoInputMode:
     def test_no_input_uses_git_config_defaults(self) -> None:
         """Test --no-input uses git config for author defaults."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch(
-                "yolo_developer.cli.commands.init.get_git_config"
-            ) as mock_git:
+            with patch("yolo_developer.cli.commands.init.get_git_config") as mock_git:
                 mock_git.side_effect = lambda key: {
                     "user.name": "Configured User",
                     "user.email": "configured@email.com",

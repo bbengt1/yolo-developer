@@ -102,9 +102,7 @@ def state_with_message_metadata() -> YoloState:
 class TestExtractArtifactsFromDevOutput:
     """Tests for extracting artifacts from dev_output."""
 
-    def test_extracts_code_files_from_dev_output(
-        self, state_with_dev_output: YoloState
-    ) -> None:
+    def test_extracts_code_files_from_dev_output(self, state_with_dev_output: YoloState) -> None:
         """Test that code files are extracted from dev_output."""
         artifacts = _extract_artifacts_for_validation(state_with_dev_output)
 
@@ -113,9 +111,7 @@ class TestExtractArtifactsFromDevOutput:
         assert any(a["artifact_id"] == "src/auth.py" for a in code_files)
         assert any(a["artifact_id"] == "src/utils.py" for a in code_files)
 
-    def test_extracts_test_files_from_dev_output(
-        self, state_with_dev_output: YoloState
-    ) -> None:
+    def test_extracts_test_files_from_dev_output(self, state_with_dev_output: YoloState) -> None:
         """Test that test files are extracted from dev_output."""
         artifacts = _extract_artifacts_for_validation(state_with_dev_output)
 
@@ -124,18 +120,14 @@ class TestExtractArtifactsFromDevOutput:
         assert test_files[0]["artifact_id"] == "tests/test_auth.py"
         assert test_files[0]["test_type"] == "unit"
 
-    def test_includes_story_id_in_artifacts(
-        self, state_with_dev_output: YoloState
-    ) -> None:
+    def test_includes_story_id_in_artifacts(self, state_with_dev_output: YoloState) -> None:
         """Test that story_id is included in each artifact."""
         artifacts = _extract_artifacts_for_validation(state_with_dev_output)
 
         for artifact in artifacts:
             assert artifact["story_id"] == "story-001"
 
-    def test_includes_content_in_artifacts(
-        self, state_with_dev_output: YoloState
-    ) -> None:
+    def test_includes_content_in_artifacts(self, state_with_dev_output: YoloState) -> None:
         """Test that content is included in each artifact."""
         artifacts = _extract_artifacts_for_validation(state_with_dev_output)
 

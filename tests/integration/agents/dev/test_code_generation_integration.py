@@ -91,7 +91,8 @@ This function handles the basic authentication logic.
     def test_maintainability_check_detects_issues(self) -> None:
         """Test that maintainability check detects code issues."""
         # Code with issues: long function, deep nesting
-        problematic_code = '''
+        problematic_code = (
+            """
 def process_everything(data):
     result = []
     if data:
@@ -101,9 +102,12 @@ def process_everything(data):
                     if subitem:
                         if subitem.value:
                             result.append(subitem.value)
-    ''' + "\n".join([f"    x{i} = {i}" for i in range(55)]) + '''
+    """
+            + "\n".join([f"    x{i} = {i}" for i in range(55)])
+            + """
     return result
-'''
+"""
+        )
         report = check_maintainability(problematic_code)
         assert report.has_warnings() is True
         # Should have function length warning
@@ -183,9 +187,7 @@ def process_data(items: list[str]) -> dict[str, int]:
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
 
-        code, is_valid, pattern_result = await _generate_code_with_llm(
-            story, context, mock_router
-        )
+        code, is_valid, _pattern_result = await _generate_code_with_llm(story, context, mock_router)
 
         assert is_valid is True
         assert "def process_data" in code
@@ -194,23 +196,21 @@ def process_data(items: list[str]) -> dict[str, int]:
     async def test_retries_on_syntax_error(self, mock_router: MagicMock) -> None:
         """Test that code generation retries on syntax error."""
         # First response has syntax error
-        invalid_response = '''```python
+        invalid_response = """```python
 def broken(
     pass
-```'''
+```"""
         # Second response is valid
-        valid_response = '''```python
+        valid_response = """```python
 def fixed() -> None:
     pass
-```'''
+```"""
         mock_router.call.side_effect = [invalid_response, valid_response]
 
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
 
-        code, is_valid, pattern_result = await _generate_code_with_llm(
-            story, context, mock_router
-        )
+        code, is_valid, _pattern_result = await _generate_code_with_llm(story, context, mock_router)
 
         # Should have called LLM twice (original + retry)
         assert mock_router.call.call_count == 2

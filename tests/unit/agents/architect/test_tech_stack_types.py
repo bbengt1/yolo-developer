@@ -137,7 +137,10 @@ class TestStackPattern:
         )
         assert pattern.pattern_name == "pytest-fixtures"
         assert pattern.description == "Use pytest fixtures for test setup/teardown"
-        assert pattern.rationale == "pytest is configured as test framework; fixtures provide clean test isolation"
+        assert (
+            pattern.rationale
+            == "pytest is configured as test framework; fixtures provide clean test isolation"
+        )
         assert pattern.applicable_technologies == ("pytest", "pytest-asyncio")
 
     def test_stack_pattern_is_frozen(self) -> None:

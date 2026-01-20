@@ -11,8 +11,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
 if TYPE_CHECKING:
     from yolo_developer.audit.export_types import ExportOptions
     from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
@@ -40,9 +38,6 @@ class TestAuditExporterProtocol:
     def test_conforming_class_is_instance_of_protocol(self) -> None:
         """Test class implementing protocol methods is recognized."""
         from yolo_developer.audit.export_protocol import AuditExporter
-        from yolo_developer.audit.export_types import ExportOptions
-        from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
-        from yolo_developer.audit.types import Decision
 
         class MockExporter:
             """Mock exporter implementing all protocol methods."""

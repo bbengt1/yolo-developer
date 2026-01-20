@@ -13,8 +13,6 @@ All tests follow the patterns established in Story 9.1-9.3.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestCalculateCoverageScore:
     """Tests for _calculate_coverage_score function (Task 3)."""
@@ -607,7 +605,7 @@ class TestCheckDeploymentThreshold:
         from yolo_developer.agents.tea.scoring import check_deployment_threshold
 
         # Score 79 is more than 10 points below threshold 90, so it blocks
-        passed, recommendation, reasons, finding = check_deployment_threshold(79, threshold=90)
+        passed, recommendation, reasons, _finding = check_deployment_threshold(79, threshold=90)
 
         assert passed is False
         assert recommendation == "block"
@@ -630,7 +628,7 @@ class TestCheckDeploymentThreshold:
         """Test that score far below threshold (>10 points) blocks."""
         from yolo_developer.agents.tea.scoring import check_deployment_threshold
 
-        passed, recommendation, reasons, finding = check_deployment_threshold(70, threshold=90)
+        passed, recommendation, reasons, _finding = check_deployment_threshold(70, threshold=90)
 
         assert passed is False
         assert recommendation == "block"
@@ -661,7 +659,7 @@ class TestCheckDeploymentThreshold:
         """Test AC4: blocking generates a Finding with severity='critical'."""
         from yolo_developer.agents.tea.scoring import check_deployment_threshold
 
-        passed, recommendation, reasons, finding = check_deployment_threshold(70, threshold=90)
+        passed, recommendation, _reasons, finding = check_deployment_threshold(70, threshold=90)
 
         assert passed is False
         assert recommendation == "block"

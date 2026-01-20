@@ -328,7 +328,10 @@ class TestInjectionResult:
         assert d["contexts_retrieved"][0]["source"] == "memory"
 
     def test_post_init_warning_negative_size(
-        self, sample_gap: ContextGap, sample_context: RetrievedContext, caplog: pytest.LogCaptureFixture
+        self,
+        sample_gap: ContextGap,
+        sample_context: RetrievedContext,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test that negative total_context_size logs a warning."""
         with caplog.at_level(logging.WARNING):
@@ -343,7 +346,10 @@ class TestInjectionResult:
         assert "total_context_size=-100 is negative" in caplog.text
 
     def test_post_init_warning_negative_duration(
-        self, sample_gap: ContextGap, sample_context: RetrievedContext, caplog: pytest.LogCaptureFixture
+        self,
+        sample_gap: ContextGap,
+        sample_context: RetrievedContext,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test that negative duration_ms logs a warning."""
         with caplog.at_level(logging.WARNING):
@@ -358,7 +364,10 @@ class TestInjectionResult:
         assert "duration_ms=-10.00 is negative" in caplog.text
 
     def test_post_init_warning_injected_empty_target(
-        self, sample_gap: ContextGap, sample_context: RetrievedContext, caplog: pytest.LogCaptureFixture
+        self,
+        sample_gap: ContextGap,
+        sample_context: RetrievedContext,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test that injected=True with empty target logs a warning."""
         with caplog.at_level(logging.WARNING):
@@ -475,13 +484,15 @@ class TestConstants:
 
     def test_valid_gap_reasons(self) -> None:
         """Test VALID_GAP_REASONS contains expected values."""
-        assert VALID_GAP_REASONS == frozenset({
-            "clarification_requested",
-            "circular_logic",
-            "long_cycle_time",
-            "gate_failure",
-            "explicit_flag",
-        })
+        assert VALID_GAP_REASONS == frozenset(
+            {
+                "clarification_requested",
+                "circular_logic",
+                "long_cycle_time",
+                "gate_failure",
+                "explicit_flag",
+            }
+        )
 
     def test_default_max_context_items(self) -> None:
         """Test DEFAULT_MAX_CONTEXT_ITEMS is reasonable."""

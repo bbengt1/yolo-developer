@@ -213,19 +213,39 @@ class TestQualityGateWithoutEvaluator:
         assert result["executed"] is True
 
     @pytest.mark.asyncio
-    async def test_unregistered_gate_logs_warning(self, capsys: pytest.CaptureFixture[str]) -> None:
+    async def test_unregistered_gate_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """Unregistered gate logs a warning."""
+        import structlog
+
         from yolo_developer.gates.decorator import quality_gate
+        from yolo_developer.gates.evaluators import clear_evaluators
+
+        # Ensure no evaluator is registered
+        clear_evaluators()
+
+        # Configure structlog to use standard logging for capture
+        structlog.configure(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.dev.ConsoleRenderer(),
+            ],
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            cache_logger_on_first_use=False,
+        )
 
         @quality_gate("missing_evaluator_gate")
         async def node(state: dict[str, Any]) -> dict[str, Any]:
             return state
 
-        await node({})
-        captured = capsys.readouterr()
+        with caplog.at_level("WARNING"):
+            await node({})
+
         # Verify warning was logged about missing evaluator
-        assert "No evaluator registered for gate" in captured.out
-        assert "missing_evaluator_gate" in captured.out
+        log_output = caplog.text
+        assert "No evaluator registered for gate" in log_output
+        assert "missing_evaluator_gate" in log_output
 
 
 class TestBlockingGateBehavior:
@@ -417,13 +437,27 @@ class TestAdvisoryGateBehavior:
         assert result["advisory_warnings"][0]["reason"] == "Style violation"
 
     @pytest.mark.asyncio
-    async def test_advisory_gate_logs_warning(self, capsys: pytest.CaptureFixture[str]) -> None:
+    async def test_advisory_gate_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """Advisory gate failure logs a warning."""
+        import structlog
+
         from yolo_developer.gates.decorator import quality_gate
         from yolo_developer.gates.evaluators import clear_evaluators, register_evaluator
         from yolo_developer.gates.types import GateContext, GateResult
 
         clear_evaluators()
+
+        # Configure structlog to use standard logging for capture
+        structlog.configure(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.dev.ConsoleRenderer(),
+            ],
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            cache_logger_on_first_use=False,
+        )
 
         async def failing_eval(ctx: GateContext) -> GateResult:
             return GateResult(
@@ -438,10 +472,12 @@ class TestAdvisoryGateBehavior:
         async def node(state: dict[str, Any]) -> dict[str, Any]:
             return state
 
-        await node({})
-        captured = capsys.readouterr()
-        assert "Advisory gate failure" in captured.out
-        assert "advisory_log_test" in captured.out
+        with caplog.at_level("WARNING"):
+            await node({})
+
+        log_output = caplog.text
+        assert "Advisory gate failure" in log_output
+        assert "advisory_log_test" in log_output
 
 
 class TestMetricsRecordingIntegration:

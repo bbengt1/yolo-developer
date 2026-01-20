@@ -283,12 +283,8 @@ def _identify_scalability_risks(
     for pattern, (severity, description) in SCALABILITY_RISK_PATTERNS.items():
         if pattern in text:
             # Link to specific decisions
-            linked_decisions = [
-                d.id for d in decisions if pattern in d.description.lower()
-            ]
-            components = (
-                tuple(linked_decisions) if linked_decisions else affected
-            )
+            linked_decisions = [d.id for d in decisions if pattern in d.description.lower()]
+            components = tuple(linked_decisions) if linked_decisions else affected
 
             risks.append(
                 TechnicalRisk(
@@ -469,9 +465,7 @@ def _generate_design_specific_mitigation(
         context_parts.append(f"affecting {components_str}")
 
     # Reference relevant decisions
-    relevant_decisions = [
-        d for d in decisions if d.decision_type == risk.category
-    ]
+    relevant_decisions = [d for d in decisions if d.decision_type == risk.category]
     if relevant_decisions:
         context_parts.append(f"review {relevant_decisions[0].decision_type} decision")
 
@@ -647,8 +641,7 @@ async def _analyze_risks_with_llm(
     """
     # Build prompt
     decisions_text = "\n".join(
-        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})"
-        for d in decisions
+        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})" for d in decisions
     )
 
     prompt = RISK_IDENTIFICATION_PROMPT.format(

@@ -215,9 +215,7 @@ class TestTelemetrySnapshot:
             status="healthy",
         )
 
-    def test_create_valid_telemetry_snapshot(
-        self, sample_metric_summary: MetricSummary
-    ) -> None:
+    def test_create_valid_telemetry_snapshot(self, sample_metric_summary: MetricSummary) -> None:
         """Test creating a valid TelemetrySnapshot."""
         snapshot = TelemetrySnapshot(
             burn_down_velocity=sample_metric_summary,
@@ -231,9 +229,7 @@ class TestTelemetrySnapshot:
         assert snapshot.alert_count == 0
         assert "analyst" in snapshot.agent_idle_times
 
-    def test_telemetry_snapshot_auto_timestamp(
-        self, sample_metric_summary: MetricSummary
-    ) -> None:
+    def test_telemetry_snapshot_auto_timestamp(self, sample_metric_summary: MetricSummary) -> None:
         """Test that collected_at is auto-generated."""
         snapshot = TelemetrySnapshot(
             burn_down_velocity=sample_metric_summary,
@@ -246,9 +242,7 @@ class TestTelemetrySnapshot:
         parsed = datetime.fromisoformat(snapshot.collected_at)
         assert parsed.tzinfo == timezone.utc
 
-    def test_telemetry_snapshot_is_frozen(
-        self, sample_metric_summary: MetricSummary
-    ) -> None:
+    def test_telemetry_snapshot_is_frozen(self, sample_metric_summary: MetricSummary) -> None:
         """Test that TelemetrySnapshot is immutable."""
         snapshot = TelemetrySnapshot(
             burn_down_velocity=sample_metric_summary,
@@ -260,9 +254,7 @@ class TestTelemetrySnapshot:
         with pytest.raises(AttributeError):
             snapshot.health_status = "critical"  # type: ignore[misc]
 
-    def test_telemetry_snapshot_to_dict(
-        self, sample_metric_summary: MetricSummary
-    ) -> None:
+    def test_telemetry_snapshot_to_dict(self, sample_metric_summary: MetricSummary) -> None:
         """Test TelemetrySnapshot serialization to dict."""
         snapshot = TelemetrySnapshot(
             burn_down_velocity=sample_metric_summary,
@@ -432,9 +424,7 @@ class TestDashboardMetrics:
             alert_count=0,
         )
 
-    def test_create_valid_dashboard_metrics(
-        self, sample_snapshot: TelemetrySnapshot
-    ) -> None:
+    def test_create_valid_dashboard_metrics(self, sample_snapshot: TelemetrySnapshot) -> None:
         """Test creating valid DashboardMetrics."""
         metrics = DashboardMetrics(
             snapshot=sample_snapshot,
@@ -448,9 +438,7 @@ class TestDashboardMetrics:
         assert metrics.health_summary == "System healthy, 0 alerts"
         assert len(metrics.agent_status_table) == 1
 
-    def test_dashboard_metrics_is_frozen(
-        self, sample_snapshot: TelemetrySnapshot
-    ) -> None:
+    def test_dashboard_metrics_is_frozen(self, sample_snapshot: TelemetrySnapshot) -> None:
         """Test that DashboardMetrics is immutable."""
         metrics = DashboardMetrics(
             snapshot=sample_snapshot,
@@ -462,9 +450,7 @@ class TestDashboardMetrics:
         with pytest.raises(AttributeError):
             metrics.health_summary = "Not healthy"  # type: ignore[misc]
 
-    def test_dashboard_metrics_to_dict(
-        self, sample_snapshot: TelemetrySnapshot
-    ) -> None:
+    def test_dashboard_metrics_to_dict(self, sample_snapshot: TelemetrySnapshot) -> None:
         """Test DashboardMetrics serialization to dict."""
         metrics = DashboardMetrics(
             snapshot=sample_snapshot,

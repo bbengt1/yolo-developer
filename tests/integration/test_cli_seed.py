@@ -600,9 +600,7 @@ class TestSOPValidationFeatures:
                 return_value=SOPValidationResult(passed=True),
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--validate-sop"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--validate-sop"])
 
         assert result.exit_code == 0
         assert "SOP validation passed" in result.output or "No SOP conflicts" in result.output
@@ -653,9 +651,7 @@ class TestSOPValidationFeatures:
                 return_value=mock_sop_result,
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--validate-sop"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--validate-sop"])
 
         assert result.exit_code == 1
         assert "HARD" in result.output or "BLOCKED" in result.output
@@ -737,9 +733,7 @@ class TestSOPValidationFeatures:
                 return_value=mock_sop_result,
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--validate-sop", "--json"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--validate-sop", "--json"])
 
         assert result.exit_code == 0
         # JSON output should contain sop_validation field
@@ -863,9 +857,7 @@ class TestValidationReportFeatures:
             new_callable=AsyncMock,
             return_value=mock_llm_response,
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--report-format", "json"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--report-format", "json"])
 
         assert result.exit_code == 0
         # Should contain report structure
@@ -910,9 +902,7 @@ class TestValidationReportFeatures:
             new_callable=AsyncMock,
             return_value=mock_llm_response,
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--report-format", "rich"])
 
         assert result.exit_code == 0
         # Rich output should contain score information
@@ -1007,9 +997,7 @@ class TestValidationReportFeatures:
             new_callable=AsyncMock,
             return_value=mock_llm_response,
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "-r", "json"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "-r", "json"])
 
         assert result.exit_code == 0
         assert "quality_metrics" in result.output
@@ -1191,9 +1179,7 @@ class TestQualityThresholdRejection:
                 return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--report-format", "rich"])
 
         assert result.exit_code == 1
         assert "Rejected" in result.output or "rejected" in result.output.lower()
@@ -1342,9 +1328,7 @@ class TestQualityThresholdRejection:
                 return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--report-format", "rich"])
 
         assert result.exit_code == 1
         # Should show remediation steps
@@ -1396,9 +1380,7 @@ class TestQualityThresholdRejection:
                 return_value=QualityThreshold(overall=0.80, ambiguity=0.80, sop=0.80),
             ),
         ):
-            result = runner.invoke(
-                app, ["seed", str(simple_seed_path), "--report-format", "rich"]
-            )
+            result = runner.invoke(app, ["seed", str(simple_seed_path), "--report-format", "rich"])
 
         assert result.exit_code == 1
         assert "--force" in result.output

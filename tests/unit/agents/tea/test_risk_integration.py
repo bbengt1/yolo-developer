@@ -8,8 +8,6 @@ Tests for the integration of risk categorization with the TEA agent:
 
 from __future__ import annotations
 
-import pytest
-
 from yolo_developer.agents.tea.types import (
     Finding,
     TEAOutput,
@@ -23,7 +21,6 @@ class TestRiskCategorizationFlow:
     def test_categorize_risks_full_flow(self) -> None:
         """Test full risk categorization from findings to report."""
         from yolo_developer.agents.tea.risk import (
-            categorize_finding,
             categorize_risks,
             generate_risk_report,
         )
@@ -170,7 +167,7 @@ class TestRiskBlockingWithConfidenceScoring:
         risk = categorize_finding(high_finding)
         report = generate_risk_report((risk,))
 
-        is_blocked, reasons = check_risk_deployment_blocking(report)
+        is_blocked, _reasons = check_risk_deployment_blocking(report)
         acknowledgments = get_acknowledgment_requirements(report)
 
         assert is_blocked is False
@@ -197,7 +194,7 @@ class TestRiskBlockingWithConfidenceScoring:
         risk = categorize_finding(low_finding)
         report = generate_risk_report((risk,))
 
-        is_blocked, reasons = check_risk_deployment_blocking(report)
+        is_blocked, _reasons = check_risk_deployment_blocking(report)
         acknowledgments = get_acknowledgment_requirements(report)
 
         assert is_blocked is False
@@ -213,7 +210,7 @@ class TestTEAOutputWithRiskReport:
 
         # TEAOutput should support risk_report field
         # This tests AC6: Integration with TEA Output
-        report = RiskReport(
+        RiskReport(
             risks=(),
             critical_count=0,
             high_count=0,

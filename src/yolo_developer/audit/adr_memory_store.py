@@ -127,11 +127,7 @@ class InMemoryADRStore:
         """
         with self._lock:
             adr_ids = self._story_index.get(story_id, [])
-            result = [
-                self._adrs[adr_id]
-                for adr_id in adr_ids
-                if adr_id in self._adrs
-            ]
+            result = [self._adrs[adr_id] for adr_id in adr_ids if adr_id in self._adrs]
 
         _logger.debug(
             "adrs_retrieved_by_story",

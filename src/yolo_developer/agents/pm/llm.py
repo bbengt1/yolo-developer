@@ -302,12 +302,14 @@ def _parse_ac_response(response: str) -> list[dict[str, Any]]:
                         # Ensure and_clauses items are strings
                         raw_clauses = ac.get("and_clauses", [])
                         and_clauses = [str(c) for c in raw_clauses if c is not None]
-                        valid_acs.append({
-                            "given": str(ac.get("given", "")),
-                            "when": str(ac.get("when", "")),
-                            "then": str(ac.get("then", "")),
-                            "and_clauses": and_clauses,
-                        })
+                        valid_acs.append(
+                            {
+                                "given": str(ac.get("given", "")),
+                                "when": str(ac.get("when", "")),
+                                "then": str(ac.get("then", "")),
+                                "and_clauses": and_clauses,
+                            }
+                        )
                 return valid_acs
         logger.warning("pm_ac_response_invalid_format", response=response[:200])
         return []
@@ -559,7 +561,9 @@ async def _generate_acceptance_criteria_llm(
             {
                 "given": f"the system is ready to process {requirement_id}",
                 "when": "the feature is used as specified",
-                "then": f"the requirement is satisfied: {requirement_text[:50]}..." if requirement_text else "the requirement is satisfied",
+                "then": f"the requirement is satisfied: {requirement_text[:50]}..."
+                if requirement_text
+                else "the requirement is satisfied",
                 "and_clauses": [],
             },
             {
@@ -604,12 +608,14 @@ async def _generate_acceptance_criteria_llm(
                 valid_acs = valid_acs[:5]
             elif len(valid_acs) < 2:
                 # Add a generic AC if too few
-                valid_acs.append({
-                    "given": f"the {story_components.get('role', 'user')} is authenticated",
-                    "when": f"they attempt to {story_components.get('action', 'use the feature')}",
-                    "then": "the operation completes successfully",
-                    "and_clauses": [],
-                })
+                valid_acs.append(
+                    {
+                        "given": f"the {story_components.get('role', 'user')} is authenticated",
+                        "when": f"they attempt to {story_components.get('action', 'use the feature')}",
+                        "then": "the operation completes successfully",
+                        "and_clauses": [],
+                    }
+                )
 
             logger.info(
                 "pm_acceptance_criteria_generated",
@@ -635,7 +641,9 @@ async def _generate_acceptance_criteria_llm(
         {
             "given": f"the system is ready to process {requirement_id}",
             "when": "the feature is used as specified",
-            "then": f"the requirement is satisfied: {requirement_text[:50]}..." if requirement_text else "the requirement is satisfied",
+            "then": f"the requirement is satisfied: {requirement_text[:50]}..."
+            if requirement_text
+            else "the requirement is satisfied",
             "and_clauses": [],
         },
         {

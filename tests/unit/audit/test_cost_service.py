@@ -5,8 +5,6 @@ Tests for CostTrackingService class and get_cost_tracking_service factory functi
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
 
 from yolo_developer.audit.cost_memory_store import InMemoryCostStore
@@ -14,8 +12,6 @@ from yolo_developer.audit.cost_service import (
     CostTrackingService,
     get_cost_tracking_service,
 )
-from yolo_developer.audit.cost_store import CostFilters
-from yolo_developer.audit.cost_types import CostAggregation, CostRecord, TokenUsage
 
 
 class TestCostTrackingServiceRecording:
@@ -134,18 +130,30 @@ class TestCostTrackingServiceAgentCosts:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.001, agent_name="analyst",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.001,
+            agent_name="analyst",
             session_id="sess-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.002, agent_name="pm",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.002,
+            agent_name="pm",
             session_id="sess-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.003, agent_name="analyst",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.003,
+            agent_name="analyst",
             session_id="sess-1",
         )
 
@@ -179,19 +187,34 @@ class TestCostTrackingServiceStoryCosts:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.001, agent_name="analyst",
-            session_id="sess-1", story_id="1-2-auth",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.001,
+            agent_name="analyst",
+            session_id="sess-1",
+            story_id="1-2-auth",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.002, agent_name="pm",
-            session_id="sess-1", story_id="1-3-profile",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.002,
+            agent_name="pm",
+            session_id="sess-1",
+            story_id="1-3-profile",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.003, agent_name="dev",
-            session_id="sess-1", story_id="1-2-auth",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.003,
+            agent_name="dev",
+            session_id="sess-1",
+            story_id="1-2-auth",
         )
 
         result = await service.get_story_costs()
@@ -212,18 +235,30 @@ class TestCostTrackingServiceTotals:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.001, agent_name="analyst",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.001,
+            agent_name="analyst",
             session_id="sess-a",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.002, agent_name="pm",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.002,
+            agent_name="pm",
             session_id="sess-b",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.003, agent_name="dev",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.003,
+            agent_name="dev",
             session_id="sess-a",
         )
 
@@ -239,19 +274,34 @@ class TestCostTrackingServiceTotals:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.001, agent_name="analyst",
-            session_id="sess-1", sprint_id="sprint-1",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.001,
+            agent_name="analyst",
+            session_id="sess-1",
+            sprint_id="sprint-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.002, agent_name="pm",
-            session_id="sess-1", sprint_id="sprint-2",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.002,
+            agent_name="pm",
+            session_id="sess-1",
+            sprint_id="sprint-2",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini", tier="routine", prompt_tokens=100,
-            completion_tokens=50, cost_usd=0.003, agent_name="dev",
-            session_id="sess-1", sprint_id="sprint-1",
+            model="gpt-4o-mini",
+            tier="routine",
+            prompt_tokens=100,
+            completion_tokens=50,
+            cost_usd=0.003,
+            agent_name="dev",
+            session_id="sess-1",
+            sprint_id="sprint-1",
         )
 
         result = await service.get_sprint_total("sprint-1")

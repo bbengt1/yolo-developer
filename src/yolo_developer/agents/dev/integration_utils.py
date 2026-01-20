@@ -164,10 +164,7 @@ class IntegrationTestQualityReport:
             True if test quality meets minimum standards.
         """
         return (
-            self.uses_fixtures
-            and self.uses_mocks
-            and self.has_cleanup
-            and self.is_async_compliant
+            self.uses_fixtures and self.uses_mocks and self.has_cleanup and self.is_async_compliant
         )
 
 
@@ -240,13 +237,15 @@ def analyze_component_boundaries(code_files: list[CodeFile]) -> list[ComponentBo
                     # Check if this is an internal import
                     if alias.name in module_to_file:
                         target_file = module_to_file[alias.name]
-                        boundaries.append(ComponentBoundary(
-                            source_file=code_file.file_path,
-                            target_file=target_file,
-                            interaction_type="import",
-                            boundary_point=alias.name,
-                            is_async=False,
-                        ))
+                        boundaries.append(
+                            ComponentBoundary(
+                                source_file=code_file.file_path,
+                                target_file=target_file,
+                                interaction_type="import",
+                                boundary_point=alias.name,
+                                is_async=False,
+                            )
+                        )
                         imported_names[name] = alias.name
 
             elif isinstance(node, ast.ImportFrom):
@@ -257,13 +256,15 @@ def analyze_component_boundaries(code_files: list[CodeFile]) -> list[ComponentBo
                         target_file = module_to_file[node.module]
                         for alias in node.names:
                             name = alias.asname if alias.asname else alias.name
-                            boundaries.append(ComponentBoundary(
-                                source_file=code_file.file_path,
-                                target_file=target_file,
-                                interaction_type="import",
-                                boundary_point=alias.name,
-                                is_async=False,
-                            ))
+                            boundaries.append(
+                                ComponentBoundary(
+                                    source_file=code_file.file_path,
+                                    target_file=target_file,
+                                    interaction_type="import",
+                                    boundary_point=alias.name,
+                                    is_async=False,
+                                )
+                            )
                             imported_names[name] = node.module
 
             elif isinstance(node, ast.Call):
@@ -274,13 +275,15 @@ def analyze_component_boundaries(code_files: list[CodeFile]) -> list[ComponentBo
                     if module_name in module_to_file:
                         target_file = module_to_file[module_name]
                         is_async = _is_awaited_call(node, tree)
-                        boundaries.append(ComponentBoundary(
-                            source_file=code_file.file_path,
-                            target_file=target_file,
-                            interaction_type="function_call",
-                            boundary_point=func_name,
-                            is_async=is_async,
-                        ))
+                        boundaries.append(
+                            ComponentBoundary(
+                                source_file=code_file.file_path,
+                                target_file=target_file,
+                                interaction_type="function_call",
+                                boundary_point=func_name,
+                                is_async=is_async,
+                            )
+                        )
 
     logger.debug(
         "component_boundaries_analyzed",
@@ -537,10 +540,7 @@ def _analyze_exception_handler(
             exception_type = handler.type.id
         elif isinstance(handler.type, ast.Tuple):
             # Multiple exceptions
-            types = [
-                e.id if isinstance(e, ast.Name) else str(e)
-                for e in handler.type.elts
-            ]
+            types = [e.id if isinstance(e, ast.Name) else str(e) for e in handler.type.elts]
             exception_type = " | ".join(types)
 
     # Determine if there's a recovery (return statement in handler)
@@ -652,7 +652,9 @@ def validate_integration_test_quality(test_code: str) -> IntegrationTestQualityR
     return report
 
 
-def _check_fixture_usage(tree: ast.AST, test_code: str, report: IntegrationTestQualityReport) -> None:
+def _check_fixture_usage(
+    tree: ast.AST, test_code: str, report: IntegrationTestQualityReport
+) -> None:
     """Check for pytest fixture usage."""
     # Check for @pytest.fixture decorator
     if "@pytest.fixture" in test_code:
@@ -686,7 +688,9 @@ def _check_mock_usage(test_code: str, report: IntegrationTestQualityReport) -> N
             return
 
 
-def _check_cleanup_patterns(tree: ast.AST, test_code: str, report: IntegrationTestQualityReport) -> None:
+def _check_cleanup_patterns(
+    tree: ast.AST, test_code: str, report: IntegrationTestQualityReport
+) -> None:
     """Check for cleanup/teardown patterns."""
     cleanup_indicators = [
         "autouse=True",  # Fixtures with auto cleanup
@@ -710,7 +714,9 @@ def _check_cleanup_patterns(tree: ast.AST, test_code: str, report: IntegrationTe
                     return
 
 
-def _check_async_compliance(tree: ast.AST, test_code: str, report: IntegrationTestQualityReport) -> None:
+def _check_async_compliance(
+    tree: ast.AST, test_code: str, report: IntegrationTestQualityReport
+) -> None:
     """Check async test compliance with pytest-asyncio."""
     # Find all async test functions
     async_tests: list[str] = []
@@ -821,24 +827,33 @@ async def generate_integration_tests_with_llm(
     code_files_content = "\n\n".join(code_content_parts)
 
     # Format boundaries for prompt
-    boundaries_text = "\n".join(
-        f"- {b.source_file} -> {b.target_file}: {b.interaction_type} at {b.boundary_point}"
-        + (" (async)" if b.is_async else "")
-        for b in boundaries
-    ) if boundaries else "(No boundaries detected)"
+    boundaries_text = (
+        "\n".join(
+            f"- {b.source_file} -> {b.target_file}: {b.interaction_type} at {b.boundary_point}"
+            + (" (async)" if b.is_async else "")
+            for b in boundaries
+        )
+        if boundaries
+        else "(No boundaries detected)"
+    )
 
     # Format flows for prompt
-    flows_text = "\n".join(
-        f"- {f.start_point} -> {f.end_point}: {' -> '.join(f.steps)}"
-        for f in flows
-    ) if flows else "(No flows detected)"
+    flows_text = (
+        "\n".join(f"- {f.start_point} -> {f.end_point}: {' -> '.join(f.steps)}" for f in flows)
+        if flows
+        else "(No flows detected)"
+    )
 
     # Format error scenarios for prompt
-    error_text = "\n".join(
-        f"- {s.exception_type or 'Unknown'}: {s.trigger} ({s.handling})"
-        + (f" -> {s.recovery}" if s.recovery else "")
-        for s in error_scenarios
-    ) if error_scenarios else "(No error scenarios detected)"
+    error_text = (
+        "\n".join(
+            f"- {s.exception_type or 'Unknown'}: {s.trigger} ({s.handling})"
+            + (f" -> {s.recovery}" if s.recovery else "")
+            for s in error_scenarios
+        )
+        if error_scenarios
+        else "(No error scenarios detected)"
+    )
 
     # Build initial prompt
     prompt = build_integration_test_prompt(
@@ -914,5 +929,3 @@ async def generate_integration_tests_with_llm(
         final_error=error,
     )
     return test_code, False
-
-

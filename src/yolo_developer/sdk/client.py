@@ -1612,9 +1612,7 @@ memory:
 
         self._subscriptions[subscription_id] = subscription
 
-        event_type_names = (
-            [et.name for et in event_types] if event_types else ["ALL"]
-        )
+        event_type_names = [et.name for et in event_types] if event_types else ["ALL"]
         logger.info(
             "event_subscription_created",
             subscription_id=subscription_id,

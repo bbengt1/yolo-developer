@@ -427,7 +427,9 @@ class TestHealthDataRetrieval:
         mock_health = MagicMock()
         mock_health.is_healthy = True
 
-        with patch("yolo_developer.agents.sm.health.monitor_health", new_callable=AsyncMock) as mock_monitor:
+        with patch(
+            "yolo_developer.agents.sm.health.monitor_health", new_callable=AsyncMock
+        ) as mock_monitor:
             mock_monitor.return_value = mock_health
 
             state = {"messages": [], "current_agent": "analyst"}
@@ -441,7 +443,9 @@ class TestHealthDataRetrieval:
         """Test _get_health_data handles exceptions gracefully."""
         from yolo_developer.cli.commands.status import _get_health_data
 
-        with patch("yolo_developer.agents.sm.health.monitor_health", new_callable=AsyncMock) as mock_monitor:
+        with patch(
+            "yolo_developer.agents.sm.health.monitor_health", new_callable=AsyncMock
+        ) as mock_monitor:
             # Use ValueError which is in the caught exception list
             mock_monitor.side_effect = ValueError("Health check failed")
 

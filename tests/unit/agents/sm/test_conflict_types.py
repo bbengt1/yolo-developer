@@ -73,7 +73,7 @@ class TestConstants:
         assert "performance" in RESOLUTION_PRINCIPLES
         assert "speed" in RESOLUTION_PRINCIPLES
 
-        for principle, info in RESOLUTION_PRINCIPLES.items():
+        for _principle, info in RESOLUTION_PRINCIPLES.items():
             assert "description" in info
             assert "weight" in info
             assert "keywords" in info
@@ -186,12 +186,8 @@ class TestConflict:
 
     def test_create_conflict(self) -> None:
         """Should create Conflict with all fields."""
-        party1 = ConflictParty(
-            agent="architect", position="Microservices", rationale="Scalability"
-        )
-        party2 = ConflictParty(
-            agent="dev", position="Monolith", rationale="Simplicity"
-        )
+        party1 = ConflictParty(agent="architect", position="Microservices", rationale="Scalability")
+        party2 = ConflictParty(agent="dev", position="Monolith", rationale="Simplicity")
 
         conflict = Conflict(
             conflict_id="conflict-001",
@@ -577,9 +573,7 @@ class TestEdgeCases:
         resolutions = []
 
         for i in range(10):
-            party = ConflictParty(
-                agent=f"agent-{i}", position=f"Pos {i}", rationale="R"
-            )
+            party = ConflictParty(agent=f"agent-{i}", position=f"Pos {i}", rationale="R")
             conflict = Conflict(
                 conflict_id=f"c-{i}",
                 conflict_type="design_conflict",

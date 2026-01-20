@@ -59,7 +59,9 @@ class TestTokenUsage:
             "total_tokens": 150,
         }
 
-    def test_token_usage_warns_on_negative_prompt_tokens(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_token_usage_warns_on_negative_prompt_tokens(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that negative prompt_tokens triggers a warning."""
         TokenUsage(
             prompt_tokens=-1,
@@ -69,7 +71,9 @@ class TestTokenUsage:
 
         assert "prompt_tokens is negative" in caplog.text
 
-    def test_token_usage_warns_on_negative_completion_tokens(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_token_usage_warns_on_negative_completion_tokens(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that negative completion_tokens triggers a warning."""
         TokenUsage(
             prompt_tokens=100,
@@ -79,7 +83,9 @@ class TestTokenUsage:
 
         assert "completion_tokens is negative" in caplog.text
 
-    def test_token_usage_warns_on_negative_total_tokens(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_token_usage_warns_on_negative_total_tokens(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that negative total_tokens triggers a warning."""
         TokenUsage(
             prompt_tokens=100,

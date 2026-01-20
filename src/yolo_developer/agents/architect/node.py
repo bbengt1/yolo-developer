@@ -179,13 +179,9 @@ async def _generate_design_decisions(
         compliance_pct = int(twelve_factor_result.overall_compliance * 100)
         recommendations = twelve_factor_result.recommendations
         recommendation_text = (
-            f" Recommendations: {', '.join(recommendations[:2])}"
-            if recommendations
-            else ""
+            f" Recommendations: {', '.join(recommendations[:2])}" if recommendations else ""
         )
-        rationale = (
-            f"12-Factor compliance: {compliance_pct}%.{recommendation_text}"
-        )
+        rationale = f"12-Factor compliance: {compliance_pct}%.{recommendation_text}"
 
         decision = DesignDecision(
             id=f"design-{timestamp}-{_decision_counter:03d}",

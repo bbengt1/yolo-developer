@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 if TYPE_CHECKING:
-    from yolo_developer.llm.router import LLMRouter
+    pass
 
 
 class TestDocumentationInfo:
@@ -109,7 +109,12 @@ class TestComplexSection:
         """Test valid complexity types."""
         from yolo_developer.agents.dev.doc_utils import ComplexSection
 
-        for complexity_type in ["nested_loop", "long_function", "complex_conditional", "deep_nesting"]:
+        for complexity_type in [
+            "nested_loop",
+            "long_function",
+            "complex_conditional",
+            "deep_nesting",
+        ]:
             section = ComplexSection(
                 start_line=1,
                 end_line=10,
@@ -324,7 +329,9 @@ def check(x, y, z):
 '''
         sections = detect_complex_sections(code)
         # Should detect nested conditionals
-        complex_conds = [s for s in sections if s.complexity_type in ("complex_conditional", "deep_nesting")]
+        complex_conds = [
+            s for s in sections if s.complexity_type in ("complex_conditional", "deep_nesting")
+        ]
         assert len(complex_conds) >= 1
 
     def test_handles_syntax_error(self) -> None:
@@ -476,7 +483,7 @@ def hello():
         )
 
         code = "def hello(): pass"
-        result, is_valid = await generate_documentation_with_llm(
+        _result, _is_valid = await generate_documentation_with_llm(
             code=code,
             context="Test module",
             router=mock_router,
@@ -517,13 +524,13 @@ def hello():
 
         mock_router = MagicMock()
         mock_router.call = AsyncMock(
-            return_value='''```python
+            return_value="""```python
 def broken(
-```'''
+```"""
         )
 
         code = "def hello(): pass"
-        result, is_valid = await generate_documentation_with_llm(
+        _result, is_valid = await generate_documentation_with_llm(
             code=code,
             context="Test module",
             router=mock_router,

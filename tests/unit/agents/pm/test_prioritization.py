@@ -18,8 +18,6 @@ Test Organization:
 
 from __future__ import annotations
 
-import pytest
-
 from yolo_developer.agents.pm.prioritization import (
     COMPLEXITY_ADJUSTMENTS,
     PRIORITY_BASE_SCORES,
@@ -171,9 +169,7 @@ class TestValueScoring:
 
     def test_multi_source_bonus(self) -> None:
         """Stories with multiple source requirements get bonus."""
-        story = _make_story(
-            priority=StoryPriority.HIGH, complexity="M", source_count=3
-        )
+        story = _make_story(priority=StoryPriority.HIGH, complexity="M", source_count=3)
         score, rationale = _calculate_value_score(story)
 
         assert score == 85  # 75 + 5*(3-1)
@@ -300,9 +296,7 @@ class TestDependencyAnalysis:
 
     def test_dependency_to_external_story_ignored(self) -> None:
         """Dependencies to stories not in the collection are ignored."""
-        stories = (
-            _make_story("A", dependencies=("external-story",)),
-        )
+        stories = (_make_story("A", dependencies=("external-story",)),)
 
         dep_info, _ = _analyze_dependencies(stories)
 
@@ -744,16 +738,18 @@ class TestPrioritizeStories:
         stories = (
             _make_story("unblocks-many", priority=StoryPriority.MEDIUM),
             _make_story("blocked", priority=StoryPriority.MEDIUM, dependencies=("unblocks-many",)),
-            _make_story("also-blocked", priority=StoryPriority.MEDIUM, dependencies=("unblocks-many",)),
-            _make_story("also-blocked-2", priority=StoryPriority.MEDIUM, dependencies=("unblocks-many",)),
+            _make_story(
+                "also-blocked", priority=StoryPriority.MEDIUM, dependencies=("unblocks-many",)
+            ),
+            _make_story(
+                "also-blocked-2", priority=StoryPriority.MEDIUM, dependencies=("unblocks-many",)
+            ),
         )
 
         result = prioritize_stories(stories)
 
         # "unblocks-many" blocks 3 stories, gets +20 adjustment
-        unblocks_score = next(
-            s for s in result["scores"] if s["story_id"] == "unblocks-many"
-        )
+        unblocks_score = next(s for s in result["scores"] if s["story_id"] == "unblocks-many")
         assert unblocks_score["dependency_adjustment"] == 20
         assert result["recommended_execution_order"][0] == "unblocks-many"
 

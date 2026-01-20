@@ -155,9 +155,7 @@ class AuditExportService:
         """
         if format not in self._exporters:
             supported = ", ".join(self._exporters.keys())
-            raise ValueError(
-                f"Unsupported export format: {format}. Supported formats: {supported}"
-            )
+            raise ValueError(f"Unsupported export format: {format}. Supported formats: {supported}")
 
         options = options or DEFAULT_EXPORT_OPTIONS
         exporter = self._exporters[format]

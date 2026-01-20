@@ -350,7 +350,11 @@ def _display_agent_template(agent_name: str, json_output: bool = False) -> None:
     if system_prompt:
         syntax = Syntax(system_prompt, "text", theme="monokai", word_wrap=True)
         console.print(
-            Panel(syntax, title=f"[{agent_color}]System Prompt[/{agent_color}]", border_style=agent_color)
+            Panel(
+                syntax,
+                title=f"[{agent_color}]System Prompt[/{agent_color}]",
+                border_style=agent_color,
+            )
         )
         console.print()
 
@@ -680,15 +684,16 @@ def tune_command(
                 title="Agent Templates",
             )
         else:
-            console.print_json(json.dumps({"error": "No agent specified. Use --list to see available agents."}))
+            console.print_json(
+                json.dumps({"error": "No agent specified. Use --list to see available agents."})
+            )
         return
 
     # Validate agent name
     if normalized_agent not in VALID_AGENTS:
         valid_agents = ", ".join(sorted(VALID_AGENTS))
         warning_panel(
-            f"Unknown agent: '{agent_name}'\n\n"
-            f"[dim]Valid agents:[/dim]\n  {valid_agents}",
+            f"Unknown agent: '{agent_name}'\n\n[dim]Valid agents:[/dim]\n  {valid_agents}",
             title="Invalid Agent",
         )
         raise typer.Exit(code=1)

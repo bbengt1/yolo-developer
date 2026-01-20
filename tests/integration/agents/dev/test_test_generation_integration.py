@@ -169,6 +169,7 @@ def validate_input(value: str) -> bool:
 
         # Validate the generated test code is syntactically valid
         import ast
+
         try:
             ast.parse(test_file.content)
         except SyntaxError as e:
@@ -204,6 +205,7 @@ def validate_input(value: str) -> bool:
 
         # Both should be syntactically valid Python
         import ast
+
         ast.parse(code_file.content)  # Should not raise
         ast.parse(test_file.content)  # Should not raise
 
@@ -323,25 +325,25 @@ async def async_fetch(url: str, timeout: float = 30.0) -> dict:
 
     def test_skips_private_and_dunder_methods(self) -> None:
         """Test that private and dunder methods are skipped."""
-        code = '''
+        code = """
 def public_function(): pass
 def _private_function(): pass
 def __dunder_method__(): pass
-'''
+"""
         functions = extract_public_functions(code)
         assert len(functions) == 1
         assert functions[0].name == "public_function"
 
     def test_handles_decorated_functions(self) -> None:
         """Test extraction of decorated functions."""
-        code = '''
+        code = """
 @decorator
 def decorated(): pass
 
 @decorator1
 @decorator2
 def multi_decorated(): pass
-'''
+"""
         functions = extract_public_functions(code)
         assert len(functions) == 2
         names = [f.name for f in functions]

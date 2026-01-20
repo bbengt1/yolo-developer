@@ -48,17 +48,38 @@ __all__ = [
 ]
 
 # Edge case patterns for detecting coverage
-ERROR_PATTERNS: frozenset[str] = frozenset({
-    "error", "fail", "invalid", "exception", "reject", "denied",
-})
+ERROR_PATTERNS: frozenset[str] = frozenset(
+    {
+        "error",
+        "fail",
+        "invalid",
+        "exception",
+        "reject",
+        "denied",
+    }
+)
 
-EMPTY_PATTERNS: frozenset[str] = frozenset({
-    "empty", "null", "none", "missing", "blank", "undefined",
-})
+EMPTY_PATTERNS: frozenset[str] = frozenset(
+    {
+        "empty",
+        "null",
+        "none",
+        "missing",
+        "blank",
+        "undefined",
+    }
+)
 
-BOUNDARY_PATTERNS: frozenset[str] = frozenset({
-    "maximum", "minimum", "limit", "boundary", "overflow", "threshold",
-})
+BOUNDARY_PATTERNS: frozenset[str] = frozenset(
+    {
+        "maximum",
+        "minimum",
+        "limit",
+        "boundary",
+        "overflow",
+        "threshold",
+    }
+)
 
 
 def _detect_vague_terms(ac: AcceptanceCriterion) -> list[str]:
@@ -263,9 +284,7 @@ def validate_story_testability(story: Story) -> TestabilityResult:
         validation_notes.append(f"Found vague terms in {unique_acs_with_vague} AC(s)")
 
     if missing_edge_cases:
-        validation_notes.append(
-            f"Missing edge case coverage: {', '.join(missing_edge_cases)}"
-        )
+        validation_notes.append(f"Missing edge case coverage: {', '.join(missing_edge_cases)}")
 
     if ac_count_warning:
         validation_notes.append(ac_count_warning)

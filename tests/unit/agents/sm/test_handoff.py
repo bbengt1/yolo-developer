@@ -93,9 +93,7 @@ def default_config() -> Any:
 class TestPrepareHandoffContext:
     """Tests for _prepare_handoff_context function (Task 2.2)."""
 
-    def test_prepare_context_basic(
-        self, sample_state: dict[str, Any], default_config: Any
-    ) -> None:
+    def test_prepare_context_basic(self, sample_state: dict[str, Any], default_config: Any) -> None:
         """Should prepare context with decisions and memory refs."""
         from yolo_developer.agents.sm.handoff import _prepare_handoff_context
 
@@ -202,9 +200,7 @@ class TestGatherDecisionsForHandoff:
 class TestGatherMemoryRefsForHandoff:
     """Tests for _gather_memory_refs_for_handoff function (Task 2.4)."""
 
-    def test_gather_memory_refs_from_decisions(
-        self, sample_decisions: list[Decision]
-    ) -> None:
+    def test_gather_memory_refs_from_decisions(self, sample_decisions: list[Decision]) -> None:
         """Should extract memory refs from decision artifacts."""
         from yolo_developer.agents.sm.handoff import _gather_memory_refs_for_handoff
 
@@ -227,9 +223,7 @@ class TestGatherMemoryRefsForHandoff:
 class TestFilterMessagesForHandoff:
     """Tests for _filter_messages_for_handoff function (Task 2.5)."""
 
-    def test_filter_messages_respects_limit(
-        self, sample_messages: list[AIMessage]
-    ) -> None:
+    def test_filter_messages_respects_limit(self, sample_messages: list[AIMessage]) -> None:
         """Should respect max_messages limit."""
         from yolo_developer.agents.sm.handoff import _filter_messages_for_handoff
 
@@ -240,9 +234,7 @@ class TestFilterMessagesForHandoff:
 
         assert len(filtered) <= 2
 
-    def test_filter_messages_includes_recent(
-        self, sample_messages: list[AIMessage]
-    ) -> None:
+    def test_filter_messages_includes_recent(self, sample_messages: list[AIMessage]) -> None:
         """Should include most recent messages."""
         from yolo_developer.agents.sm.handoff import _filter_messages_for_handoff
 
@@ -284,9 +276,7 @@ class TestCalculateContextSize:
         assert size > 0
         assert isinstance(size, int)
 
-    def test_calculate_size_with_decisions(
-        self, sample_decisions: list[Decision]
-    ) -> None:
+    def test_calculate_size_with_decisions(self, sample_decisions: list[Decision]) -> None:
         """Should include decisions in size calculation."""
         from yolo_developer.agents.sm.handoff import _calculate_context_size
 
@@ -382,9 +372,7 @@ class TestUpdateStateForHandoff:
         assert "handoff_context" in updates
         assert updates["handoff_context"].target_agent == "architect"
 
-    def test_update_state_sets_current_agent(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    def test_update_state_sets_current_agent(self, sample_state: dict[str, Any]) -> None:
         """Should set current_agent to target."""
         from yolo_developer.agents.sm.handoff import _update_state_for_handoff
 
@@ -401,9 +389,7 @@ class TestUpdateStateForHandoff:
 
         assert updates["current_agent"] == "architect"
 
-    def test_update_state_does_not_mutate_input(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    def test_update_state_does_not_mutate_input(self, sample_state: dict[str, Any]) -> None:
         """Should not mutate the input state (ADR-001)."""
         from yolo_developer.agents.sm.handoff import _update_state_for_handoff
 
@@ -427,9 +413,7 @@ class TestUpdateStateForHandoff:
 class TestAccumulateMessages:
     """Tests for _accumulate_messages function (Task 3.2)."""
 
-    def test_accumulate_appends_new_messages(
-        self, sample_messages: list[AIMessage]
-    ) -> None:
+    def test_accumulate_appends_new_messages(self, sample_messages: list[AIMessage]) -> None:
         """Should append new messages to existing."""
         from yolo_developer.agents.sm.handoff import _accumulate_messages
 
@@ -446,9 +430,7 @@ class TestAccumulateMessages:
         assert len(result) == len(sample_messages) + 1
         assert result[-1].content == "New handoff message"
 
-    def test_accumulate_empty_new_messages(
-        self, sample_messages: list[AIMessage]
-    ) -> None:
+    def test_accumulate_empty_new_messages(self, sample_messages: list[AIMessage]) -> None:
         """Should handle empty new messages."""
         from yolo_developer.agents.sm.handoff import _accumulate_messages
 
@@ -463,9 +445,7 @@ class TestAccumulateMessages:
 class TestTransferDecisions:
     """Tests for _transfer_decisions function (Task 3.3)."""
 
-    def test_transfer_preserves_all_decisions(
-        self, sample_decisions: list[Decision]
-    ) -> None:
+    def test_transfer_preserves_all_decisions(self, sample_decisions: list[Decision]) -> None:
         """Should preserve all existing decisions."""
         from yolo_developer.agents.sm.handoff import _transfer_decisions
 
@@ -476,9 +456,7 @@ class TestTransferDecisions:
 
         assert len(result) >= len(sample_decisions)
 
-    def test_transfer_adds_context_decisions(
-        self, sample_decisions: list[Decision]
-    ) -> None:
+    def test_transfer_adds_context_decisions(self, sample_decisions: list[Decision]) -> None:
         """Should add context decisions if not duplicated."""
         from yolo_developer.agents.sm.handoff import _transfer_decisions
 
@@ -506,9 +484,7 @@ class TestTransferDecisions:
 class TestValidateStateIntegrity:
     """Tests for _validate_state_integrity function (Task 4.1)."""
 
-    def test_validate_integrity_passes_for_unchanged(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    def test_validate_integrity_passes_for_unchanged(self, sample_state: dict[str, Any]) -> None:
         """Should pass when state integrity preserved."""
         from yolo_developer.agents.sm.handoff import _validate_state_integrity
 
@@ -523,9 +499,7 @@ class TestValidateStateIntegrity:
 
         assert is_valid is True
 
-    def test_validate_integrity_fails_for_data_change(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    def test_validate_integrity_fails_for_data_change(self, sample_state: dict[str, Any]) -> None:
         """Should fail when non-transient data changed."""
         from yolo_developer.agents.sm.handoff import _validate_state_integrity
 
@@ -713,9 +687,7 @@ class TestManageHandoff:
         assert result.record.metrics.messages_transferred >= 0
 
     @pytest.mark.asyncio
-    async def test_manage_handoff_validates_context(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    async def test_manage_handoff_validates_context(self, sample_state: dict[str, Any]) -> None:
         """Should validate context when config enabled."""
         from yolo_developer.agents.sm.handoff import manage_handoff
         from yolo_developer.agents.sm.handoff_types import HandoffConfig
@@ -798,9 +770,7 @@ class TestManageHandoff:
         assert result.state_updates.get("current_agent") == "architect"
 
     @pytest.mark.asyncio
-    async def test_manage_handoff_with_custom_config(
-        self, sample_state: dict[str, Any]
-    ) -> None:
+    async def test_manage_handoff_with_custom_config(self, sample_state: dict[str, Any]) -> None:
         """Should respect custom configuration."""
         from yolo_developer.agents.sm.handoff import manage_handoff
         from yolo_developer.agents.sm.handoff_types import HandoffConfig

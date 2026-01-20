@@ -23,7 +23,7 @@ class TestTestabilityAuditIntegration:
         code_files = [
             {
                 "artifact_id": "src/module.py",
-                "content": '''
+                "content": """
 cache = []  # Global state
 
 class Service:
@@ -33,7 +33,7 @@ class Service:
     def process(self, data):
         import json  # Hidden dependency
         return json.dumps(data)
-''',
+""",
             }
         ]
 
@@ -60,7 +60,7 @@ class Service:
         code_files = [
             {
                 "artifact_id": "src/clean.py",
-                "content": '''
+                "content": """
 from __future__ import annotations
 
 class Service:
@@ -69,7 +69,7 @@ class Service:
 
     def get_data(self) -> dict:
         return self.db.query()
-''',
+""",
             }
         ]
 

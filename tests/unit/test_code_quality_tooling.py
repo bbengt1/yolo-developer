@@ -6,6 +6,10 @@ import subprocess
 from pathlib import Path
 from typing import ClassVar
 
+import pytest
+
+from tests.conftest import UV_AVAILABLE, UV_CMD
+
 
 class TestRuffConfiguration:
     """Tests for ruff configuration in pyproject.toml."""
@@ -66,19 +70,21 @@ class TestRuffConfiguration:
         content = pyproject.read_text()
         assert "[tool.ruff.lint.isort]" in content
 
+    @pytest.mark.skipif(not UV_AVAILABLE, reason="uv not available")
     def test_ruff_check_passes(self) -> None:
         """Verify ruff check passes on the codebase."""
         result = subprocess.run(
-            ["uv", "run", "ruff", "check", "src/", "tests/"],
+            [*UV_CMD, "run", "ruff", "check", "src/", "tests/"],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 0, f"Ruff check failed: {result.stdout}\n{result.stderr}"
 
+    @pytest.mark.skipif(not UV_AVAILABLE, reason="uv not available")
     def test_ruff_format_no_changes_needed(self) -> None:
         """Verify ruff format reports no changes needed."""
         result = subprocess.run(
-            ["uv", "run", "ruff", "format", "src/", "tests/", "--check"],
+            [*UV_CMD, "run", "ruff", "format", "src/", "tests/", "--check"],
             capture_output=True,
             text=True,
         )
@@ -125,10 +131,11 @@ class TestMypyConfiguration:
         assert "[[tool.mypy.overrides]]" in content
         assert 'module = "tests.*"' in content
 
+    @pytest.mark.skipif(not UV_AVAILABLE, reason="uv not available")
     def test_mypy_passes(self) -> None:
         """Verify mypy passes on the codebase."""
         result = subprocess.run(
-            ["uv", "run", "mypy", "src/"],
+            [*UV_CMD, "run", "mypy", "src/"],
             capture_output=True,
             text=True,
         )
@@ -191,10 +198,11 @@ class TestPrecommitConfiguration:
         content = precommit.read_text()
         assert "mirrors-mypy" in content
 
+    @pytest.mark.skipif(not UV_AVAILABLE, reason="uv not available")
     def test_precommit_validate_config(self) -> None:
         """Verify pre-commit configuration is valid."""
         result = subprocess.run(
-            ["uv", "run", "pre-commit", "validate-config"],
+            [*UV_CMD, "run", "pre-commit", "validate-config"],
             capture_output=True,
             text=True,
         )

@@ -408,7 +408,9 @@ def _detect_pattern_deviations(
             pattern_type=violation.pattern_type,
             standard_pattern=violation.expected,
             proposed_pattern=violation.actual,
-            justification=found_justification if found_justification else violation.justification or "",
+            justification=found_justification
+            if found_justification
+            else violation.justification or "",
             is_justified=is_justified,
             severity=violation.severity,
         )
@@ -458,9 +460,7 @@ def _make_pattern_decision(
         d for d in deviations if d.severity == "critical" and not d.is_justified
     ]
     if critical_unjustified:
-        failure_reasons.append(
-            f"Found {len(critical_unjustified)} critical unjustified deviations"
-        )
+        failure_reasons.append(f"Found {len(critical_unjustified)} critical unjustified deviations")
 
     # Check confidence threshold
     if confidence < confidence_threshold:
@@ -809,9 +809,7 @@ async def _rule_based_pattern_matching(
         confidence = 1.0
 
     # Make pass/fail decision
-    overall_pass, failure_reasons = _make_pattern_decision(
-        all_violations, deviations, confidence
-    )
+    overall_pass, failure_reasons = _make_pattern_decision(all_violations, deviations, confidence)
 
     # Generate recommendations
     recommendations = _generate_recommendations(all_violations, deviations)

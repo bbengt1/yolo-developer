@@ -95,9 +95,7 @@ class RedactionConfig:
         """Validate redaction config and log warnings for issues."""
         for field_path in self.redact_fields:
             if not field_path:
-                _logger.warning(
-                    "RedactionConfig redact_fields contains empty field path"
-                )
+                _logger.warning("RedactionConfig redact_fields contains empty field path")
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON output.

@@ -307,7 +307,14 @@ def show_config(json_output: bool = False, no_mask: bool = False) -> None:
     config = _load_config_safe()
     if config is None:
         if json_output:
-            print(json.dumps({"error": "No configuration found", "suggestion": "Run 'yolo init' to create a project"}))
+            print(
+                json.dumps(
+                    {
+                        "error": "No configuration found",
+                        "suggestion": "Run 'yolo init' to create a project",
+                    }
+                )
+            )
         else:
             warning_panel(
                 "No configuration file found (yolo.yaml).\n\n"
@@ -348,7 +355,11 @@ def set_config_value(key: str, value: str, json_output: bool = False) -> None:
     config_path = Path("yolo.yaml")
     if not config_path.exists():
         if json_output:
-            print(json.dumps({"error": "No configuration file found", "suggestion": "Run 'yolo init' first"}))
+            print(
+                json.dumps(
+                    {"error": "No configuration file found", "suggestion": "Run 'yolo init' first"}
+                )
+            )
         else:
             warning_panel(
                 "No configuration file found (yolo.yaml).\n\n"
@@ -405,10 +416,7 @@ def set_config_value(key: str, value: str, json_output: bool = False) -> None:
         )
     else:
         success_panel(
-            f"Configuration updated:\n\n"
-            f"  Key: {key}\n"
-            f"  Old: {old_value}\n"
-            f"  New: {converted_value}",
+            f"Configuration updated:\n\n  Key: {key}\n  Old: {old_value}\n  New: {converted_value}",
             title="Configuration Set",
         )
 

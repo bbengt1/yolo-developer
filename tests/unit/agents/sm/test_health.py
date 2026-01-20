@@ -197,12 +197,10 @@ class TestMessageExtraction:
 class TestIdleTimeTracking:
     """Tests for agent idle time tracking (AC #1)."""
 
-    def test_calculate_agent_idle_times_empty_state(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_agent_idle_times_empty_state(self, empty_state: dict[str, Any]) -> None:
         """Empty state should return zero idle times."""
         idle_times = _calculate_agent_idle_times(empty_state)
-        for agent, time in idle_times.items():
+        for _agent, time in idle_times.items():
             assert time == 0.0
 
     def test_calculate_agent_idle_times_with_activity(
@@ -220,16 +218,12 @@ class TestIdleTimeTracking:
         # PM had activity 200s ago
         assert 190 < idle_times.get("pm", 0) < 210
 
-    def test_track_agent_activity(
-        self, state_with_messages: dict[str, Any]
-    ) -> None:
+    def test_track_agent_activity(self, state_with_messages: dict[str, Any]) -> None:
         """_track_agent_activity should return last activity timestamp."""
         ts = _track_agent_activity(state_with_messages, "analyst")
         assert "T" in ts  # ISO format
 
-    def test_track_agent_activity_no_activity(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_track_agent_activity_no_activity(self, empty_state: dict[str, Any]) -> None:
         """Should return current time if agent has no activity."""
         ts = _track_agent_activity(empty_state, "analyst")
         assert "T" in ts  # ISO format
@@ -243,16 +237,12 @@ class TestIdleTimeTracking:
 class TestCycleTimeMeasurement:
     """Tests for cycle time measurement (AC #2)."""
 
-    def test_calculate_agent_cycle_times_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_agent_cycle_times_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should return empty cycle times."""
         cycle_times = _calculate_agent_cycle_times(empty_state)
         assert cycle_times == {}
 
-    def test_calculate_overall_cycle_time_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_overall_cycle_time_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should return zero overall cycle time."""
         overall = _calculate_overall_cycle_time(empty_state)
         assert overall == 0.0
@@ -286,40 +276,30 @@ class TestCycleTimeMeasurement:
 class TestChurnRateCalculation:
     """Tests for churn rate calculation (AC #3)."""
 
-    def test_count_exchanges_empty_state(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_count_exchanges_empty_state(self, empty_state: dict[str, Any]) -> None:
         """Empty state should have zero exchanges."""
         count = _count_exchanges_in_window(empty_state)
         assert count == 0
 
-    def test_count_exchanges_with_activity(
-        self, state_with_messages: dict[str, Any]
-    ) -> None:
+    def test_count_exchanges_with_activity(self, state_with_messages: dict[str, Any]) -> None:
         """Should count exchanges in time window."""
         count = _count_exchanges_in_window(state_with_messages, window_seconds=60.0)
         # Messages: analyst -> pm -> analyst -> dev = 3 exchanges
         # But only those within 60s window count
         assert count >= 0
 
-    def test_calculate_churn_rate_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_churn_rate_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should have zero churn rate."""
         rate = _calculate_churn_rate(empty_state)
         assert rate == 0.0
 
-    def test_calculate_churn_rate_high_churn(
-        self, high_churn_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_churn_rate_high_churn(self, high_churn_state: dict[str, Any]) -> None:
         """High churn state should have high churn rate."""
         rate = _calculate_churn_rate(high_churn_state)
         # 15 messages alternating = ~14 exchanges in 60s
         assert rate > 5  # Should be significantly higher than default threshold
 
-    def test_calculate_agent_churn_rates_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_agent_churn_rates_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should return empty agent churn rates."""
         rates = _calculate_agent_churn_rates(empty_state)
         assert rates == {}
@@ -363,9 +343,7 @@ class TestPercentileCalculation:
         result = _calculate_percentile(values, 50)
         assert result == 50.0
 
-    def test_calculate_cycle_time_percentiles_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_cycle_time_percentiles_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should return zero percentiles."""
         result = _calculate_cycle_time_percentiles(empty_state)
         assert result == {"p50": 0.0, "p90": 0.0, "p95": 0.0}
@@ -420,9 +398,7 @@ class TestUnproductiveExchangeTracking:
         topic = _extract_topic_from_message(msg)
         assert topic == ""
 
-    def test_count_unproductive_exchanges_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_count_unproductive_exchanges_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should have zero unproductive exchanges."""
         count = _count_unproductive_exchanges(empty_state)
         assert count == 0
@@ -480,9 +456,7 @@ class TestUnproductiveExchangeTracking:
         count = _count_unproductive_exchanges(state)
         assert count >= 1  # At least one unproductive exchange detected
 
-    def test_calculate_unproductive_churn_rate_empty(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    def test_calculate_unproductive_churn_rate_empty(self, empty_state: dict[str, Any]) -> None:
         """Empty state should have zero unproductive churn rate."""
         rate = _calculate_unproductive_churn_rate(empty_state)
         assert rate == 0.0
@@ -595,7 +569,9 @@ class TestAlertGeneration:
     def test_generate_alerts_disabled(self) -> None:
         """Disabled alerts should produce empty tuple."""
         config = HealthConfig(enable_alerts=False)
-        anomalies = [{"type": "test", "severity": "warning", "agent": None, "value": 5.0, "threshold": 3.0}]
+        anomalies = [
+            {"type": "test", "severity": "warning", "agent": None, "value": 5.0, "threshold": 3.0}
+        ]
         alerts = _generate_alerts(anomalies, config)
         assert alerts == ()
 
@@ -849,9 +825,7 @@ class TestMetricsCollection:
         assert metrics.overall_churn_rate == 0.0
         assert len(metrics.agent_snapshots) == 6
 
-    def test_collect_metrics_with_activity(
-        self, state_with_messages: dict[str, Any]
-    ) -> None:
+    def test_collect_metrics_with_activity(self, state_with_messages: dict[str, Any]) -> None:
         """Should collect metrics from state with activity."""
         config = HealthConfig()
         metrics = _collect_metrics(state_with_messages, config)
@@ -870,9 +844,7 @@ class TestMonitorHealth:
     """Tests for main monitor_health function."""
 
     @pytest.mark.asyncio
-    async def test_monitor_health_empty_state(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_monitor_health_empty_state(self, empty_state: dict[str, Any]) -> None:
         """Should return healthy status for empty state."""
         status = await monitor_health(empty_state)
 
@@ -892,9 +864,7 @@ class TestMonitorHealth:
         assert status.summary != ""
 
     @pytest.mark.asyncio
-    async def test_monitor_health_with_custom_config(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_monitor_health_with_custom_config(self, empty_state: dict[str, Any]) -> None:
         """Should respect custom config thresholds."""
         config = HealthConfig(
             max_idle_time_seconds=600.0,
@@ -906,9 +876,7 @@ class TestMonitorHealth:
         assert len(status.alerts) == 0
 
     @pytest.mark.asyncio
-    async def test_monitor_health_high_churn(
-        self, high_churn_state: dict[str, Any]
-    ) -> None:
+    async def test_monitor_health_high_churn(self, high_churn_state: dict[str, Any]) -> None:
         """High churn should trigger alerts and degrade status."""
         config = HealthConfig(max_churn_rate=5.0)  # Low threshold
         status = await monitor_health(high_churn_state, config)
@@ -919,9 +887,7 @@ class TestMonitorHealth:
         assert status.metrics.overall_churn_rate >= 0
 
     @pytest.mark.asyncio
-    async def test_monitor_health_returns_serializable(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_monitor_health_returns_serializable(self, empty_state: dict[str, Any]) -> None:
         """HealthStatus should be serializable via to_dict."""
         status = await monitor_health(empty_state)
         result = status.to_dict()

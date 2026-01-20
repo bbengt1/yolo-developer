@@ -166,9 +166,7 @@ class ValidationReport:
     parse_result: SeedParseResult
     quality_metrics: QualityMetrics
     report_id: str
-    generated_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     source_file: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -216,9 +214,7 @@ class ValidationReport:
             for conflict in self.parse_result.sop_validation.conflicts:
                 sop_conflicts_list.append(conflict.to_dict())
             # Sort by severity (HARD first)
-            sop_conflicts_list.sort(
-                key=lambda x: 0 if x["severity"] == "hard" else 1
-            )
+            sop_conflicts_list.sort(key=lambda x: 0 if x["severity"] == "hard" else 1)
 
         # Build recommendations
         recommendations = _generate_recommendations(self)
@@ -381,11 +377,7 @@ def generate_validation_report(
         report_id=report_id,
         overall_score=round(quality_metrics.overall_score, 3),
         ambiguity_count=result.ambiguity_count,
-        sop_conflict_count=(
-            len(result.sop_validation.conflicts)
-            if result.sop_validation
-            else 0
-        ),
+        sop_conflict_count=(len(result.sop_validation.conflicts) if result.sop_validation else 0),
     )
 
     return ValidationReport(
@@ -411,11 +403,7 @@ def _generate_recommendations(report: ValidationReport) -> list[str]:
 
     # Ambiguity recommendations
     if result.has_ambiguities:
-        high_count = sum(
-            1
-            for amb in result.ambiguities
-            if amb.severity.value == "high"
-        )
+        high_count = sum(1 for amb in result.ambiguities if amb.severity.value == "high")
         if high_count > 0:
             recommendations.append(
                 f"Resolve {high_count} high-severity ambiguities before proceeding"
@@ -434,25 +422,17 @@ def _generate_recommendations(report: ValidationReport) -> list[str]:
                 f"BLOCKING: Resolve {hard_count} hard SOP conflicts before implementation"
             )
         if soft_count > 0:
-            recommendations.append(
-                f"Consider addressing {soft_count} soft SOP conflicts"
-            )
+            recommendations.append(f"Consider addressing {soft_count} soft SOP conflicts")
 
     # Quality score recommendations
     if metrics.overall_score < 0.7:
-        recommendations.append(
-            "Quality score below threshold - significant improvements needed"
-        )
+        recommendations.append("Quality score below threshold - significant improvements needed")
     elif metrics.overall_score < 0.85:
-        recommendations.append(
-            "Quality score moderate - some improvements recommended"
-        )
+        recommendations.append("Quality score moderate - some improvements recommended")
 
     # Content recommendations
     if result.goal_count == 0:
-        recommendations.append(
-            "No goals extracted - consider adding clear project objectives"
-        )
+        recommendations.append("No goals extracted - consider adding clear project objectives")
     if result.feature_count == 0:
         recommendations.append(
             "No features extracted - consider adding specific feature descriptions"
@@ -694,7 +674,9 @@ def format_report_rich(
                 priority_label,
                 amb["ambiguity_type"],
                 f"[{severity_style}]{severity.upper()}[/{severity_style}]",
-                amb["description"][:40] + "..." if len(amb["description"]) > 40 else amb["description"],
+                amb["description"][:40] + "..."
+                if len(amb["description"]) > 40
+                else amb["description"],
             )
 
         console.print(amb_table)

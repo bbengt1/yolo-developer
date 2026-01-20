@@ -39,10 +39,7 @@ class TestDesignDecisionGeneration:
     @pytest.mark.asyncio
     async def test_generates_multiple_decisions(self) -> None:
         """Test that decisions are generated for multiple stories."""
-        stories = [
-            {"id": f"story-{i:03d}", "title": f"Story {i}"}
-            for i in range(3)
-        ]
+        stories = [{"id": f"story-{i:03d}", "title": f"Story {i}"} for i in range(3)]
 
         decisions, _ = await _generate_design_decisions(stories)
 

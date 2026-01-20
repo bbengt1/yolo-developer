@@ -301,9 +301,7 @@ class TimelineEntry:
     def __post_init__(self) -> None:
         """Validate timeline entry data and log warnings for issues."""
         if self.sequence_number < 1:
-            _logger.warning(
-                "TimelineEntry sequence_number=%d is less than 1", self.sequence_number
-            )
+            _logger.warning("TimelineEntry sequence_number=%d is less than 1", self.sequence_number)
         if not self.timestamp:
             _logger.warning(
                 "TimelineEntry timestamp is empty for sequence_number=%d",

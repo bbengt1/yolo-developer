@@ -113,9 +113,7 @@ class JsonAuditExporter:
         exported_artifacts = [
             self._apply_artifact_redaction(a.to_dict(), redaction) for a in artifacts
         ]
-        exported_links = [
-            self._apply_link_redaction(link.to_dict(), redaction) for link in links
-        ]
+        exported_links = [self._apply_link_redaction(link.to_dict(), redaction) for link in links]
 
         data = {
             "artifacts": exported_artifacts,
@@ -157,9 +155,7 @@ class JsonAuditExporter:
         exported_artifacts = [
             self._apply_artifact_redaction(a.to_dict(), redaction) for a in artifacts
         ]
-        exported_links = [
-            self._apply_link_redaction(link.to_dict(), redaction) for link in links
-        ]
+        exported_links = [self._apply_link_redaction(link.to_dict(), redaction) for link in links]
 
         data = {
             "decisions": exported_decisions,
@@ -277,9 +273,7 @@ class JsonAuditExporter:
 
         return result
 
-    def _redact_field_path(
-        self, data: dict[str, Any], field_path: str
-    ) -> dict[str, Any]:
+    def _redact_field_path(self, data: dict[str, Any], field_path: str) -> dict[str, Any]:
         """Redact a specific field path in the data.
 
         Args:

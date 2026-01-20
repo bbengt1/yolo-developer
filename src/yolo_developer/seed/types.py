@@ -370,10 +370,7 @@ class SeedParseResult:
     @property
     def has_sop_conflicts(self) -> bool:
         """Return True if any SOP conflicts were detected."""
-        return (
-            self.sop_validation is not None
-            and self.sop_validation.has_conflicts
-        )
+        return self.sop_validation is not None and self.sop_validation.has_conflicts
 
     @property
     def sop_passed(self) -> bool:
@@ -396,8 +393,6 @@ class SeedParseResult:
             "ambiguities": [amb.to_dict() for amb in self.ambiguities],
             "ambiguity_confidence": self.ambiguity_confidence,
             "sop_validation": (
-                self.sop_validation.to_dict()
-                if self.sop_validation is not None
-                else None
+                self.sop_validation.to_dict() if self.sop_validation is not None else None
             ),
         }

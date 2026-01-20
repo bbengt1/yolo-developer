@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 if TYPE_CHECKING:
-
     from yolo_developer.orchestrator.state import YoloState
 
 

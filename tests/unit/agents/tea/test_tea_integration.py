@@ -173,7 +173,7 @@ def test_no_assertion():
 
         # Check that confidence was reduced due to test issues
         assert "tea_output" in result
-        tea_output = result["tea_output"]
+        result["tea_output"]
         # Overall confidence should be less than 1.0 due to test issues
         # (The exact value depends on the confidence calculation logic)
 
@@ -267,8 +267,12 @@ def test_no_assert():
 
         # Verify test execution validation result exists and has findings
         assert test_execution_result is not None, "test_execution validation result should exist"
-        assert len(test_execution_result.get("findings", [])) >= 1, "Should have at least one finding"
+        assert len(test_execution_result.get("findings", [])) >= 1, (
+            "Should have at least one finding"
+        )
 
         # Verify finding has correct category
         findings = test_execution_result["findings"]
-        assert any(f["category"] == "test_coverage" for f in findings), "Should have test_coverage finding"
+        assert any(f["category"] == "test_coverage" for f in findings), (
+            "Should have test_coverage finding"
+        )

@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 
 from yolo_developer.cli.commands.init import init_command
+from yolo_developer.cli.commands.mcp import app as mcp_app
 from yolo_developer.cli.commands.seed import seed_command
 
 app = typer.Typer(
@@ -475,6 +476,7 @@ config_app = typer.Typer(
     no_args_is_help=False,
 )
 app.add_typer(config_app, name="config")
+app.add_typer(mcp_app, name="mcp")
 
 
 @config_app.callback(invoke_without_command=True)

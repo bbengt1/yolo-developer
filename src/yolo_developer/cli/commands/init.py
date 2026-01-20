@@ -461,9 +461,7 @@ def merge_pyproject_dependencies(project_path: Path) -> None:
     existing_base_names = {_extract_package_name(d) for d in existing_deps}
 
     # Filter YOLO deps to only those not already present
-    new_deps = [
-        d for d in yolo_deps if _extract_package_name(d) not in existing_base_names
-    ]
+    new_deps = [d for d in yolo_deps if _extract_package_name(d) not in existing_base_names]
 
     if not new_deps:
         console.print("[green]All YOLO dependencies already present.[/green]")

@@ -6,8 +6,6 @@ Tests for the execute_tests function and failure detection heuristics.
 from __future__ import annotations
 
 from yolo_developer.agents.tea.execution import (
-    ExecutionStatus,
-    TestExecutionResult,
     detect_test_issues,
     execute_tests,
 )
@@ -18,7 +16,7 @@ class TestDetectTestIssues:
 
     def test_detect_missing_assertions(self) -> None:
         """Test detection of tests without assertions."""
-        content = '''
+        content = """
 def test_no_assertion():
     x = 1 + 1
     y = x * 2
@@ -26,7 +24,7 @@ def test_no_assertion():
 
 def test_with_assertion():
     assert 1 == 1
-'''
+"""
         failures = detect_test_issues(content, "test.py")
         # Should detect test_no_assertion as having no assertion
         assert any(f.test_name == "test_no_assertion" for f in failures)
@@ -36,7 +34,7 @@ def test_with_assertion():
 
     def test_detect_incomplete_tests(self) -> None:
         """Test detection of incomplete tests with TODO markers."""
-        content = '''
+        content = """
 def test_incomplete():
     # TODO: implement this test
     pass
@@ -48,28 +46,30 @@ def test_fixme():
 def test_complete():
     result = calculate()
     assert result == 42
-'''
+"""
         failures = detect_test_issues(content, "test.py")
         # Should detect tests with TODO/FIXME
-        assert any(f.test_name == "test_incomplete" and f.failure_type == "incomplete" for f in failures)
+        assert any(
+            f.test_name == "test_incomplete" and f.failure_type == "incomplete" for f in failures
+        )
         assert any(f.test_name == "test_fixme" and f.failure_type == "incomplete" for f in failures)
 
     def test_detect_pass_only_tests(self) -> None:
         """Test detection of tests that only have pass statement."""
-        content = '''
+        content = """
 def test_stub():
     pass
 
 def test_real():
     assert True
-'''
+"""
         failures = detect_test_issues(content, "test.py")
         # test_stub should be detected as incomplete
         assert any(f.test_name == "test_stub" for f in failures)
 
     def test_detect_pytest_raises_as_assertion(self) -> None:
         """Test that pytest.raises is counted as an assertion."""
-        content = '''
+        content = """
 import pytest
 
 def test_with_raises():
@@ -78,7 +78,7 @@ def test_with_raises():
 
 def test_no_assertion_no_raises():
     x = 1
-'''
+"""
         failures = detect_test_issues(content, "test.py")
         # test_with_raises should NOT be flagged (pytest.raises counts as assertion)
         assert not any(f.test_name == "test_with_raises" for f in failures)
@@ -92,13 +92,13 @@ def test_no_assertion_no_raises():
 
     def test_no_tests_in_content(self) -> None:
         """Test with no test functions."""
-        content = '''
+        content = """
 def helper():
     return 42
 
 class UtilityClass:
     pass
-'''
+"""
         failures = detect_test_issues(content, "test.py")
         assert failures == []
 
@@ -111,13 +111,13 @@ class TestExecuteTests:
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''
+                "content": """
 def test_one():
     assert 1 == 1
 
 def test_two():
     assert True
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -134,7 +134,7 @@ def test_two():
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''
+                "content": """
 def test_pass():
     assert True
 
@@ -144,7 +144,7 @@ def test_no_assertion():
 def test_incomplete():
     # TODO: implement
     pass
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -168,13 +168,13 @@ def test_incomplete():
         test_files = [
             {
                 "artifact_id": "tests/conftest.py",
-                "content": '''
+                "content": """
 import pytest
 
 @pytest.fixture
 def sample_fixture():
     return 42
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -189,24 +189,24 @@ def sample_fixture():
         test_files = [
             {
                 "artifact_id": "tests/test_a.py",
-                "content": '''
+                "content": """
 def test_a1():
     assert True
 
 def test_a2():
     assert True
-''',
+""",
             },
             {
                 "artifact_id": "tests/test_b.py",
-                "content": '''
+                "content": """
 def test_b1():
     assert True
 
 def test_b2_incomplete():
     # TODO: implement
     pass
-''',
+""",
             },
         ]
         result = execute_tests(test_files)
@@ -220,10 +220,10 @@ def test_b2_incomplete():
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''
+                "content": """
 def test_one():
     assert True
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -239,10 +239,10 @@ def test_one():
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''
+                "content": """
 def test_good():
     assert True
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -253,10 +253,10 @@ def test_good():
         test_files = [
             {
                 "artifact_id": "tests/test_module.py",
-                "content": '''
+                "content": """
 def test_missing_assert():
     x = 1
-''',
+""",
             }
         ]
         result = execute_tests(test_files)
@@ -267,10 +267,10 @@ def test_missing_assert():
         test_files = [
             {
                 "artifact_id": "tests/specific/test_module.py",
-                "content": '''
+                "content": """
 def test_no_assert():
     pass
-''',
+""",
             }
         ]
         result = execute_tests(test_files)

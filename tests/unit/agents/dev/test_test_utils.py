@@ -368,10 +368,10 @@ def multiply(x: int, y: int) -> int:
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that function returns tuple of (code, is_valid)."""
-        mock_router.call.return_value = '''```python
+        mock_router.call.return_value = """```python
 def test_add():
     assert add(1, 2) == 3
-```'''
+```"""
         result = await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
@@ -533,7 +533,7 @@ def test_add_positive_numbers():
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that code is properly extracted from markdown blocks."""
-        mock_router.call.return_value = '''Here are the tests:
+        mock_router.call.return_value = """Here are the tests:
 
 ```python
 def test_add():
@@ -543,7 +543,7 @@ def test_multiply():
     assert multiply(2, 3) == 6
 ```
 
-These tests cover the basic functionality.'''
+These tests cover the basic functionality."""
         code, is_valid = await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
@@ -562,32 +562,32 @@ class TestCalculateCoverageEstimate:
 
     def test_returns_float_between_0_and_1(self) -> None:
         """Test that coverage estimate is between 0 and 1."""
-        code = '''
+        code = """
 def add(a, b):
     return a + b
-'''
-        tests = '''
+"""
+        tests = """
 def test_add():
     assert add(1, 2) == 3
-'''
+"""
         coverage = calculate_coverage_estimate(code, tests)
         assert isinstance(coverage, float)
         assert 0.0 <= coverage <= 1.0
 
     def test_higher_coverage_for_more_tests(self) -> None:
         """Test that more tests result in higher coverage estimate."""
-        code = '''
+        code = """
 def add(a, b):
     return a + b
 
 def subtract(a, b):
     return a - b
-'''
-        few_tests = '''
+"""
+        few_tests = """
 def test_add():
     assert add(1, 2) == 3
-'''
-        many_tests = '''
+"""
+        many_tests = """
 def test_add():
     assert add(1, 2) == 3
 
@@ -599,17 +599,17 @@ def test_subtract():
 
 def test_subtract_negative():
     assert subtract(-5, -3) == -2
-'''
+"""
         coverage_few = calculate_coverage_estimate(code, few_tests)
         coverage_many = calculate_coverage_estimate(code, many_tests)
         assert coverage_many >= coverage_few
 
     def test_empty_tests_return_zero(self) -> None:
         """Test that empty tests return zero coverage."""
-        code = '''
+        code = """
 def add(a, b):
     return a + b
-'''
+"""
         coverage = calculate_coverage_estimate(code, "")
         assert coverage == 0.0
 
@@ -628,7 +628,7 @@ def add(a, b):
 
     def test_counts_functions_tested(self) -> None:
         """Test that coverage considers functions that have tests."""
-        code = '''
+        code = """
 def func1():
     pass
 
@@ -637,28 +637,28 @@ def func2():
 
 def func3():
     pass
-'''
-        tests = '''
+"""
+        tests = """
 def test_func1():
     pass
 
 def test_func2():
     pass
-'''
+"""
         coverage = calculate_coverage_estimate(code, tests)
         # 2 out of 3 functions tested -> ~66%
         assert 0.5 <= coverage <= 0.8
 
     def test_detects_method_calls_on_objects(self) -> None:
         """Test that coverage detects method calls via obj.method()."""
-        code = '''
+        code = """
 def calculate(value):
     return value * 2
 
 def process(data):
     return data.upper()
-'''
-        tests = '''
+"""
+        tests = """
 def test_calculate_via_method():
     calc = Calculator()
     result = calc.calculate(5)  # Method call
@@ -668,14 +668,14 @@ def test_process_via_method():
     proc = Processor()
     result = proc.process("hello")  # Method call
     assert result == "HELLO"
-'''
+"""
         coverage = calculate_coverage_estimate(code, tests)
         # Both functions should be detected via method call pattern
         assert coverage >= 0.7
 
     def test_coverage_accuracy_for_full_coverage(self) -> None:
         """Test that full test coverage produces high coverage estimate."""
-        code = '''
+        code = """
 def add(a, b):
     return a + b
 
@@ -684,8 +684,8 @@ def subtract(a, b):
 
 def multiply(a, b):
     return a * b
-'''
-        tests = '''
+"""
+        tests = """
 def test_add_positive():
     assert add(2, 3) == 5
 
@@ -703,7 +703,7 @@ def test_multiply_positive():
 
 def test_multiply_by_zero():
     assert multiply(5, 0) == 0
-'''
+"""
         coverage = calculate_coverage_estimate(code, tests)
         # All 3 functions tested with multiple tests -> should be high
         assert coverage >= 0.9
@@ -793,9 +793,7 @@ class TestQualityReport:
 
     def test_stores_warnings(self) -> None:
         """Test that warnings are stored properly."""
-        report = QualityReport(
-            warnings=["Missing assertions", "Uses time.time()"]
-        )
+        report = QualityReport(warnings=["Missing assertions", "Uses time.time()"])
         assert len(report.warnings) == 2
         assert "Missing assertions" in report.warnings
 
@@ -805,42 +803,42 @@ class TestValidateTestQuality:
 
     def test_returns_test_quality_report(self) -> None:
         """Test that function returns QualityReport."""
-        tests = '''
+        tests = """
 def test_add():
     assert add(1, 2) == 3
-'''
+"""
         report = validate_test_quality(tests)
         assert isinstance(report, QualityReport)
 
     def test_detects_missing_assertions(self) -> None:
         """Test detection of tests without assertions."""
-        tests = '''
+        tests = """
 def test_no_assert():
     x = 1 + 1
     print(x)
-'''
+"""
         report = validate_test_quality(tests)
         assert report.has_assertions is False
 
     def test_passes_with_assertions(self) -> None:
         """Test that tests with assertions pass."""
-        tests = '''
+        tests = """
 def test_with_assert():
     result = calculate()
     assert result == expected
-'''
+"""
         report = validate_test_quality(tests)
         assert report.has_assertions is True
 
     def test_detects_random_without_seed(self) -> None:
         """Test detection of random usage without seeding."""
-        tests = '''
+        tests = """
 import random
 
 def test_random_usage():
     value = random.randint(1, 10)
     assert value > 0
-'''
+"""
         report = validate_test_quality(tests)
         # Should warn about non-deterministic behavior
         assert report.is_deterministic is False or any(
@@ -849,20 +847,20 @@ def test_random_usage():
 
     def test_detects_time_without_mocking(self) -> None:
         """Test detection of time.time() usage."""
-        tests = '''
+        tests = """
 import time
 
 def test_time_usage():
     start = time.time()
     assert start > 0
-'''
+"""
         report = validate_test_quality(tests)
         # Should warn about potential non-determinism
         assert any("time" in w.lower() for w in report.warnings) or not report.is_deterministic
 
     def test_detects_fixture_usage(self) -> None:
         """Test detection of pytest fixture usage."""
-        tests = '''
+        tests = """
 import pytest
 
 @pytest.fixture
@@ -871,7 +869,7 @@ def sample_data():
 
 def test_with_fixture(sample_data):
     assert sample_data["key"] == "value"
-'''
+"""
         report = validate_test_quality(tests)
         assert report.uses_fixtures is True
 
@@ -888,13 +886,13 @@ def test_with_fixture(sample_data):
 
     def test_detects_global_state_mutation(self) -> None:
         """Test detection of potential global state mutation."""
-        tests = '''
+        tests = """
 GLOBAL_VAR = []
 
 def test_modifies_global():
     GLOBAL_VAR.append(1)
     assert len(GLOBAL_VAR) == 1
-'''
+"""
         report = validate_test_quality(tests)
         # Should warn about global state mutation
         assert any("global" in w.lower() for w in report.warnings) or len(report.warnings) > 0

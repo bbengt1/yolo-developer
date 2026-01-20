@@ -289,9 +289,7 @@ class TestSprintProgress:
             StoryProgress(story_id="1-1", title="First", status="completed"),
             StoryProgress(story_id="2-1", title="Second", status="completed"),
         )
-        in_progress = (
-            StoryProgress(story_id="3-1", title="Third", status="in_progress"),
-        )
+        in_progress = (StoryProgress(story_id="3-1", title="Third", status="in_progress"),)
         remaining = (StoryProgress(story_id="4-1", title="Fourth", status="backlog"),)
         blocked = (
             StoryProgress(
@@ -345,9 +343,7 @@ class TestSprintProgress:
             in_progress_stories=(
                 StoryProgress(story_id="1-1", title="First", status="in_progress"),
             ),
-            remaining_stories=(
-                StoryProgress(story_id="2-1", title="Second", status="backlog"),
-            ),
+            remaining_stories=(StoryProgress(story_id="2-1", title="Second", status="backlog"),),
             blocked_stories=(),
             completion_estimate=None,
         )
@@ -425,9 +421,7 @@ class TestSprintProgress:
         )
         progress = SprintProgress(
             snapshot=snapshot,
-            completed_stories=(
-                StoryProgress(story_id="1-1", title="First", status="completed"),
-            ),
+            completed_stories=(StoryProgress(story_id="1-1", title="First", status="completed"),),
             in_progress_stories=(
                 StoryProgress(story_id="2-1", title="Second", status="in_progress"),
             ),

@@ -354,7 +354,12 @@ class TestGetRoutingRationale:
     def test_gate_blocked_rationale(self) -> None:
         """Test rationale for gate blocked routing."""
         state = create_test_state(gate_blocked=True)
-        analysis = {"current_agent": "tea", "message_count": 5, "decision_count": 2, "gate_blocked": True}
+        analysis = {
+            "current_agent": "tea",
+            "message_count": 5,
+            "decision_count": 2,
+            "gate_blocked": True,
+        }
         rationale = _get_routing_rationale(state, "dev", analysis)
 
         assert "Gate blocked" in rationale
@@ -362,7 +367,12 @@ class TestGetRoutingRationale:
     def test_normal_progression_rationale(self) -> None:
         """Test rationale for normal progression."""
         state = create_test_state()
-        analysis = {"current_agent": "analyst", "message_count": 1, "decision_count": 0, "gate_blocked": False}
+        analysis = {
+            "current_agent": "analyst",
+            "message_count": 1,
+            "decision_count": 0,
+            "gate_blocked": False,
+        }
         rationale = _get_routing_rationale(state, "pm", analysis)
 
         assert "progression" in rationale.lower() or "pm" in rationale.lower()
@@ -740,7 +750,9 @@ class TestSMNodeEnhancedCircularDetection:
 
         # If circular detected, notes should mention enhanced detection
         if sm_output["circular_logic_detected"]:
-            assert "Enhanced detection" in processing_notes or "patterns" in processing_notes.lower()
+            assert (
+                "Enhanced detection" in processing_notes or "patterns" in processing_notes.lower()
+            )
 
 
 class TestSMNodeConflictMediation:

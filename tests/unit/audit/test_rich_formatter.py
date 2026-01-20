@@ -17,12 +17,12 @@ from __future__ import annotations
 import pytest
 from rich.console import Console
 
+from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
 from yolo_developer.audit.types import (
     AgentIdentity,
     Decision,
     DecisionContext,
 )
-from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
 
 
 @pytest.fixture

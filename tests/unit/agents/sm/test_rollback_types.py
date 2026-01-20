@@ -17,8 +17,7 @@ Following red-green-refactor cycle per Story 10.15 requirements.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime
 
 import pytest
 
@@ -28,9 +27,7 @@ from yolo_developer.agents.sm.rollback_types import (
     VALID_ROLLBACK_STATUSES,
     RollbackConfig,
     RollbackPlan,
-    RollbackReason,
     RollbackResult,
-    RollbackStatus,
     RollbackStep,
 )
 
@@ -195,9 +192,7 @@ class TestRollbackPlan:
             ),
         )
 
-    def test_create_valid_rollback_plan(
-        self, sample_steps: tuple[RollbackStep, ...]
-    ) -> None:
+    def test_create_valid_rollback_plan(self, sample_steps: tuple[RollbackStep, ...]) -> None:
         """Should create RollbackPlan with valid values."""
         plan = RollbackPlan(
             plan_id="plan-001",
@@ -213,9 +208,7 @@ class TestRollbackPlan:
         assert len(plan.steps) == 2
         assert plan.estimated_impact == "moderate"
 
-    def test_rollback_plan_is_frozen(
-        self, sample_steps: tuple[RollbackStep, ...]
-    ) -> None:
+    def test_rollback_plan_is_frozen(self, sample_steps: tuple[RollbackStep, ...]) -> None:
         """RollbackPlan should be immutable."""
         plan = RollbackPlan(
             plan_id="plan-001",
@@ -228,9 +221,7 @@ class TestRollbackPlan:
         with pytest.raises(AttributeError):
             plan.reason = "manual_request"  # type: ignore[misc]
 
-    def test_rollback_plan_to_dict(
-        self, sample_steps: tuple[RollbackStep, ...]
-    ) -> None:
+    def test_rollback_plan_to_dict(self, sample_steps: tuple[RollbackStep, ...]) -> None:
         """RollbackPlan.to_dict() should serialize with nested steps."""
         plan = RollbackPlan(
             plan_id="plan-001",

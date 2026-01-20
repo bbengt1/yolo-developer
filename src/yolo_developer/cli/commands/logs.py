@@ -251,9 +251,7 @@ def _display_decisions_table(
         agent_name = decision.agent.agent_name
         agent_color = AGENT_COLORS.get(agent_name, "white")
 
-        type_display = DECISION_TYPE_DISPLAY.get(
-            decision.decision_type, decision.decision_type
-        )
+        type_display = DECISION_TYPE_DISPLAY.get(decision.decision_type, decision.decision_type)
 
         row = [
             _format_timestamp(decision.timestamp),
@@ -270,9 +268,7 @@ def _display_decisions_table(
     # Pagination info
     showing_end = offset + len(decisions)
     console.print()
-    console.print(
-        f"[dim]Showing {offset + 1}-{showing_end} of {total} entries[/dim]"
-    )
+    console.print(f"[dim]Showing {offset + 1}-{showing_end} of {total} entries[/dim]")
     console.print()
 
 
@@ -417,8 +413,7 @@ def logs_command(
     if decision_type and decision_type not in VALID_DECISION_TYPES:
         valid_types = ", ".join(sorted(VALID_DECISION_TYPES))
         warning_panel(
-            f"Invalid decision type: '{decision_type}'\n\n"
-            f"[dim]Valid types:[/dim]\n  {valid_types}",
+            f"Invalid decision type: '{decision_type}'\n\n[dim]Valid types:[/dim]\n  {valid_types}",
             title="Invalid Filter",
         )
         return
@@ -426,8 +421,7 @@ def logs_command(
     # Validate limit
     if limit < 1:
         warning_panel(
-            f"Invalid limit: {limit}\n\n"
-            "[dim]Limit must be a positive integer.[/dim]",
+            f"Invalid limit: {limit}\n\n[dim]Limit must be a positive integer.[/dim]",
             title="Invalid Parameter",
         )
         return
@@ -498,9 +492,7 @@ def logs_command(
         _display_decisions_verbose(decisions)
         console.print(f"[dim]Showing {len(decisions)} of {total_count} entries[/dim]")
         if not show_all and total_count > limit:
-            console.print(
-                f"[dim]Use --all to show all {total_count} entries[/dim]"
-            )
+            console.print(f"[dim]Use --all to show all {total_count} entries[/dim]")
         console.print()
         return
 

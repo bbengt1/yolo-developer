@@ -42,7 +42,7 @@ def add(a, b):
         artifact = {
             "type": "test_file",
             "artifact_id": "tests/test_module.py",
-            "content": '''def test_add(): assert True''',
+            "content": """def test_add(): assert True""",
         }
         result = _validate_artifact(artifact)
         # Test files are validated differently
@@ -110,14 +110,14 @@ class TestCoverageInTeaNode:
                         "code_files": [
                             {
                                 "file_path": "src/module.py",
-                                "content": '''def func(): return 42''',
+                                "content": """def func(): return 42""",
                                 "file_type": "source",
                             }
                         ],
                         "test_files": [
                             {
                                 "file_path": "tests/test_module.py",
-                                "content": '''def test_func(): assert True''',
+                                "content": """def test_func(): assert True""",
                                 "test_type": "unit",
                             }
                         ],
@@ -148,14 +148,14 @@ class TestCoverageInTeaNode:
                         "code_files": [
                             {
                                 "file_path": "src/module.py",
-                                "content": '''def add(a, b): return a + b''',
+                                "content": """def add(a, b): return a + b""",
                                 "file_type": "source",
                             }
                         ],
                         "test_files": [
                             {
                                 "file_path": "tests/test_module.py",
-                                "content": '''def test_add(): assert add(1, 2) == 3''',
+                                "content": """def test_add(): assert add(1, 2) == 3""",
                                 "test_type": "unit",
                             }
                         ],
@@ -183,7 +183,7 @@ class TestCoverageInTeaNode:
                         "code_files": [
                             {
                                 "file_path": "src/module.py",
-                                "content": '''def func(): return 42''',
+                                "content": """def func(): return 42""",
                                 "file_type": "source",
                             }
                         ],
@@ -217,7 +217,7 @@ class TestCoverageValidationDetails:
         artifact = {
             "type": "code_file",
             "artifact_id": "orchestrator/core.py",
-            "content": '''def orchestrate(): pass''',
+            "content": """def orchestrate(): pass""",
         }
         result = _validate_artifact(artifact, test_content="")
         # Critical path without tests should be flagged

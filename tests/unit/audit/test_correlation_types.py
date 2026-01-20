@@ -123,7 +123,9 @@ class TestDecisionChain:
 
         assert "DecisionChain id is empty" in caplog.text
 
-    def test_decision_chain_invalid_type_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_decision_chain_invalid_type_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test invalid chain_type logs warning."""
         from yolo_developer.audit.correlation_types import DecisionChain
 
@@ -136,7 +138,9 @@ class TestDecisionChain:
 
         assert "is not a valid correlation type" in caplog.text
 
-    def test_decision_chain_empty_decisions_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_decision_chain_empty_decisions_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test empty decisions tuple logs warning."""
         from yolo_developer.audit.correlation_types import DecisionChain
 
@@ -247,7 +251,9 @@ class TestCausalRelation:
 
         assert "CausalRelation id is empty" in caplog.text
 
-    def test_causal_relation_empty_cause_id_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_causal_relation_empty_cause_id_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test empty cause_decision_id logs warning."""
         from yolo_developer.audit.correlation_types import CausalRelation
 
@@ -359,7 +365,9 @@ class TestAgentTransition:
 
         assert "AgentTransition id is empty" in caplog.text
 
-    def test_agent_transition_empty_from_agent_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_agent_transition_empty_from_agent_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test empty from_agent logs warning."""
         from yolo_developer.audit.correlation_types import AgentTransition
 
@@ -373,7 +381,9 @@ class TestAgentTransition:
 
         assert "AgentTransition from_agent is empty" in caplog.text
 
-    def test_agent_transition_empty_to_agent_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_agent_transition_empty_to_agent_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test empty to_agent logs warning."""
         from yolo_developer.audit.correlation_types import AgentTransition
 

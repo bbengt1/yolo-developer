@@ -323,9 +323,7 @@ async def fetch_from_api():
         report = check_maintainability(code)
         naming_warnings = report.get_warnings_by_category("naming")
         # Should have no warnings for snake_case names
-        function_naming_warnings = [
-            w for w in naming_warnings if "Function" in w.message
-        ]
+        function_naming_warnings = [w for w in naming_warnings if "Function" in w.message]
         assert len(function_naming_warnings) == 0
 
     def test_non_snake_case_warning(self) -> None:
@@ -350,9 +348,7 @@ def example():
         report = check_maintainability(code)
         naming_warnings = report.get_warnings_by_category("naming")
         # 'a' and 'b' should generate warnings
-        single_letter_warnings = [
-            w for w in naming_warnings if "Single-letter" in w.message
-        ]
+        single_letter_warnings = [w for w in naming_warnings if "Single-letter" in w.message]
         assert len(single_letter_warnings) >= 2
 
     def test_allowed_single_letters(self) -> None:
@@ -367,9 +363,7 @@ def example():
         report = check_maintainability(code)
         naming_warnings = report.get_warnings_by_category("naming")
         # i, j, x should be allowed
-        single_letter_warnings = [
-            w for w in naming_warnings if "Single-letter" in w.message
-        ]
+        single_letter_warnings = [w for w in naming_warnings if "Single-letter" in w.message]
         # Should have no warnings for i, j, x
         assert len(single_letter_warnings) == 0
 

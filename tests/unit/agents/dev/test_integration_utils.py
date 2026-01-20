@@ -498,7 +498,7 @@ class TestValidateIntegrationTestQuality:
             validate_integration_test_quality,
         )
 
-        test_code = '''
+        test_code = """
 import pytest
 
 @pytest.fixture
@@ -507,7 +507,7 @@ def sample_data():
 
 def test_something(sample_data):
     assert sample_data["key"] == "value"
-'''
+"""
 
         report = validate_integration_test_quality(test_code)
 
@@ -519,14 +519,14 @@ def test_something(sample_data):
             validate_integration_test_quality,
         )
 
-        test_code = '''
+        test_code = """
 from unittest.mock import MagicMock, patch
 
 def test_with_mock():
     mock = MagicMock()
     mock.return_value = 42
     assert mock() == 42
-'''
+"""
 
         report = validate_integration_test_quality(test_code)
 
@@ -538,14 +538,14 @@ def test_with_mock():
             validate_integration_test_quality,
         )
 
-        test_code = '''
+        test_code = """
 import pytest
 
 @pytest.mark.asyncio
 async def test_async_function():
     result = await some_async_call()
     assert result is not None
-'''
+"""
 
         report = validate_integration_test_quality(test_code)
 
@@ -557,11 +557,11 @@ async def test_async_function():
             validate_integration_test_quality,
         )
 
-        test_code = '''
+        test_code = """
 async def test_async_without_marker():
     result = await some_async_call()
     assert result is not None
-'''
+"""
 
         report = validate_integration_test_quality(test_code)
 

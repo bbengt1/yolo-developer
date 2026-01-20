@@ -150,7 +150,11 @@ class TestArchitectNodeTwelveFactorIntegration:
                 decision = output["design_decisions"][0]
                 # Rationale should mention twelve-factor or compliance
                 rationale = decision.get("rationale", "")
-                assert "12-factor" in rationale.lower() or "twelve" in rationale.lower() or "compliance" in rationale.lower()
+                assert (
+                    "12-factor" in rationale.lower()
+                    or "twelve" in rationale.lower()
+                    or "compliance" in rationale.lower()
+                )
 
 
 class TestDesignDecisionEnhancement:
@@ -176,7 +180,10 @@ class TestDesignDecisionEnhancement:
         for decision in decisions:
             assert decision.rationale is not None
             # Rationale should mention 12-factor compliance
-            assert "12-factor" in decision.rationale.lower() or "compliance" in decision.rationale.lower()
+            assert (
+                "12-factor" in decision.rationale.lower()
+                or "compliance" in decision.rationale.lower()
+            )
 
 
 class TestArchitectOutputTwelveFactorField:

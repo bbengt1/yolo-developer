@@ -268,15 +268,11 @@ class CorrelationService:
             Dictionary with workflow information
         """
         # Get all transitions in the session
-        transitions = await self._correlation_store.get_transitions_by_session(
-            session_id
-        )
+        transitions = await self._correlation_store.get_transitions_by_session(session_id)
 
         # Get all decisions for the session
         decisions = await self._decision_store.get_decisions()
-        session_decisions = [
-            d for d in decisions if d.agent.session_id == session_id
-        ]
+        session_decisions = [d for d in decisions if d.agent.session_id == session_id]
 
         # Build agent sequence from decisions
         agent_sequence: list[str] = []
@@ -354,9 +350,7 @@ class CorrelationService:
         # Get transitions for the session if available
         transitions_by_decision: dict[str, AgentTransition] = {}
         if session_id is not None:
-            transitions = await self._correlation_store.get_transitions_by_session(
-                session_id
-            )
+            transitions = await self._correlation_store.get_transitions_by_session(session_id)
             for t in transitions:
                 transitions_by_decision[t.decision_id] = t
 
@@ -399,9 +393,7 @@ class CorrelationService:
         decisions = await self._decision_store.get_decisions()
 
         # Filter by session_id
-        session_decisions = [
-            d for d in decisions if d.agent.session_id == session_id
-        ]
+        session_decisions = [d for d in decisions if d.agent.session_id == session_id]
 
         decision_ids = [d.id for d in session_decisions]
 

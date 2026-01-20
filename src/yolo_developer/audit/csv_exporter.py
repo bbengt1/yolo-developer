@@ -117,9 +117,7 @@ class CsvAuditExporter:
         options = options or DEFAULT_EXPORT_OPTIONS
         redaction = options.redaction_config
 
-        rows = [
-            self._flatten_decision(d, redaction) for d in decisions
-        ]
+        rows = [self._flatten_decision(d, redaction) for d in decisions]
 
         return self._to_csv_bytes(rows, DECISION_COLUMNS)
 
@@ -148,15 +146,11 @@ class CsvAuditExporter:
 
         # Write artifacts section
         output.write("# ARTIFACTS\n")
-        artifact_rows = [
-            self._flatten_artifact(a, redaction) for a in artifacts
-        ]
+        artifact_rows = [self._flatten_artifact(a, redaction) for a in artifacts]
         self._write_csv_section(output, artifact_rows, ARTIFACT_COLUMNS)
 
         output.write("\n# LINKS\n")
-        link_rows = [
-            self._flatten_link(link, redaction) for link in links
-        ]
+        link_rows = [self._flatten_link(link, redaction) for link in links]
         self._write_csv_section(output, link_rows, LINK_COLUMNS)
 
         # Convert to bytes with BOM
@@ -190,23 +184,17 @@ class CsvAuditExporter:
 
         # Write decisions section
         output.write("# DECISIONS\n")
-        decision_rows = [
-            self._flatten_decision(d, redaction) for d in decisions
-        ]
+        decision_rows = [self._flatten_decision(d, redaction) for d in decisions]
         self._write_csv_section(output, decision_rows, DECISION_COLUMNS)
 
         # Write artifacts section
         output.write("\n# ARTIFACTS\n")
-        artifact_rows = [
-            self._flatten_artifact(a, redaction) for a in artifacts
-        ]
+        artifact_rows = [self._flatten_artifact(a, redaction) for a in artifacts]
         self._write_csv_section(output, artifact_rows, ARTIFACT_COLUMNS)
 
         # Write links section
         output.write("\n# LINKS\n")
-        link_rows = [
-            self._flatten_link(link, redaction) for link in links
-        ]
+        link_rows = [self._flatten_link(link, redaction) for link in links]
         self._write_csv_section(output, link_rows, LINK_COLUMNS)
 
         # Convert to bytes with BOM
@@ -229,9 +217,7 @@ class CsvAuditExporter:
         """
         return "text/csv"
 
-    def _to_csv_bytes(
-        self, rows: list[dict[str, str]], columns: list[str]
-    ) -> bytes:
+    def _to_csv_bytes(self, rows: list[dict[str, str]], columns: list[str]) -> bytes:
         """Convert rows to CSV bytes with BOM.
 
         Args:
@@ -269,9 +255,7 @@ class CsvAuditExporter:
         for row in rows:
             writer.writerow(row)
 
-    def _flatten_decision(
-        self, decision: Decision, redaction: RedactionConfig
-    ) -> dict[str, str]:
+    def _flatten_decision(self, decision: Decision, redaction: RedactionConfig) -> dict[str, str]:
         """Flatten a Decision into a flat dictionary for CSV.
 
         Args:
@@ -359,9 +343,7 @@ class CsvAuditExporter:
             "metadata": metadata_str,
         }
 
-    def _flatten_link(
-        self, link: TraceLink, redaction: RedactionConfig
-    ) -> dict[str, str]:
+    def _flatten_link(self, link: TraceLink, redaction: RedactionConfig) -> dict[str, str]:
         """Flatten a TraceLink into a flat dictionary for CSV.
 
         Args:

@@ -99,7 +99,10 @@ class TestCategorizedRisk:
         assert risk.risk_id == "R-F001"
         assert risk.finding == finding
         assert risk.risk_level == "critical"
-        assert risk.impact_description == "Critical test coverage gap may allow undetected bugs in production"
+        assert (
+            risk.impact_description
+            == "Critical test coverage gap may allow undetected bugs in production"
+        )
         assert risk.requires_acknowledgment is False
 
     def test_create_high_risk_requires_acknowledgment(self) -> None:

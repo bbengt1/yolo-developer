@@ -369,9 +369,7 @@ class TestTeaNodeIntegration:
         assert len(tea_output["validation_results"]) == 2
 
     @pytest.mark.asyncio
-    async def test_processing_notes_include_stats(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_processing_notes_include_stats(self, state_with_artifacts: YoloState) -> None:
         """Test that processing notes include statistics."""
         result = await tea_node(state_with_artifacts)
         tea_output = result["tea_output"]
@@ -381,9 +379,7 @@ class TestTeaNodeIntegration:
         assert "confidence" in notes.lower()
 
     @pytest.mark.asyncio
-    async def test_decision_includes_rationale(
-        self, state_with_artifacts: YoloState
-    ) -> None:
+    async def test_decision_includes_rationale(self, state_with_artifacts: YoloState) -> None:
         """Test that decision includes rationale."""
         result = await tea_node(state_with_artifacts)
         decisions = result["decisions"]
@@ -418,9 +414,7 @@ class TestTeaNodeRetryBehavior:
         assert hasattr(tea_node, "retry")
 
     @pytest.mark.asyncio
-    async def test_successful_execution_no_retry_needed(
-        self, empty_state: YoloState
-    ) -> None:
+    async def test_successful_execution_no_retry_needed(self, empty_state: YoloState) -> None:
         """Test that successful execution doesn't trigger retries."""
         # Normal execution should work without retry
         result = await tea_node(empty_state)

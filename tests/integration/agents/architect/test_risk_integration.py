@@ -61,7 +61,12 @@ def _create_test_decision(
 
     # Validate decision_type is a valid Literal value
     valid_types: list[DesignDecisionType] = [
-        "pattern", "technology", "integration", "data", "security", "infrastructure"
+        "pattern",
+        "technology",
+        "integration",
+        "data",
+        "security",
+        "infrastructure",
     ]
     validated_type: DesignDecisionType = (
         decision_type if decision_type in valid_types else "pattern"
@@ -172,9 +177,7 @@ class TestIdentifyTechnicalRisksIntegration:
     @pytest.mark.asyncio
     async def test_identify_without_design_decisions(self) -> None:
         """Test risk identification without design decisions."""
-        story = _create_test_story(
-            description="Simple feature with deprecated technology"
-        )
+        story = _create_test_story(description="Simple feature with deprecated technology")
         decisions: list[DesignDecision] = []
 
         report = await identify_technical_risks(story, decisions, use_llm=False)
@@ -313,9 +316,7 @@ class TestRiskOverallLevelCalculation:
     @pytest.mark.asyncio
     async def test_no_risks_returns_low(self) -> None:
         """Test that no risks returns low overall level."""
-        story = _create_test_story(
-            description="Standard feature implementation"
-        )
+        story = _create_test_story(description="Standard feature implementation")
         decisions: list[DesignDecision] = []
 
         report = await identify_technical_risks(story, decisions, use_llm=False)

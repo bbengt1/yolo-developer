@@ -284,9 +284,7 @@ class TestJsonExportRedaction:
 
         exporter = JsonAuditExporter()
         decision = create_test_decision()
-        redaction = RedactionConfig(
-            redact_fields=("context.sprint_id", "context.story_id")
-        )
+        redaction = RedactionConfig(redact_fields=("context.sprint_id", "context.story_id"))
         options = ExportOptions(redaction_config=redaction)
 
         result = exporter.export_decisions([decision], options=options)

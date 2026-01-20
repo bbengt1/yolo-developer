@@ -50,20 +50,14 @@ class TestDevNodeCommitMessageIntegration:
         }
 
     @pytest.mark.asyncio
-    async def test_dev_node_includes_commit_message_in_output(
-        self, mock_state: dict
-    ) -> None:
+    async def test_dev_node_includes_commit_message_in_output(self, mock_state: dict) -> None:
         """Test that dev_node output includes suggested_commit_message."""
         from yolo_developer.agents.dev.node import dev_node
 
         # Mock the LLM router to avoid actual API calls
-        with patch(
-            "yolo_developer.agents.dev.node._get_llm_router"
-        ) as mock_get_router:
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(
-                return_value='def implement(): return {"status": "ok"}'
-            )
+            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -77,19 +71,13 @@ class TestDevNodeCommitMessageIntegration:
             assert dev_output["suggested_commit_message"] is not None
 
     @pytest.mark.asyncio
-    async def test_commit_message_references_story_ids(
-        self, mock_state: dict
-    ) -> None:
+    async def test_commit_message_references_story_ids(self, mock_state: dict) -> None:
         """Test that generated commit message references story IDs."""
         from yolo_developer.agents.dev.node import dev_node
 
-        with patch(
-            "yolo_developer.agents.dev.node._get_llm_router"
-        ) as mock_get_router:
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(
-                return_value='def implement(): return {"status": "ok"}'
-            )
+            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -100,20 +88,14 @@ class TestDevNodeCommitMessageIntegration:
             assert "8-8" in commit_message or "Story" in commit_message
 
     @pytest.mark.asyncio
-    async def test_commit_message_uses_conventional_format(
-        self, mock_state: dict
-    ) -> None:
+    async def test_commit_message_uses_conventional_format(self, mock_state: dict) -> None:
         """Test that generated commit message uses conventional commit format."""
         from yolo_developer.agents.dev.commit_utils import validate_commit_message
         from yolo_developer.agents.dev.node import dev_node
 
-        with patch(
-            "yolo_developer.agents.dev.node._get_llm_router"
-        ) as mock_get_router:
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(
-                return_value='def implement(): return {"status": "ok"}'
-            )
+            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -127,15 +109,11 @@ class TestDevNodeCommitMessageIntegration:
             assert validation.passed is True, f"Errors: {validation.errors}"
 
     @pytest.mark.asyncio
-    async def test_commit_message_without_llm_uses_template(
-        self, mock_state: dict
-    ) -> None:
+    async def test_commit_message_without_llm_uses_template(self, mock_state: dict) -> None:
         """Test that commit message falls back to template without LLM."""
         from yolo_developer.agents.dev.node import dev_node
 
-        with patch(
-            "yolo_developer.agents.dev.node._get_llm_router"
-        ) as mock_get_router:
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             # Return None to simulate no LLM available
             mock_get_router.return_value = None
 
@@ -173,9 +151,7 @@ class TestDevNodeCommitMessageIntegration:
             "advisory_warnings": [],
         }
 
-        with patch(
-            "yolo_developer.agents.dev.node._get_llm_router"
-        ) as mock_get_router:
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_get_router.return_value = None  # Use template
 
             result = await dev_node(multi_story_state)

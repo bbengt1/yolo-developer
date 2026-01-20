@@ -221,7 +221,9 @@ def _get_negative_effects(decision: DesignDecision) -> str:
         "security": "May add operational complexity for security management.",
         "infrastructure": "Adds operational complexity and potential cost.",
     }
-    return effects_map.get(decision.decision_type, "Requires careful implementation and monitoring.")
+    return effects_map.get(
+        decision.decision_type, "Requires careful implementation and monitoring."
+    )
 
 
 def _document_alternatives(decision: DesignDecision) -> str:
@@ -328,7 +330,7 @@ def _generate_adr_title(decision: DesignDecision) -> str:
     clean_desc = description
     for p in ["use ", "implement ", "apply ", "design ", "deploy "]:
         if clean_desc.lower().startswith(p):
-            clean_desc = clean_desc[len(p):]
+            clean_desc = clean_desc[len(p) :]
             break
 
     # Capitalize first letter
@@ -403,10 +405,18 @@ async def _generate_adr_with_llm(
         Dict with title, context, decision, consequences keys.
     """
     # Build prompt
-    alternatives = ", ".join(decision.alternatives_considered) if decision.alternatives_considered else "None"
+    alternatives = (
+        ", ".join(decision.alternatives_considered) if decision.alternatives_considered else "None"
+    )
     compliance_pct = int(analysis.overall_compliance * 100) if analysis else 100
-    applicable = ", ".join(analysis.applicable_factors) if analysis and analysis.applicable_factors else "None"
-    recommendations = ", ".join(analysis.recommendations) if analysis and analysis.recommendations else "None"
+    applicable = (
+        ", ".join(analysis.applicable_factors)
+        if analysis and analysis.applicable_factors
+        else "None"
+    )
+    recommendations = (
+        ", ".join(analysis.recommendations) if analysis and analysis.recommendations else "None"
+    )
 
     prompt = ADR_GENERATION_PROMPT.format(
         decision_type=decision.decision_type,
@@ -426,7 +436,9 @@ async def _generate_adr_with_llm(
             "title": result.get("title", _generate_adr_title(decision)),
             "context": result.get("context", _generate_adr_context(decision, analysis)),
             "decision": result.get("decision", _generate_adr_decision(decision)),
-            "consequences": result.get("consequences", _generate_adr_consequences(decision, analysis)),
+            "consequences": result.get(
+                "consequences", _generate_adr_consequences(decision, analysis)
+            ),
         }
     except Exception as e:
         logger.warning(

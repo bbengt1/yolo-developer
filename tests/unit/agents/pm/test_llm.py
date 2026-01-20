@@ -13,18 +13,17 @@ Tests cover:
 from __future__ import annotations
 
 import json
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from yolo_developer.agents.pm.llm import (
+    _USE_LLM,
     AC_SYSTEM_PROMPT,
     AC_USER_PROMPT_TEMPLATE,
     PM_SYSTEM_PROMPT,
     PM_USER_PROMPT_TEMPLATE,
     VAGUE_TERMS,
-    _USE_LLM,
     _call_llm,
     _contains_vague_terms,
     _estimate_complexity,
@@ -78,7 +77,9 @@ class TestPromptTemplates:
         """AC system prompt should warn against vague terms."""
         assert "vague" in AC_SYSTEM_PROMPT.lower()
         # Should mention at least some vague terms as examples
-        assert any(term in AC_SYSTEM_PROMPT.lower() for term in ["fast", "easy", "simple", "should"])
+        assert any(
+            term in AC_SYSTEM_PROMPT.lower() for term in ["fast", "easy", "simple", "should"]
+        )
 
     def test_ac_user_prompt_template_has_placeholders(self) -> None:
         """AC user prompt should have all required placeholders."""
@@ -210,12 +211,14 @@ class TestParseStoryResponse:
 
     def test_parse_story_response_valid_json(self) -> None:
         """Should parse valid JSON response."""
-        response = json.dumps({
-            "role": "developer",
-            "action": "deploy applications",
-            "benefit": "reduce manual work",
-            "title": "App Deployment",
-        })
+        response = json.dumps(
+            {
+                "role": "developer",
+                "action": "deploy applications",
+                "benefit": "reduce manual work",
+                "title": "App Deployment",
+            }
+        )
         result = _parse_story_response(response)
         assert result["role"] == "developer"
         assert result["action"] == "deploy applications"
@@ -255,20 +258,22 @@ class TestParseAcResponse:
 
     def test_parse_ac_response_valid_json_array(self) -> None:
         """Should parse valid JSON array response."""
-        response = json.dumps([
-            {
-                "given": "a user is logged in",
-                "when": "they click logout",
-                "then": "they are redirected to login page",
-                "and_clauses": ["session is invalidated"],
-            },
-            {
-                "given": "a user is not logged in",
-                "when": "they access protected page",
-                "then": "they are redirected to login",
-                "and_clauses": [],
-            },
-        ])
+        response = json.dumps(
+            [
+                {
+                    "given": "a user is logged in",
+                    "when": "they click logout",
+                    "then": "they are redirected to login page",
+                    "and_clauses": ["session is invalidated"],
+                },
+                {
+                    "given": "a user is not logged in",
+                    "when": "they access protected page",
+                    "then": "they are redirected to login",
+                    "and_clauses": [],
+                },
+            ]
+        )
         result = _parse_ac_response(response)
         assert len(result) == 2
         assert result[0]["given"] == "a user is logged in"
@@ -286,10 +291,12 @@ class TestParseAcResponse:
 
     def test_parse_ac_response_missing_required_fields(self) -> None:
         """Should skip ACs missing required fields."""
-        response = json.dumps([
-            {"given": "x", "when": "y"},  # Missing 'then'
-            {"given": "a", "when": "b", "then": "c", "and_clauses": []},  # Valid
-        ])
+        response = json.dumps(
+            [
+                {"given": "x", "when": "y"},  # Missing 'then'
+                {"given": "a", "when": "b", "then": "c", "and_clauses": []},  # Valid
+            ]
+        )
         result = _parse_ac_response(response)
         assert len(result) == 1
         assert result[0]["given"] == "a"
@@ -417,6 +424,7 @@ class TestCallLlm:
     async def test_call_llm_signature(self) -> None:
         """_call_llm should have correct async signature."""
         import inspect
+
         assert inspect.iscoroutinefunction(_call_llm)
 
     @pytest.mark.asyncio

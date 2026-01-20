@@ -449,7 +449,7 @@ class TestAnalyzeNamingPatterns:
         """Test analyze_naming_patterns() with valid snake_case functions."""
         from yolo_developer.agents.dev.pattern_utils import analyze_naming_patterns
 
-        code = '''
+        code = """
 def get_user():
     pass
 
@@ -458,7 +458,7 @@ def process_order():
 
 def validate_input():
     pass
-'''
+"""
 
         patterns = [
             CodePattern(
@@ -478,7 +478,7 @@ def validate_input():
         """Test analyze_naming_patterns() with valid PascalCase classes."""
         from yolo_developer.agents.dev.pattern_utils import analyze_naming_patterns
 
-        code = '''
+        code = """
 class UserService:
     pass
 
@@ -487,7 +487,7 @@ class OrderProcessor:
 
 class DataValidator:
     pass
-'''
+"""
 
         patterns = [
             CodePattern(
@@ -507,13 +507,13 @@ class DataValidator:
         """Test analyze_naming_patterns() detecting camelCase deviation."""
         from yolo_developer.agents.dev.pattern_utils import analyze_naming_patterns
 
-        code = '''
+        code = """
 def getUser():
     pass
 
 def processOrder():
     pass
-'''
+"""
 
         patterns = [
             CodePattern(
@@ -535,10 +535,10 @@ def processOrder():
         """Test analyze_naming_patterns() with no patterns (empty list)."""
         from yolo_developer.agents.dev.pattern_utils import analyze_naming_patterns
 
-        code = '''
+        code = """
 def getUser():
     pass
-'''
+"""
 
         patterns: list[CodePattern] = []
 
@@ -583,13 +583,13 @@ class TestAnalyzeErrorHandlingPatterns:
             analyze_error_handling_patterns,
         )
 
-        code = '''
+        code = """
 try:
     result = process_data()
 except ValueError as e:
     logger.error("Invalid value", error=str(e))
     raise
-'''
+"""
 
         patterns = [
             ErrorHandlingPattern(
@@ -611,12 +611,12 @@ except ValueError as e:
             analyze_error_handling_patterns,
         )
 
-        code = '''
+        code = """
 try:
     result = process_data()
 except Exception as e:
     pass
-'''
+"""
 
         patterns = [
             ErrorHandlingPattern(
@@ -639,12 +639,12 @@ except Exception as e:
             analyze_error_handling_patterns,
         )
 
-        code = '''
+        code = """
 try:
     result = process_data()
 except:
     pass
-'''
+"""
 
         patterns = [
             ErrorHandlingPattern(
@@ -667,13 +667,13 @@ except:
             analyze_error_handling_patterns,
         )
 
-        code = '''
+        code = """
 try:
     result = process_data()
 except ConfigurationError as e:
     logger.error("Config error", error=str(e))
     raise
-'''
+"""
 
         patterns = [
             ErrorHandlingPattern(
@@ -704,7 +704,7 @@ class TestAnalyzeStylePatterns:
             analyze_style_patterns,
         )
 
-        code = '''from __future__ import annotations
+        code = """from __future__ import annotations
 
 import os
 import sys
@@ -713,7 +713,7 @@ import pytest
 import structlog
 
 from yolo_developer.config import load_config
-'''
+"""
 
         patterns = [
             StylePattern(
@@ -768,11 +768,11 @@ def process_data(data: dict) -> str:
             analyze_style_patterns,
         )
 
-        code = '''
+        code = """
 def process_data(data: dict[str, Any]) -> str:
     result: str = str(data)
     return result
-'''
+"""
 
         patterns = [
             StylePattern(
@@ -795,13 +795,13 @@ def process_data(data: dict[str, Any]) -> str:
         )
 
         # Code with multiple style issues
-        code = '''from yolo_developer.config import load_config
+        code = """from yolo_developer.config import load_config
 import os
 
 def process_data(data):
     result = str(data)
     return result
-'''
+"""
 
         patterns = [
             StylePattern(
@@ -879,7 +879,7 @@ class UserService:
         from yolo_developer.agents.dev.pattern_utils import validate_pattern_adherence
 
         # Code with multiple pattern deviations
-        code = '''
+        code = """
 def getUserData():
     pass
 
@@ -893,7 +893,7 @@ try:
     x = 1
 except:
     pass
-'''
+"""
 
         state: dict[str, Any] = {}
 
@@ -906,10 +906,10 @@ except:
         """Test validate_pattern_adherence() score calculation."""
         from yolo_developer.agents.dev.pattern_utils import validate_pattern_adherence
 
-        code = '''
+        code = """
 def getUserData():
     pass
-'''
+"""
 
         state: dict[str, Any] = {}
 
@@ -925,13 +925,13 @@ def getUserData():
         from yolo_developer.agents.dev.pattern_utils import validate_pattern_adherence
 
         # Code with high severity deviation (naming) and medium (bare except)
-        code = '''
+        code = """
 def getUserData():
     try:
         x = 1
     except:
         pass
-'''
+"""
 
         state: dict[str, Any] = {}
 
@@ -946,10 +946,10 @@ def getUserData():
         """Test validate_pattern_adherence() with custom threshold."""
         from yolo_developer.agents.dev.pattern_utils import validate_pattern_adherence
 
-        code = '''
+        code = """
 def get_user():
     pass
-'''
+"""
 
         state: dict[str, Any] = {}
 

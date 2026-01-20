@@ -138,9 +138,7 @@ class DesignDecision:
     description: str
     rationale: str
     alternatives_considered: tuple[str, ...] = field(default_factory=tuple)
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -195,9 +193,7 @@ class ADR:
     decision: str
     consequences: str
     story_ids: tuple[str, ...] = field(default_factory=tuple)
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
@@ -392,8 +388,7 @@ class TwelveFactorAnalysis:
         """
         return {
             "factor_results": {
-                name: result.to_dict()
-                for name, result in self.factor_results.items()
+                name: result.to_dict() for name, result in self.factor_results.items()
             },
             "applicable_factors": list(self.applicable_factors),
             "overall_compliance": self.overall_compliance,

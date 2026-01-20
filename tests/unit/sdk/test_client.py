@@ -508,9 +508,7 @@ class TestYoloClientGetAudit:
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio
-    async def test_get_audit_async_with_decision_type_filter(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_audit_async_with_decision_type_filter(self, tmp_path: Path) -> None:
         """Test get_audit_async() accepts decision_type filter."""
         (tmp_path / ".yolo").mkdir()
         client = YoloClient(project_path=tmp_path)
@@ -520,16 +518,12 @@ class TestYoloClientGetAudit:
             mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
             mock_service.return_value = mock_filter_service
 
-            entries = await client.get_audit_async(
-                decision_type="requirement_analysis"
-            )
+            entries = await client.get_audit_async(decision_type="requirement_analysis")
 
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio
-    async def test_get_audit_async_with_artifact_type_filter(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_audit_async_with_artifact_type_filter(self, tmp_path: Path) -> None:
         """Test get_audit_async() accepts artifact_type parameter (reserved for future use)."""
         (tmp_path / ".yolo").mkdir()
         client = YoloClient(project_path=tmp_path)
@@ -539,9 +533,7 @@ class TestYoloClientGetAudit:
             mock_filter_service.filter_all = AsyncMock(return_value={"decisions": []})
             mock_service.return_value = mock_filter_service
 
-            entries = await client.get_audit_async(
-                artifact_type="requirement"
-            )
+            entries = await client.get_audit_async(artifact_type="requirement")
 
         assert isinstance(entries, list)
 
@@ -562,9 +554,7 @@ class TestYoloClientGetAudit:
         assert isinstance(entries, list)
 
     @pytest.mark.asyncio
-    async def test_get_audit_async_pagination_slices_correctly(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_audit_async_pagination_slices_correctly(self, tmp_path: Path) -> None:
         """Test that pagination correctly slices results."""
         (tmp_path / ".yolo").mkdir()
         client = YoloClient(project_path=tmp_path)
@@ -585,9 +575,7 @@ class TestYoloClientGetAudit:
 
         with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
             mock_filter_service = MagicMock()
-            mock_filter_service.filter_all = AsyncMock(
-                return_value={"decisions": mock_decisions}
-            )
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": mock_decisions})
             mock_service.return_value = mock_filter_service
 
             # Get first page (0-9)
@@ -678,9 +666,7 @@ class TestYoloClientGetAudit:
 
         with patch("yolo_developer.audit.get_audit_filter_service") as mock_service:
             mock_filter_service = MagicMock()
-            mock_filter_service.filter_all = AsyncMock(
-                return_value={"decisions": [mock_decision]}
-            )
+            mock_filter_service.filter_all = AsyncMock(return_value={"decisions": [mock_decision]})
             mock_service.return_value = mock_filter_service
 
             entries = await client.get_audit_async()
@@ -781,9 +767,7 @@ class TestYoloClientConfigUpdate:
         config = YoloConfig(project_name="test-project")
         client = YoloClient(config=config, project_path=tmp_path)
 
-        result = client.update_config(
-            quality={"test_coverage_threshold": 0.85}
-        )
+        result = client.update_config(quality={"test_coverage_threshold": 0.85})
 
         assert result.success
         assert client.config.quality.test_coverage_threshold == 0.85
@@ -796,8 +780,7 @@ class TestYoloClientConfigUpdate:
         client = YoloClient(config=config, project_path=tmp_path)
 
         result = client.update_config(
-            llm={"cheap_model": "gpt-4o"},
-            quality={"test_coverage_threshold": 0.90}
+            llm={"cheap_model": "gpt-4o"}, quality={"test_coverage_threshold": 0.90}
         )
 
         assert result.success
@@ -821,9 +804,7 @@ class TestYoloClientConfigUpdate:
         config = YoloConfig(project_name="test-project")
         client = YoloClient(config=config, project_path=tmp_path)
 
-        result = client.update_config(
-            quality={"test_coverage_threshold": 0.85}
-        )
+        result = client.update_config(quality={"test_coverage_threshold": 0.85})
 
         assert "quality" in result.previous_values
         assert "quality" in result.new_values
@@ -839,9 +820,7 @@ class TestYoloClientConfigUpdate:
 
         with pytest.raises(ConfigurationAPIError):
             # test_coverage_threshold must be 0.0-1.0
-            client.update_config(
-                quality={"test_coverage_threshold": 2.0}
-            )
+            client.update_config(quality={"test_coverage_threshold": 2.0})
 
     @pytest.mark.asyncio
     async def test_update_config_async(self, tmp_path: Path) -> None:
@@ -849,9 +828,7 @@ class TestYoloClientConfigUpdate:
         config = YoloConfig(project_name="test-project")
         client = YoloClient(config=config, project_path=tmp_path)
 
-        result = await client.update_config_async(
-            quality={"confidence_threshold": 0.95}
-        )
+        result = await client.update_config_async(quality={"confidence_threshold": 0.95})
 
         assert result.success
         assert client.config.quality.confidence_threshold == 0.95
@@ -894,9 +871,7 @@ class TestYoloClientConfigValidation:
 
         # Should have warnings about missing API keys
         assert len(result.warnings) > 0
-        api_key_warning = any(
-            "api_key" in issue.field.lower() for issue in result.warnings
-        )
+        api_key_warning = any("api_key" in issue.field.lower() for issue in result.warnings)
         assert api_key_warning
 
     def test_validate_config_separates_errors_warnings(self, tmp_path: Path) -> None:
@@ -975,10 +950,7 @@ class TestYoloClientConfigPersistence:
         config = YoloConfig(project_name="auto-persist")
         client = YoloClient(config=config, project_path=tmp_path)
 
-        result = client.update_config(
-            quality={"confidence_threshold": 0.95},
-            persist=True
-        )
+        result = client.update_config(quality={"confidence_threshold": 0.95}, persist=True)
 
         assert result.success
         assert result.persisted
@@ -1029,9 +1001,7 @@ class TestYoloClientConfigAsyncSync:
         config = YoloConfig(project_name="test-project")
         client = YoloClient(config=config, project_path=tmp_path)
 
-        sync_result = client.update_config(
-            quality={"test_coverage_threshold": 0.85}
-        )
+        sync_result = client.update_config(quality={"test_coverage_threshold": 0.85})
 
         assert sync_result.success
         assert client.config.quality.test_coverage_threshold == 0.85
@@ -1195,9 +1165,7 @@ class TestYoloClientPreHookExecution:
 
         client.register_hook(agent="analyst", phase="pre", callback=my_hook)
 
-        _modifications, _results = await client._execute_pre_hooks(
-            "analyst", {"existing": "data"}
-        )
+        _modifications, _results = await client._execute_pre_hooks("analyst", {"existing": "data"})
 
         assert len(called_with) == 1
         assert called_with[0][0] == "analyst"
@@ -1878,9 +1846,7 @@ class TestYoloClientEventSubscription:
         def my_callback(event: Any) -> None:
             pass
 
-        sub_id = client.subscribe(
-            my_callback, event_types=[EventType.AGENT_START]
-        )
+        sub_id = client.subscribe(my_callback, event_types=[EventType.AGENT_START])
 
         subscriptions = client.list_subscriptions()
         assert len(subscriptions) == 1
@@ -2048,9 +2014,7 @@ class TestYoloClientEventEmission:
         client.subscribe(callback1, event_types=[EventType.WORKFLOW_START])
         client.subscribe(callback2, event_types=[EventType.WORKFLOW_START])
 
-        await client._emit_event(
-            EventType.WORKFLOW_START, data={"workflow_id": "test-123"}
-        )
+        await client._emit_event(EventType.WORKFLOW_START, data={"workflow_id": "test-123"})
 
         assert len(received1) == 1
         assert len(received2) == 1
@@ -2252,9 +2216,7 @@ class TestYoloClientEventEmission:
         mock_orchestrator.create_initial_state = MagicMock(
             return_value={"messages": [], "decisions": []}
         )
-        mock_orchestrator.run_workflow = AsyncMock(
-            side_effect=RuntimeError("Workflow failed!")
-        )
+        mock_orchestrator.run_workflow = AsyncMock(side_effect=RuntimeError("Workflow failed!"))
 
         with (
             patch("yolo_developer.seed.parse_seed") as mock_parse,
@@ -2409,9 +2371,7 @@ class TestYoloClientEventCallbackErrorHandling:
         # Logging would be verified with structlog capture if needed
 
     @pytest.mark.asyncio
-    async def test_workflow_continues_despite_callback_error(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_workflow_continues_despite_callback_error(self, tmp_path: Path) -> None:
         """Test workflow execution continues despite callback errors."""
         from yolo_developer.sdk.types import EventData
 
@@ -2520,9 +2480,7 @@ class TestYoloClientEventFiltering:
         def capture(event: EventData) -> None:
             received.append(event)
 
-        client.subscribe(
-            capture, event_types=[EventType.AGENT_START, EventType.AGENT_END]
-        )
+        client.subscribe(capture, event_types=[EventType.AGENT_START, EventType.AGENT_END])
 
         # Emit multiple event types
         await client._emit_event(EventType.WORKFLOW_START)

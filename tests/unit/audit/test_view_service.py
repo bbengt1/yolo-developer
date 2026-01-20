@@ -13,8 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pytest
 
 from yolo_developer.audit.memory_store import InMemoryDecisionStore

@@ -161,9 +161,7 @@ class ADRGenerationService:
         decisions = await self._decision_store.get_decisions(filters)
 
         # Filter by session (check agent.session_id)
-        session_decisions = [
-            d for d in decisions if d.agent.session_id == session_id
-        ]
+        session_decisions = [d for d in decisions if d.agent.session_id == session_id]
 
         adrs: list[AutoADR] = []
         for decision in session_decisions:
@@ -358,9 +356,7 @@ def _generate_consequences(decision: Decision) -> str:
             "Note: This is a critical decision that significantly impacts system behavior."
         )
     elif decision.severity == "warning":
-        parts.append(
-            "Note: This decision may need attention and should be reviewed."
-        )
+        parts.append("Note: This decision may need attention and should be reviewed.")
 
     # Trade-offs
     parts.append("Trade-offs: Requires careful implementation and monitoring.")
@@ -394,35 +390,43 @@ def _generate_adr_markdown(adr: AutoADR) -> str:
         lines.extend([f"**Stories:** {stories}", ""])
 
     # Context section
-    lines.extend([
-        "## Context",
-        "",
-        adr.context,
-        "",
-    ])
+    lines.extend(
+        [
+            "## Context",
+            "",
+            adr.context,
+            "",
+        ]
+    )
 
     # Decision section
-    lines.extend([
-        "## Decision",
-        "",
-        adr.decision,
-        "",
-    ])
+    lines.extend(
+        [
+            "## Decision",
+            "",
+            adr.decision,
+            "",
+        ]
+    )
 
     # Consequences section
-    lines.extend([
-        "## Consequences",
-        "",
-        adr.consequences,
-        "",
-    ])
+    lines.extend(
+        [
+            "## Consequences",
+            "",
+            adr.consequences,
+            "",
+        ]
+    )
 
     # Source reference
-    lines.extend([
-        "---",
-        "",
-        f"*Source Decision ID: {adr.source_decision_id}*",
-    ])
+    lines.extend(
+        [
+            "---",
+            "",
+            f"*Source Decision ID: {adr.source_decision_id}*",
+        ]
+    )
 
     return "\n".join(lines)
 

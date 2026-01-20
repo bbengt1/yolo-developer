@@ -105,11 +105,13 @@ class TestArchitectNodeQualityIntegration:
     @pytest.mark.asyncio
     async def test_architect_node_quality_eval_has_risks(self) -> None:
         """Test that quality evaluations may include risks."""
-        stories = [_create_test_story(
-            "story-001",
-            "Risky Feature",
-            "Implement a feature with no tests and no documentation",
-        )]
+        stories = [
+            _create_test_story(
+                "story-001",
+                "Risky Feature",
+                "Implement a feature with no tests and no documentation",
+            )
+        ]
         state = _create_minimal_state(stories)
 
         result = await architect_node(state)

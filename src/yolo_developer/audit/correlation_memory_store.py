@@ -184,9 +184,7 @@ class InMemoryCorrelationStore:
         """
         with self._lock:
             transitions = [
-                t
-                for t in self._transitions.values()
-                if t.context.get("session_id") == session_id
+                t for t in self._transitions.values() if t.context.get("session_id") == session_id
             ]
         # Sort by timestamp (outside lock for efficiency)
         transitions.sort(key=lambda t: t.timestamp)

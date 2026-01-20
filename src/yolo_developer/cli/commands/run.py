@@ -175,7 +175,9 @@ async def execute_workflow(
             logger.info("session_resumed", thread_id=thread_id, agent=starting_agent)
         except SessionNotFoundError:
             if not json_output:
-                console.print(f"[yellow]No checkpoint found for {thread_id}, starting fresh[/yellow]")
+                console.print(
+                    f"[yellow]No checkpoint found for {thread_id}, starting fresh[/yellow]"
+                )
             messages = get_seed_messages()
             initial_state = create_initial_state(starting_agent="analyst", messages=messages)
     else:

@@ -342,15 +342,9 @@ class PdfAuditExporter:
                 self._body_style,
             )
         )
-        story.append(
-            Paragraph(f"Severity: <b>{severity}</b>", severity_style)
-        )
-        story.append(
-            Paragraph(f"Content: {d.get('content', '')}", self._body_style)
-        )
-        story.append(
-            Paragraph(f"Rationale: {d.get('rationale', '')}", self._body_style)
-        )
+        story.append(Paragraph(f"Severity: <b>{severity}</b>", severity_style))
+        story.append(Paragraph(f"Content: {d.get('content', '')}", self._body_style))
+        story.append(Paragraph(f"Rationale: {d.get('rationale', '')}", self._body_style))
         story.append(
             Paragraph(
                 f"Agent: {d.get('agent', {}).get('agent_name', '')} "
@@ -359,9 +353,7 @@ class PdfAuditExporter:
             )
         )
         story.append(Paragraph(f"Session ID: {session_id}", self._body_style))
-        story.append(
-            Paragraph(f"Timestamp: {d.get('timestamp', '')}", self._body_style)
-        )
+        story.append(Paragraph(f"Timestamp: {d.get('timestamp', '')}", self._body_style))
         if metadata_str:
             story.append(Paragraph(f"Metadata: {metadata_str}", self._body_style))
 
@@ -386,38 +378,42 @@ class PdfAuditExporter:
         for artifact in artifacts:
             d = artifact.to_dict()
             description = d.get("description", "")
-            desc_display = (
-                description[:40] + "..."
-                if len(description) > 40
-                else description
-            )
+            desc_display = description[:40] + "..." if len(description) > 40 else description
 
             # Apply redaction to metadata
             metadata = d.get("metadata", {})
             if redaction.redact_metadata:
                 metadata_str = REDACTED_PLACEHOLDER
             else:
-                metadata_str = str(metadata)[:30] + "..." if len(str(metadata)) > 30 else str(metadata)
+                metadata_str = (
+                    str(metadata)[:30] + "..." if len(str(metadata)) > 30 else str(metadata)
+                )
 
-            data.append([
-                d.get("id", ""),
-                d.get("artifact_type", ""),
-                d.get("name", ""),
-                desc_display,
-                metadata_str,
-            ])
+            data.append(
+                [
+                    d.get("id", ""),
+                    d.get("artifact_type", ""),
+                    d.get("name", ""),
+                    desc_display,
+                    metadata_str,
+                ]
+            )
 
         table = Table(data, colWidths=[1 * inch, 0.8 * inch, 1.5 * inch, 2 * inch, 1.4 * inch])
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ]
+            )
+        )
 
         return table
 
@@ -445,26 +441,34 @@ class PdfAuditExporter:
             if redaction.redact_metadata:
                 metadata_str = REDACTED_PLACEHOLDER
             else:
-                metadata_str = str(metadata)[:25] + "..." if len(str(metadata)) > 25 else str(metadata)
+                metadata_str = (
+                    str(metadata)[:25] + "..." if len(str(metadata)) > 25 else str(metadata)
+                )
 
-            data.append([
-                d.get("id", ""),
-                f"{d.get('source_id', '')} ({d.get('source_type', '')})",
-                f"{d.get('target_id', '')} ({d.get('target_type', '')})",
-                d.get("link_type", ""),
-                metadata_str,
-            ])
+            data.append(
+                [
+                    d.get("id", ""),
+                    f"{d.get('source_id', '')} ({d.get('source_type', '')})",
+                    f"{d.get('target_id', '')} ({d.get('target_type', '')})",
+                    d.get("link_type", ""),
+                    metadata_str,
+                ]
+            )
 
         table = Table(data, colWidths=[1 * inch, 1.6 * inch, 1.6 * inch, 1.2 * inch, 1.3 * inch])
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ]
+            )
+        )
 
         return table

@@ -173,9 +173,7 @@ def _display_sprint_progress(
     """
     if metadata is None:
         info_panel("No active sprint found.", title="Sprint Progress")
-        console.print(
-            "\n[dim]Start a sprint with:[/dim] [cyan]yolo run[/cyan]\n"
-        )
+        console.print("\n[dim]Start a sprint with:[/dim] [cyan]yolo run[/cyan]\n")
         return
 
     completed = metadata.stories_completed
@@ -237,8 +235,7 @@ def _display_health_metrics(
         for alert in health.alerts:
             alert_color = ALERT_COLORS.get(alert.severity, "white")
             console.print(
-                f"  [{alert_color}]● {alert.severity.upper()}[/{alert_color}]: "
-                f"{alert.message}"
+                f"  [{alert_color}]● {alert.severity.upper()}[/{alert_color}]: {alert.message}"
             )
     else:
         console.print("\n  [green]✓ No active alerts[/green]")
@@ -277,14 +274,10 @@ def _display_health_metrics(
         # Overall metrics
         console.print()
         console.print("[bold]Overall Metrics:[/bold]")
-        console.print(
-            f"  Cycle Time: {_format_duration(metrics.overall_cycle_time)}"
-        )
+        console.print(f"  Cycle Time: {_format_duration(metrics.overall_cycle_time)}")
         console.print(f"  Churn Rate: {metrics.overall_churn_rate:.2f}/min")
         if metrics.unproductive_churn_rate > 0:
-            console.print(
-                f"  Unproductive Churn: {metrics.unproductive_churn_rate:.2f}/min"
-            )
+            console.print(f"  Unproductive Churn: {metrics.unproductive_churn_rate:.2f}/min")
 
     console.print()
 
@@ -303,9 +296,7 @@ def _display_sessions(
     """
     if not all_sessions:
         info_panel("No sessions found.", title="Sessions")
-        console.print(
-            "\n[dim]Start a session with:[/dim] [cyan]yolo run[/cyan]\n"
-        )
+        console.print("\n[dim]Start a session with:[/dim] [cyan]yolo run[/cyan]\n")
         return
 
     console.print()
@@ -346,7 +337,9 @@ def _display_sessions(
         console.print("[dim]Resume active session:[/dim] [cyan]yolo run --resume[/cyan]")
     elif all_sessions:
         console.print()
-        console.print("[dim]Resume a session:[/dim] [cyan]yolo run --resume --thread-id <session-id>[/cyan]")
+        console.print(
+            "[dim]Resume a session:[/dim] [cyan]yolo run --resume --thread-id <session-id>[/cyan]"
+        )
 
     console.print()
 

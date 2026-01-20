@@ -504,9 +504,7 @@ class TestUpdateStoriesWithScores:
     def test_uses_normalized_score(self) -> None:
         """Test that normalized_score is used when available."""
         stories = [SprintStory(story_id="A", title="A")]
-        results = [
-            PriorityResult(story_id="A", priority_score=0.5, normalized_score=0.8)
-        ]
+        results = [PriorityResult(story_id="A", priority_score=0.5, normalized_score=0.8)]
         updated = update_stories_with_scores(stories, results)
         assert updated[0].priority_score == 0.8
 

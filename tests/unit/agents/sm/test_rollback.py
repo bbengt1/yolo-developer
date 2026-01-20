@@ -12,13 +12,9 @@ Following red-green-refactor cycle per Story 10.15 requirements.
 
 from __future__ import annotations
 
-import logging
-from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import structlog
 from structlog.testing import capture_logs
 
 from yolo_developer.agents.sm.emergency_types import (
@@ -40,7 +36,6 @@ from yolo_developer.agents.sm.rollback_types import (
     RollbackResult,
     RollbackStep,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -150,9 +145,7 @@ def sample_rollback_plan(sample_checkpoint: Checkpoint) -> RollbackPlan:
 class TestShouldRollback:
     """Tests for should_rollback function."""
 
-    def test_returns_false_when_no_triggers(
-        self, minimal_state: dict[str, Any]
-    ) -> None:
+    def test_returns_false_when_no_triggers(self, minimal_state: dict[str, Any]) -> None:
         """Should return (False, None) when no rollback triggers present."""
         should, reason = should_rollback(
             state=minimal_state,
@@ -411,9 +404,7 @@ class TestExecuteRollback:
         # With allow_partial_rollback=False, should handle gracefully
         assert isinstance(result, RollbackResult)
 
-    def test_respects_max_steps_config(
-        self, minimal_state: dict[str, Any]
-    ) -> None:
+    def test_respects_max_steps_config(self, minimal_state: dict[str, Any]) -> None:
         """Should respect max_steps configuration limit."""
         # Create plan with many steps
         steps = tuple(

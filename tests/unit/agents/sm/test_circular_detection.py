@@ -259,9 +259,7 @@ class TestTimeWindowFiltering:
 
         assert len(filtered) == 0
 
-    def test_filter_by_time_window_handles_empty(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_filter_by_time_window_handles_empty(self, default_config: CircularLogicConfig) -> None:
         """Test filtering empty exchange list."""
         from yolo_developer.agents.sm.circular_detection import _filter_by_time_window
 
@@ -310,9 +308,7 @@ class TestTrackTopicExchanges:
 class TestAgentPairCycleDetection:
     """Tests for A->B->A agent pair cycle detection."""
 
-    def test_detect_no_cycles_below_threshold(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_detect_no_cycles_below_threshold(self, default_config: CircularLogicConfig) -> None:
         """Test no cycles detected when below threshold."""
         from yolo_developer.agents.sm.circular_detection import (
             _detect_agent_pair_cycles,
@@ -343,9 +339,7 @@ class TestAgentPairCycleDetection:
         assert set(pattern.agents_involved) == {"analyst", "pm"}
         assert pattern.exchange_count == 4
 
-    def test_detect_multiple_agent_pairs(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_detect_multiple_agent_pairs(self, default_config: CircularLogicConfig) -> None:
         """Test detecting multiple different agent pair cycles."""
         from yolo_developer.agents.sm.circular_detection import (
             _detect_agent_pair_cycles,
@@ -394,9 +388,7 @@ class TestMultiAgentCycleDetection:
 
         assert len(patterns) == 0
 
-    def test_detect_three_agent_cycle(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_detect_three_agent_cycle(self, default_config: CircularLogicConfig) -> None:
         """Test detecting A->B->C->A pattern."""
         from yolo_developer.agents.sm.circular_detection import (
             _detect_multi_agent_cycles,
@@ -425,14 +417,14 @@ class TestMultiAgentCycleDetection:
 
         # Verify pattern details
         pattern = multi_patterns[0]
-        assert set(pattern.agents_involved) == {"analyst", "pm", "architect"}, \
+        assert set(pattern.agents_involved) == {"analyst", "pm", "architect"}, (
             f"Expected analyst, pm, architect but got {pattern.agents_involved}"
-        assert pattern.exchange_count > default_config.exchange_threshold, \
+        )
+        assert pattern.exchange_count > default_config.exchange_threshold, (
             f"Exchange count {pattern.exchange_count} should exceed threshold {default_config.exchange_threshold}"
+        )
 
-    def test_no_false_positive_linear_flow(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_no_false_positive_linear_flow(self, default_config: CircularLogicConfig) -> None:
         """Test no false positive for linear workflow."""
         from yolo_developer.agents.sm.circular_detection import (
             _detect_multi_agent_cycles,
@@ -466,11 +458,21 @@ class TestTopicCycleDetection:
         base_time = datetime(2026, 1, 16, 10, 0, 0, tzinfo=timezone.utc)
         grouped_exchanges = {
             "requirements_clarification": [
-                AgentExchange("analyst", "pm", "handoff", "requirements_clarification", base_time.isoformat()),
-                AgentExchange("pm", "analyst", "query", "requirements_clarification", base_time.isoformat()),
-                AgentExchange("analyst", "pm", "response", "requirements_clarification", base_time.isoformat()),
-                AgentExchange("pm", "analyst", "query", "requirements_clarification", base_time.isoformat()),
-                AgentExchange("analyst", "pm", "response", "requirements_clarification", base_time.isoformat()),
+                AgentExchange(
+                    "analyst", "pm", "handoff", "requirements_clarification", base_time.isoformat()
+                ),
+                AgentExchange(
+                    "pm", "analyst", "query", "requirements_clarification", base_time.isoformat()
+                ),
+                AgentExchange(
+                    "analyst", "pm", "response", "requirements_clarification", base_time.isoformat()
+                ),
+                AgentExchange(
+                    "pm", "analyst", "query", "requirements_clarification", base_time.isoformat()
+                ),
+                AgentExchange(
+                    "analyst", "pm", "response", "requirements_clarification", base_time.isoformat()
+                ),
             ],
             "other_topic": [
                 AgentExchange("dev", "tea", "handoff", "other_topic", base_time.isoformat()),
@@ -487,9 +489,7 @@ class TestTopicCycleDetection:
         # Verify agents are extracted from exchanges
         assert set(pattern.agents_involved) == {"analyst", "pm"}
 
-    def test_no_topic_cycle_below_threshold(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_no_topic_cycle_below_threshold(self, default_config: CircularLogicConfig) -> None:
         """Test no topic cycle when below threshold."""
         from yolo_developer.agents.sm.circular_detection import _detect_topic_cycles
 
@@ -524,9 +524,7 @@ class TestSeverityCalculation:
         severity = _calculate_severity(4, default_config)
         assert severity == "low"
 
-    def test_calculate_medium_severity(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_calculate_medium_severity(self, default_config: CircularLogicConfig) -> None:
         """Test medium severity for moderate exchanges."""
         from yolo_developer.agents.sm.circular_detection import _calculate_severity
 
@@ -540,9 +538,7 @@ class TestSeverityCalculation:
         severity = _calculate_severity(9, default_config)
         assert severity == "high"
 
-    def test_calculate_critical_severity(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_calculate_critical_severity(self, default_config: CircularLogicConfig) -> None:
         """Test critical severity for severe exchanges."""
         from yolo_developer.agents.sm.circular_detection import _calculate_severity
 
@@ -601,7 +597,7 @@ class TestInterventionStrategy:
             )
         ]
 
-        strategy, message = _determine_intervention_strategy(patterns)
+        strategy, _message = _determine_intervention_strategy(patterns)
 
         assert strategy == "inject_context"
 
@@ -624,7 +620,7 @@ class TestInterventionStrategy:
             )
         ]
 
-        strategy, message = _determine_intervention_strategy(patterns)
+        strategy, _message = _determine_intervention_strategy(patterns)
 
         assert strategy == "escalate_human"
 
@@ -648,9 +644,7 @@ class TestInterventionStrategy:
 class TestEscalation:
     """Tests for escalation triggering."""
 
-    def test_should_escalate_critical(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_should_escalate_critical(self, default_config: CircularLogicConfig) -> None:
         """Test escalation triggered for critical severity."""
         from yolo_developer.agents.sm.circular_detection import _should_escalate
 
@@ -673,9 +667,7 @@ class TestEscalation:
         assert reason is not None
         assert "critical" in reason.lower()
 
-    def test_should_not_escalate_low(
-        self, default_config: CircularLogicConfig
-    ) -> None:
+    def test_should_not_escalate_low(self, default_config: CircularLogicConfig) -> None:
         """Test no escalation for low severity."""
         from yolo_developer.agents.sm.circular_detection import _should_escalate
 
@@ -788,9 +780,7 @@ class TestDetectCircularLogic:
     """Tests for the main detect_circular_logic function."""
 
     @pytest.mark.asyncio
-    async def test_detect_no_circular_logic(
-        self, mock_state_no_exchanges: dict[str, Any]
-    ) -> None:
+    async def test_detect_no_circular_logic(self, mock_state_no_exchanges: dict[str, Any]) -> None:
         """Test detection with no circular logic."""
         from yolo_developer.agents.sm.circular_detection import detect_circular_logic
 

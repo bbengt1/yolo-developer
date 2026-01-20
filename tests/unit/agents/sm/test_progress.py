@@ -66,7 +66,9 @@ def make_story_progress(
     )
 
 
-def make_sprint_plan(stories: list[dict[str, Any]], sprint_id: str = "sprint-test") -> dict[str, Any]:
+def make_sprint_plan(
+    stories: list[dict[str, Any]], sprint_id: str = "sprint-test"
+) -> dict[str, Any]:
     """Create a sprint plan dict for testing."""
     return {
         "sprint_id": sprint_id,
@@ -112,10 +114,12 @@ class TestCategorizeStoriesByStatus:
 
     def test_all_backlog(self) -> None:
         """All stories in backlog."""
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "backlog"},
-            {"story_id": "1-2", "title": "Second", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "backlog"},
+                {"story_id": "1-2", "title": "Second", "status": "backlog"},
+            ]
+        )
         result = _categorize_stories_by_status(plan)
         assert len(result["remaining"]) == 2
         assert len(result["completed"]) == 0
@@ -124,13 +128,15 @@ class TestCategorizeStoriesByStatus:
 
     def test_mixed_statuses(self) -> None:
         """Stories with mixed statuses are categorized correctly."""
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
-            {"story_id": "1-2", "title": "Second", "status": "in_progress"},
-            {"story_id": "1-3", "title": "Third", "status": "backlog"},
-            {"story_id": "1-4", "title": "Fourth", "status": "blocked"},
-            {"story_id": "1-5", "title": "Fifth", "status": "failed"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
+                {"story_id": "1-2", "title": "Second", "status": "in_progress"},
+                {"story_id": "1-3", "title": "Third", "status": "backlog"},
+                {"story_id": "1-4", "title": "Fourth", "status": "blocked"},
+                {"story_id": "1-5", "title": "Fifth", "status": "failed"},
+            ]
+        )
         result = _categorize_stories_by_status(plan)
         assert len(result["completed"]) == 1
         assert len(result["in_progress"]) == 1
@@ -139,9 +145,16 @@ class TestCategorizeStoriesByStatus:
 
     def test_completed_stories_have_duration(self) -> None:
         """Completed stories retain duration information."""
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 3600000.0},
-        ])
+        plan = make_sprint_plan(
+            [
+                {
+                    "story_id": "1-1",
+                    "title": "First",
+                    "status": "completed",
+                    "duration_ms": 3600000.0,
+                },
+            ]
+        )
         result = _categorize_stories_by_status(plan)
         assert len(result["completed"]) == 1
         assert result["completed"][0].duration_ms == 3600000.0
@@ -152,12 +165,14 @@ class TestCategorizeStoriesByStatus:
         This ensures graceful handling of unexpected status values
         that might come from external data sources.
         """
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "unknown_status"},
-            {"story_id": "1-2", "title": "Second", "status": "invalid"},
-            {"story_id": "1-3", "title": "Third", "status": ""},
-            {"story_id": "1-4", "title": "Fourth"},  # Missing status entirely
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "unknown_status"},
+                {"story_id": "1-2", "title": "Second", "status": "invalid"},
+                {"story_id": "1-3", "title": "Third", "status": ""},
+                {"story_id": "1-4", "title": "Fourth"},  # Missing status entirely
+            ]
+        )
         result = _categorize_stories_by_status(plan)
         # All should be in "remaining" (treated as backlog)
         assert len(result["remaining"]) == 4
@@ -178,19 +193,23 @@ class TestGetCurrentStory:
 
     def test_no_in_progress_story(self) -> None:
         """Returns None when no story is in progress."""
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed"},
-            {"story_id": "1-2", "title": "Second", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "completed"},
+                {"story_id": "1-2", "title": "Second", "status": "backlog"},
+            ]
+        )
         assert _get_current_story(plan) is None
 
     def test_finds_in_progress_story(self) -> None:
         """Finds the in-progress story."""
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed"},
-            {"story_id": "1-2", "title": "Second", "status": "in_progress"},
-            {"story_id": "1-3", "title": "Third", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "completed"},
+                {"story_id": "1-2", "title": "Second", "status": "in_progress"},
+                {"story_id": "1-3", "title": "Third", "status": "backlog"},
+            ]
+        )
         assert _get_current_story(plan) == "1-2"
 
 
@@ -646,11 +665,13 @@ class TestTrackProgress:
     async def test_with_sprint_plan(self) -> None:
         """Tracks progress from sprint plan."""
         state = make_state("dev")
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
-            {"story_id": "1-2", "title": "Second", "status": "in_progress"},
-            {"story_id": "1-3", "title": "Third", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
+                {"story_id": "1-2", "title": "Second", "status": "in_progress"},
+                {"story_id": "1-3", "title": "Third", "status": "backlog"},
+            ]
+        )
 
         result = await track_progress(state, plan)
 
@@ -664,10 +685,12 @@ class TestTrackProgress:
     async def test_respects_config_no_estimates(self) -> None:
         """Respects config to disable estimates."""
         state = make_state()
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
-            {"story_id": "1-2", "title": "Second", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 1000.0},
+                {"story_id": "1-2", "title": "Second", "status": "backlog"},
+            ]
+        )
         config = ProgressConfig(include_estimates=False)
 
         result = await track_progress(state, plan, config)
@@ -678,11 +701,23 @@ class TestTrackProgress:
     async def test_generates_estimate_when_enabled(self) -> None:
         """Generates completion estimate when configured."""
         state = make_state()
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "completed", "duration_ms": 3600000.0},
-            {"story_id": "1-2", "title": "Second", "status": "completed", "duration_ms": 3600000.0},
-            {"story_id": "1-3", "title": "Third", "status": "backlog"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {
+                    "story_id": "1-1",
+                    "title": "First",
+                    "status": "completed",
+                    "duration_ms": 3600000.0,
+                },
+                {
+                    "story_id": "1-2",
+                    "title": "Second",
+                    "status": "completed",
+                    "duration_ms": 3600000.0,
+                },
+                {"story_id": "1-3", "title": "Third", "status": "backlog"},
+            ]
+        )
         config = ProgressConfig(include_estimates=True)
 
         result = await track_progress(state, plan, config)
@@ -706,10 +741,12 @@ class TestTrackProgress:
     async def test_categorizes_blocked_and_failed(self) -> None:
         """Blocked and failed stories are both in blocked_stories."""
         state = make_state()
-        plan = make_sprint_plan([
-            {"story_id": "1-1", "title": "First", "status": "blocked"},
-            {"story_id": "1-2", "title": "Second", "status": "failed"},
-        ])
+        plan = make_sprint_plan(
+            [
+                {"story_id": "1-1", "title": "First", "status": "blocked"},
+                {"story_id": "1-2", "title": "Second", "status": "failed"},
+            ]
+        )
 
         result = await track_progress(state, plan)
 

@@ -213,11 +213,7 @@ class TestValidationReport:
                 SeedFeature(name="F2", description="D2"),
                 SeedFeature(name="F3", description="D3"),
             ),
-            constraints=(
-                SeedConstraint(
-                    category=ConstraintCategory.TECHNICAL, description="C1"
-                ),
-            ),
+            constraints=(SeedConstraint(category=ConstraintCategory.TECHNICAL, description="C1"),),
             raw_content="test",
             source=SeedSource.TEXT,
         )

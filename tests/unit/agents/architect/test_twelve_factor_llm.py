@@ -26,9 +26,7 @@ class TestAnalyzeWithLlm:
             "description": "A story requiring LLM analysis",
         }
 
-        with patch(
-            "yolo_developer.agents.architect.twelve_factor._call_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.twelve_factor._call_llm") as mock_llm:
             mock_llm.return_value = {
                 "factors": [
                     {
@@ -54,9 +52,7 @@ class TestAnalyzeWithLlm:
 
         story = {"title": "Test", "description": "Complex story"}
 
-        with patch(
-            "yolo_developer.agents.architect.twelve_factor._call_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.twelve_factor._call_llm") as mock_llm:
             mock_llm.return_value = {
                 "factors": [
                     {
@@ -88,9 +84,7 @@ class TestAnalyzeWithLlm:
 
         story = {"title": "Test"}
 
-        with patch(
-            "yolo_developer.agents.architect.twelve_factor._call_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.twelve_factor._call_llm") as mock_llm:
             mock_llm.return_value = {
                 "factors": [
                     {
@@ -176,11 +170,7 @@ class TestLlmRetryBehavior:
             # First call fails, second succeeds
             mock_completion.side_effect = [
                 Exception("Rate limit exceeded"),
-                MagicMock(
-                    choices=[
-                        MagicMock(message=MagicMock(content='{"factors": []}'))
-                    ]
-                ),
+                MagicMock(choices=[MagicMock(message=MagicMock(content='{"factors": []}'))]),
             ]
 
             # With retry, should succeed on second try
@@ -207,9 +197,7 @@ class TestLlmIntegrationWithAnalyze:
             "description": "Need to decide between multiple patterns for auth",
         }
 
-        with patch(
-            "yolo_developer.agents.architect.twelve_factor._analyze_with_llm"
-        ) as mock_llm:
+        with patch("yolo_developer.agents.architect.twelve_factor._analyze_with_llm") as mock_llm:
             mock_llm.return_value = {}
 
             await analyze_twelve_factor_with_llm(story)

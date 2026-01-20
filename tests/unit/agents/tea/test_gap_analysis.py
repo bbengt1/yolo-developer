@@ -833,8 +833,22 @@ class TestPrioritizeGaps:
         from yolo_developer.agents.tea.gap_analysis import TestGap, prioritize_gaps
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
-            TestGap(gap_id="GAP-002", file_path="src/b.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/a.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
+            TestGap(
+                gap_id="GAP-002",
+                file_path="src/b.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
         )
 
         priorities = prioritize_gaps(gaps, critical_paths=())
@@ -849,8 +863,22 @@ class TestPrioritizeGaps:
         from yolo_developer.agents.tea.gap_analysis import TestGap, prioritize_gaps
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/utils.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
-            TestGap(gap_id="GAP-002", file_path="src/agents/core.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/utils.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
+            TestGap(
+                gap_id="GAP-002",
+                file_path="src/agents/core.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
         )
 
         priorities = prioritize_gaps(gaps, critical_paths=("agents/",))
@@ -864,7 +892,14 @@ class TestPrioritizeGaps:
         from yolo_developer.agents.tea.gap_analysis import TestGap, prioritize_gaps
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/a.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
         )
 
         priorities = prioritize_gaps(gaps)
@@ -983,7 +1018,14 @@ class TestGenerateTestSuggestions:
         )
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=((1, 10),), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/a.py",
+                function_names=(),
+                uncovered_lines=((1, 10),),
+                gap_type="no_tests",
+                description="",
+            ),
         )
         priorities = (
             GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1),
@@ -1004,7 +1046,14 @@ class TestGenerateTestSuggestions:
 
         # Create 5 gaps
         gaps = tuple(
-            TestGap(gap_id=f"GAP-{i:03d}", file_path=f"src/{i}.py", function_names=(), uncovered_lines=((1, 10),), gap_type="no_tests", description="")
+            TestGap(
+                gap_id=f"GAP-{i:03d}",
+                file_path=f"src/{i}.py",
+                function_names=(),
+                uncovered_lines=((1, 10),),
+                gap_type="no_tests",
+                description="",
+            )
             for i in range(1, 6)
         )
         priorities = tuple(
@@ -1025,7 +1074,14 @@ class TestGenerateTestSuggestions:
         )
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/a.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
         )
         priorities = (
             GapPriority(gap_id="GAP-001", severity="low", risk_score=30, priority_rank=1),
@@ -1075,7 +1131,14 @@ class TestEstimateTotalEffort:
         )
 
         suggestions = (
-            TestSuggestion(suggestion_id="SUG-001", target_gap_id="GAP-001", test_type="unit", description="", estimated_impact=5.0, example_signature="test_a"),
+            TestSuggestion(
+                suggestion_id="SUG-001",
+                target_gap_id="GAP-001",
+                test_type="unit",
+                description="",
+                estimated_impact=5.0,
+                example_signature="test_a",
+            ),
         )
 
         effort = _estimate_total_effort(suggestions)
@@ -1104,15 +1167,36 @@ class TestGenerateSummary:
         )
 
         gaps = (
-            TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
-            TestGap(gap_id="GAP-002", file_path="src/b.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description=""),
+            TestGap(
+                gap_id="GAP-001",
+                file_path="src/a.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
+            TestGap(
+                gap_id="GAP-002",
+                file_path="src/b.py",
+                function_names=(),
+                uncovered_lines=(),
+                gap_type="no_tests",
+                description="",
+            ),
         )
         priorities = (
             GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1),
             GapPriority(gap_id="GAP-002", severity="low", risk_score=30, priority_rank=2),
         )
         suggestions = (
-            TestSuggestion(suggestion_id="SUG-001", target_gap_id="GAP-001", test_type="unit", description="", estimated_impact=5.0, example_signature="test_a"),
+            TestSuggestion(
+                suggestion_id="SUG-001",
+                target_gap_id="GAP-001",
+                test_type="unit",
+                description="",
+                estimated_impact=5.0,
+                example_signature="test_a",
+            ),
         )
 
         summary = generate_summary(gaps, priorities, suggestions)
@@ -1255,9 +1339,22 @@ class TestExportToJson:
         )
 
         summary = GapAnalysisSummary(
-            total_gaps=0, critical_gaps=0, high_gaps=0, medium_gaps=0, low_gaps=0, total_suggestions=0, estimated_effort="None"
+            total_gaps=0,
+            critical_gaps=0,
+            high_gaps=0,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=0,
+            estimated_effort="None",
         )
-        report = GapAnalysisReport(gaps=(), priorities=(), suggestions=(), summary=summary, coverage_baseline=100.0, projected_coverage=100.0)
+        report = GapAnalysisReport(
+            gaps=(),
+            priorities=(),
+            suggestions=(),
+            summary=summary,
+            coverage_baseline=100.0,
+            projected_coverage=100.0,
+        )
 
         json_str = export_to_json(report)
 
@@ -1279,13 +1376,40 @@ class TestExportToJson:
             export_to_json,
         )
 
-        gap = TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description="")
-        priority = GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1)
-        suggestion = TestSuggestion(suggestion_id="SUG-001", target_gap_id="GAP-001", test_type="unit", description="Test", estimated_impact=5.0, example_signature="test_a")
-        summary = GapAnalysisSummary(
-            total_gaps=1, critical_gaps=0, high_gaps=1, medium_gaps=0, low_gaps=0, total_suggestions=1, estimated_effort="1 hour"
+        gap = TestGap(
+            gap_id="GAP-001",
+            file_path="src/a.py",
+            function_names=(),
+            uncovered_lines=(),
+            gap_type="no_tests",
+            description="",
         )
-        report = GapAnalysisReport(gaps=(gap,), priorities=(priority,), suggestions=(suggestion,), summary=summary, coverage_baseline=70.0, projected_coverage=75.0)
+        priority = GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1)
+        suggestion = TestSuggestion(
+            suggestion_id="SUG-001",
+            target_gap_id="GAP-001",
+            test_type="unit",
+            description="Test",
+            estimated_impact=5.0,
+            example_signature="test_a",
+        )
+        summary = GapAnalysisSummary(
+            total_gaps=1,
+            critical_gaps=0,
+            high_gaps=1,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=1,
+            estimated_effort="1 hour",
+        )
+        report = GapAnalysisReport(
+            gaps=(gap,),
+            priorities=(priority,),
+            suggestions=(suggestion,),
+            summary=summary,
+            coverage_baseline=70.0,
+            projected_coverage=75.0,
+        )
 
         json_str = export_to_json(report)
         parsed = json.loads(json_str)
@@ -1308,9 +1432,22 @@ class TestExportToMarkdown:
         )
 
         summary = GapAnalysisSummary(
-            total_gaps=0, critical_gaps=0, high_gaps=0, medium_gaps=0, low_gaps=0, total_suggestions=0, estimated_effort="None"
+            total_gaps=0,
+            critical_gaps=0,
+            high_gaps=0,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=0,
+            estimated_effort="None",
         )
-        report = GapAnalysisReport(gaps=(), priorities=(), suggestions=(), summary=summary, coverage_baseline=100.0, projected_coverage=100.0)
+        report = GapAnalysisReport(
+            gaps=(),
+            priorities=(),
+            suggestions=(),
+            summary=summary,
+            coverage_baseline=100.0,
+            projected_coverage=100.0,
+        )
 
         markdown = export_to_markdown(report)
 
@@ -1328,13 +1465,40 @@ class TestExportToMarkdown:
             export_to_markdown,
         )
 
-        gap = TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description="No tests")
-        priority = GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1)
-        suggestion = TestSuggestion(suggestion_id="SUG-001", target_gap_id="GAP-001", test_type="unit", description="Add test", estimated_impact=5.0, example_signature="test_a")
-        summary = GapAnalysisSummary(
-            total_gaps=1, critical_gaps=0, high_gaps=1, medium_gaps=0, low_gaps=0, total_suggestions=1, estimated_effort="1 hour"
+        gap = TestGap(
+            gap_id="GAP-001",
+            file_path="src/a.py",
+            function_names=(),
+            uncovered_lines=(),
+            gap_type="no_tests",
+            description="No tests",
         )
-        report = GapAnalysisReport(gaps=(gap,), priorities=(priority,), suggestions=(suggestion,), summary=summary, coverage_baseline=70.0, projected_coverage=75.0)
+        priority = GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1)
+        suggestion = TestSuggestion(
+            suggestion_id="SUG-001",
+            target_gap_id="GAP-001",
+            test_type="unit",
+            description="Add test",
+            estimated_impact=5.0,
+            example_signature="test_a",
+        )
+        summary = GapAnalysisSummary(
+            total_gaps=1,
+            critical_gaps=0,
+            high_gaps=1,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=1,
+            estimated_effort="1 hour",
+        )
+        report = GapAnalysisReport(
+            gaps=(gap,),
+            priorities=(priority,),
+            suggestions=(suggestion,),
+            summary=summary,
+            coverage_baseline=70.0,
+            projected_coverage=75.0,
+        )
 
         markdown = export_to_markdown(report)
 
@@ -1355,9 +1519,22 @@ class TestExportToCsv:
         )
 
         summary = GapAnalysisSummary(
-            total_gaps=0, critical_gaps=0, high_gaps=0, medium_gaps=0, low_gaps=0, total_suggestions=0, estimated_effort="None"
+            total_gaps=0,
+            critical_gaps=0,
+            high_gaps=0,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=0,
+            estimated_effort="None",
         )
-        report = GapAnalysisReport(gaps=(), priorities=(), suggestions=(), summary=summary, coverage_baseline=100.0, projected_coverage=100.0)
+        report = GapAnalysisReport(
+            gaps=(),
+            priorities=(),
+            suggestions=(),
+            summary=summary,
+            coverage_baseline=100.0,
+            projected_coverage=100.0,
+        )
 
         csv_str = export_to_csv(report)
 
@@ -1375,12 +1552,32 @@ class TestExportToCsv:
             export_to_csv,
         )
 
-        gap = TestGap(gap_id="GAP-001", file_path="src/a.py", function_names=(), uncovered_lines=(), gap_type="no_tests", description="No tests")
+        gap = TestGap(
+            gap_id="GAP-001",
+            file_path="src/a.py",
+            function_names=(),
+            uncovered_lines=(),
+            gap_type="no_tests",
+            description="No tests",
+        )
         priority = GapPriority(gap_id="GAP-001", severity="high", risk_score=80, priority_rank=1)
         summary = GapAnalysisSummary(
-            total_gaps=1, critical_gaps=0, high_gaps=1, medium_gaps=0, low_gaps=0, total_suggestions=0, estimated_effort="1 hour"
+            total_gaps=1,
+            critical_gaps=0,
+            high_gaps=1,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=0,
+            estimated_effort="1 hour",
         )
-        report = GapAnalysisReport(gaps=(gap,), priorities=(priority,), suggestions=(), summary=summary, coverage_baseline=70.0, projected_coverage=75.0)
+        report = GapAnalysisReport(
+            gaps=(gap,),
+            priorities=(priority,),
+            suggestions=(),
+            summary=summary,
+            coverage_baseline=70.0,
+            projected_coverage=75.0,
+        )
 
         csv_str = export_to_csv(report)
 
@@ -1415,9 +1612,22 @@ class TestTEAOutputIntegration:
         from yolo_developer.agents.tea.types import TEAOutput
 
         summary = GapAnalysisSummary(
-            total_gaps=1, critical_gaps=0, high_gaps=1, medium_gaps=0, low_gaps=0, total_suggestions=1, estimated_effort="1 hour"
+            total_gaps=1,
+            critical_gaps=0,
+            high_gaps=1,
+            medium_gaps=0,
+            low_gaps=0,
+            total_suggestions=1,
+            estimated_effort="1 hour",
         )
-        gap_report = GapAnalysisReport(gaps=(), priorities=(), suggestions=(), summary=summary, coverage_baseline=80.0, projected_coverage=85.0)
+        gap_report = GapAnalysisReport(
+            gaps=(),
+            priorities=(),
+            suggestions=(),
+            summary=summary,
+            coverage_baseline=80.0,
+            projected_coverage=85.0,
+        )
 
         output = TEAOutput(gap_analysis_report=gap_report)
         result = output.to_dict()

@@ -195,9 +195,7 @@ class TestAutoADRValidation:
 
         assert "is not a valid status" in caplog.text
 
-    def test_warns_on_empty_source_decision_id(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_warns_on_empty_source_decision_id(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that empty source_decision_id triggers a warning."""
         AutoADR(
             id="ADR-001",

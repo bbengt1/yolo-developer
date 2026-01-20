@@ -274,9 +274,7 @@ class TestContentGenerationHelpers:
 
     def test_generate_title_uses_first_sentence(self) -> None:
         """Test that title uses first sentence of content."""
-        decision = _make_decision(
-            content="Use PostgreSQL. It provides strong ACID compliance."
-        )
+        decision = _make_decision(content="Use PostgreSQL. It provides strong ACID compliance.")
 
         result = _generate_title(decision)
 

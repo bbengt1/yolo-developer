@@ -165,7 +165,10 @@ class TestConfigFactorAnalysis:
 
         assert result.applies is True
         if not result.compliant:
-            assert "environment" in result.recommendation.lower() or "env" in result.recommendation.lower()
+            assert (
+                "environment" in result.recommendation.lower()
+                or "env" in result.recommendation.lower()
+            )
 
     def test_config_compliant_when_using_env_vars(self) -> None:
         """Test config is compliant when story mentions env vars."""
@@ -298,7 +301,10 @@ class TestBackingServicesFactorAnalysis:
 
         assert result.applies is True
         assert result.compliant is False
-        assert "connection" in result.recommendation.lower() or "external" in result.recommendation.lower()
+        assert (
+            "connection" in result.recommendation.lower()
+            or "external" in result.recommendation.lower()
+        )
 
 
 class TestCodebaseFactorAnalysis:

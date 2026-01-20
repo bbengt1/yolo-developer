@@ -228,32 +228,22 @@ class TestPrepareContext:
 
     def test_implementation_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include implementation-specific context."""
-        context = _prepare_delegation_context(
-            state_with_context, "implementation", "dev"
-        )
+        context = _prepare_delegation_context(state_with_context, "implementation", "dev")
         assert context["current_story"] == "story-10-4"
         assert context["design"] == {"pattern": "singleton"}
         assert context["patterns"] == ["pattern1"]
 
-    def test_requirement_analysis_context(
-        self, state_with_context: dict[str, Any]
-    ) -> None:
+    def test_requirement_analysis_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include requirement analysis context."""
-        context = _prepare_delegation_context(
-            state_with_context, "requirement_analysis", "analyst"
-        )
+        context = _prepare_delegation_context(state_with_context, "requirement_analysis", "analyst")
         assert context["seed_input"] == "Initial project requirements"
 
     def test_story_creation_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include story creation context."""
-        context = _prepare_delegation_context(
-            state_with_context, "story_creation", "pm"
-        )
+        context = _prepare_delegation_context(state_with_context, "story_creation", "pm")
         assert context["requirements"] == ["req1", "req2"]
 
-    def test_architecture_design_context(
-        self, state_with_context: dict[str, Any]
-    ) -> None:
+    def test_architecture_design_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include architecture design context."""
         context = _prepare_delegation_context(
             state_with_context, "architecture_design", "architect"
@@ -264,26 +254,20 @@ class TestPrepareContext:
 
     def test_validation_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include validation context."""
-        context = _prepare_delegation_context(
-            state_with_context, "validation", "tea"
-        )
+        context = _prepare_delegation_context(state_with_context, "validation", "tea")
         assert context["implementation"] == "def foo(): pass"
         assert context["test_results"] == {"passed": 10, "failed": 0}
         assert context["coverage"] == 0.85
 
     def test_orchestration_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include orchestration context."""
-        context = _prepare_delegation_context(
-            state_with_context, "orchestration", "sm"
-        )
+        context = _prepare_delegation_context(state_with_context, "orchestration", "sm")
         assert context["sprint_plan"] == {"sprint_id": "sprint-1"}
         assert context["health_metrics"] == {"status": "healthy"}
 
     def test_includes_previous_handoff(self, state_with_context: dict[str, Any]) -> None:
         """Should include previous handoff context if present."""
-        context = _prepare_delegation_context(
-            state_with_context, "implementation", "dev"
-        )
+        context = _prepare_delegation_context(state_with_context, "implementation", "dev")
         assert context["previous_handoff"] == {"previous": "context"}
 
 
@@ -342,18 +326,14 @@ class TestHandleUnacknowledgedDelegation:
     def test_retry_when_attempts_available(self) -> None:
         """Should return retry if attempts available."""
         config = DelegationConfig(max_retry_attempts=3)
-        action, rationale = _handle_unacknowledged_delegation(
-            "dev", "implementation", config
-        )
+        action, rationale = _handle_unacknowledged_delegation("dev", "implementation", config)
         assert action == "retry"
         assert "retry" in rationale.lower()
 
     def test_escalate_when_no_retries(self) -> None:
         """Should escalate when no retries left."""
         config = DelegationConfig(max_retry_attempts=0)
-        action, rationale = _handle_unacknowledged_delegation(
-            "dev", "implementation", config
-        )
+        action, rationale = _handle_unacknowledged_delegation("dev", "implementation", config)
         assert action == "escalate"
         assert "unresponsive" in rationale.lower()
 
@@ -402,9 +382,7 @@ class TestDelegateTask:
         assert result.request.priority == "critical"
 
     @pytest.mark.asyncio
-    async def test_delegation_includes_handoff_context(
-        self, basic_state: dict[str, Any]
-    ) -> None:
+    async def test_delegation_includes_handoff_context(self, basic_state: dict[str, Any]) -> None:
         """Should include handoff context in result."""
         result = await delegate_task(
             state=basic_state,
@@ -416,9 +394,7 @@ class TestDelegateTask:
         assert result.handoff_context["target_agent"] == "dev"
 
     @pytest.mark.asyncio
-    async def test_delegation_to_unavailable_agent_fails(
-        self, basic_state: dict[str, Any]
-    ) -> None:
+    async def test_delegation_to_unavailable_agent_fails(self, basic_state: dict[str, Any]) -> None:
         """Should fail when agent is unavailable."""
         basic_state["gate_blocked"] = True
         basic_state["current_agent"] = "dev"
@@ -433,9 +409,7 @@ class TestDelegateTask:
         assert result.error_message is not None
 
     @pytest.mark.asyncio
-    async def test_delegation_uses_custom_config(
-        self, basic_state: dict[str, Any]
-    ) -> None:
+    async def test_delegation_uses_custom_config(self, basic_state: dict[str, Any]) -> None:
         """Should use custom config when provided."""
         config = DelegationConfig(acknowledgment_timeout_seconds=60.0)
         result = await delegate_task(
@@ -447,9 +421,7 @@ class TestDelegateTask:
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_delegation_includes_context(
-        self, state_with_context: dict[str, Any]
-    ) -> None:
+    async def test_delegation_includes_context(self, state_with_context: dict[str, Any]) -> None:
         """Should include prepared context in request."""
         result = await delegate_task(
             state=state_with_context,
@@ -552,9 +524,7 @@ class TestSmNodeDelegationIntegration:
         assert sm_output["delegation_result"]["request"]["task_type"] == "story_creation"
 
     @pytest.mark.asyncio
-    async def test_sm_node_includes_handoff_context(
-        self, analyst_state: dict[str, Any]
-    ) -> None:
+    async def test_sm_node_includes_handoff_context(self, analyst_state: dict[str, Any]) -> None:
         """sm_node should include handoff_context in return dict.
 
         Note: With Story 10.8 integration, handoff_context is now a
@@ -591,9 +561,7 @@ class TestSmNodeDelegationIntegration:
         assert "delegation" in decision.related_artifacts
 
     @pytest.mark.asyncio
-    async def test_sm_node_no_delegation_on_escalate(
-        self, analyst_state: dict[str, Any]
-    ) -> None:
+    async def test_sm_node_no_delegation_on_escalate(self, analyst_state: dict[str, Any]) -> None:
         """sm_node should not delegate when escalating."""
         from yolo_developer.agents.sm.node import sm_node
 

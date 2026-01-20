@@ -101,9 +101,7 @@ class TestDevNodeGateIntegration:
         assert dev_node._gate_blocking is False  # Advisory mode
 
     @pytest.mark.asyncio
-    async def test_dev_node_runs_with_empty_state(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dev_node_runs_with_empty_state(self, mock_state: dict[str, Any]) -> None:
         """Test dev_node runs and returns valid output with empty state."""
         # Reset LLM router to avoid external calls
         from yolo_developer.agents.dev.node import _reset_llm_router
@@ -165,7 +163,10 @@ class TestDevNodeGateIntegration:
         decision = result["decisions"][0]
 
         # Should mention definition_of_done gate
-        assert "definition_of_done" in decision.rationale.lower() or "gate" in decision.rationale.lower()
+        assert (
+            "definition_of_done" in decision.rationale.lower()
+            or "gate" in decision.rationale.lower()
+        )
 
 
 class TestGateEvaluationFlow:

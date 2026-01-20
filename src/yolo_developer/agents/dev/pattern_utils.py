@@ -272,9 +272,7 @@ DEFAULT_ERROR_PATTERNS: list[ErrorHandlingPattern] = [
         pattern_name="specific_exceptions",
         exception_types=("ValueError", "TypeError", "KeyError", "AttributeError"),
         handling_style="specific exceptions with context",
-        examples=(
-            "try:\n    ...\nexcept ValueError as e:\n    logger.error(...)\n    raise",
-        ),
+        examples=("try:\n    ...\nexcept ValueError as e:\n    logger.error(...)\n    raise",),
     ),
 ]
 
@@ -1067,7 +1065,9 @@ def validate_pattern_adherence(
         # Adherence = percentage of patterns that had no deviations
         # Each deviation counts against one pattern (capped at patterns_checked)
         patterns_with_deviations = min(deviation_count, patterns_checked)
-        adherence_percentage = ((patterns_checked - patterns_with_deviations) / patterns_checked) * 100
+        adherence_percentage = (
+            (patterns_checked - patterns_with_deviations) / patterns_checked
+        ) * 100
     else:
         adherence_percentage = 100.0 if not all_deviations else 0.0
 

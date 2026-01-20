@@ -42,6 +42,7 @@ class TestAnswerFormat:
         assert str(AnswerFormat.BOOLEAN) == "AnswerFormat.BOOLEAN"
         # Should work with JSON serialization via .value
         import json
+
         serialized = json.dumps({"format": AnswerFormat.BOOLEAN.value})
         assert '"boolean"' in serialized
 
@@ -161,9 +162,7 @@ class TestQuestionQualityValidation:
 
     def test_question_with_please_clarify_fails(self) -> None:
         """Test that vague 'please clarify' phrase is flagged."""
-        is_valid, suggestions = validate_question_quality(
-            "Please clarify what you mean by fast."
-        )
+        is_valid, suggestions = validate_question_quality("Please clarify what you mean by fast.")
         assert is_valid is False
         assert any("vague phrase" in s.lower() for s in suggestions)
 
@@ -222,9 +221,7 @@ class TestQuestionQualityValidation:
 
     def test_case_insensitive_vague_phrase_detection(self) -> None:
         """Test that vague phrase detection is case insensitive."""
-        is_valid, _ = validate_question_quality(
-            "PLEASE CLARIFY what you mean."
-        )
+        is_valid, _ = validate_question_quality("PLEASE CLARIFY what you mean.")
         assert is_valid is False
 
     def test_actionable_question_with_specifics_passes(self) -> None:
@@ -319,8 +316,12 @@ class TestQuestionPrioritization:
     def test_prioritize_questions_ordering(self) -> None:
         """Test that prioritize_questions returns highest priority first."""
         amb_low = self._create_ambiguity(AmbiguityType.PRIORITY, AmbiguitySeverity.LOW, "low_item")
-        amb_med = self._create_ambiguity(AmbiguityType.TECHNICAL, AmbiguitySeverity.MEDIUM, "med_item")
-        amb_high = self._create_ambiguity(AmbiguityType.UNDEFINED, AmbiguitySeverity.HIGH, "high_item")
+        amb_med = self._create_ambiguity(
+            AmbiguityType.TECHNICAL, AmbiguitySeverity.MEDIUM, "med_item"
+        )
+        amb_high = self._create_ambiguity(
+            AmbiguityType.UNDEFINED, AmbiguitySeverity.HIGH, "high_item"
+        )
 
         # Pass in unsorted order
         unsorted = [amb_low, amb_med, amb_high]
@@ -466,7 +467,9 @@ class TestAmbiguityResultPrioritization:
         from yolo_developer.seed.ambiguity import AmbiguityResult, ResolutionPrompt
 
         amb1 = self._create_ambiguity(AmbiguityType.SCOPE, AmbiguitySeverity.HIGH, "scope_issue")
-        amb2 = self._create_ambiguity(AmbiguityType.PRIORITY, AmbiguitySeverity.LOW, "priority_issue")
+        amb2 = self._create_ambiguity(
+            AmbiguityType.PRIORITY, AmbiguitySeverity.LOW, "priority_issue"
+        )
 
         prompt1 = ResolutionPrompt(question="Q1?", suggestions=())
         prompt2 = ResolutionPrompt(question="Q2?", suggestions=())

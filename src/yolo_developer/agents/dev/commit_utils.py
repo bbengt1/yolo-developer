@@ -524,8 +524,7 @@ def validate_commit_message(message: str) -> CommitMessageValidationResult:
             if url_pattern.search(line):
                 continue
             result.warnings.append(
-                f"Body line {i + 1} exceeds {BODY_LINE_LIMIT} characters "
-                f"(current: {len(line)})"
+                f"Body line {i + 1} exceeds {BODY_LINE_LIMIT} characters (current: {len(line)})"
             )
 
     logger.debug(

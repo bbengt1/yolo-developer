@@ -180,9 +180,7 @@ class AuditViewService:
 
         # Get requirements with no outgoing links (in our model, requirements don't
         # have outgoing links - stories link TO requirements, so this returns ALL requirements)
-        all_requirements = await self._traceability_store.get_unlinked_artifacts(
-            "requirement"
-        )
+        all_requirements = await self._traceability_store.get_unlinked_artifacts("requirement")
         total_requirements = len(all_requirements)
 
         # Find covered vs uncovered requirements

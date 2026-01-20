@@ -354,9 +354,7 @@ class TestResumeFunctionality:
                 "yolo_developer.cli.commands.run.load_config",
                 return_value=MagicMock(project_name="test-project"),
             ),
-            patch(
-                "yolo_developer.cli.commands.run.check_seed_exists", return_value=False
-            ),
+            patch("yolo_developer.cli.commands.run.check_seed_exists", return_value=False),
             patch("yolo_developer.cli.commands.run.run_async_workflow") as mock_run,
             patch("yolo_developer.cli.commands.run.display_summary"),
         ):
@@ -587,9 +585,7 @@ class TestRunCLIIntegration:
     def test_cli_run_command_all_flags(self) -> None:
         """Test CLI invocation with all flags."""
         with patch("yolo_developer.cli.commands.run.run_command") as mock_run:
-            runner.invoke(
-                app, ["run", "-d", "-v", "-j", "-r", "-t", "thread-123"]
-            )
+            runner.invoke(app, ["run", "-d", "-v", "-j", "-r", "-t", "thread-123"])
             mock_run.assert_called_once()
             call_kwargs = mock_run.call_args.kwargs
             assert call_kwargs["dry_run"] is True

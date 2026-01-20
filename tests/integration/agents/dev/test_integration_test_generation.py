@@ -7,14 +7,11 @@ integration test generation, validating the end-to-end pipeline.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from yolo_developer.agents.dev.integration_utils import (
-    ComponentBoundary,
-    DataFlowPath,
-    ErrorScenario,
     analyze_component_boundaries,
     analyze_data_flow,
     detect_error_scenarios,
@@ -24,7 +21,7 @@ from yolo_developer.agents.dev.integration_utils import (
 from yolo_developer.agents.dev.types import CodeFile
 
 if TYPE_CHECKING:
-    from yolo_developer.llm.router import LLMRouter
+    pass
 
 
 class TestIntegrationTestGenerationPipeline:
@@ -99,28 +96,20 @@ async def test_service_repository_integration(mock_repository):
         )
         return router
 
-    def test_boundary_analysis_detects_imports(
-        self, multi_file_codebase: list[CodeFile]
-    ) -> None:
+    def test_boundary_analysis_detects_imports(self, multi_file_codebase: list[CodeFile]) -> None:
         """Test that boundary analysis detects imports between modules."""
         boundaries = analyze_component_boundaries(multi_file_codebase)
 
         # Should detect imports from service.py to repository.py
-        import_boundaries = [
-            b for b in boundaries if b.interaction_type == "import"
-        ]
+        import_boundaries = [b for b in boundaries if b.interaction_type == "import"]
         assert len(import_boundaries) >= 1
 
         # Should detect function call boundaries
-        call_boundaries = [
-            b for b in boundaries if b.interaction_type == "function_call"
-        ]
+        call_boundaries = [b for b in boundaries if b.interaction_type == "function_call"]
         # service.py calls save_data from repository
         assert len(call_boundaries) >= 1
 
-    def test_data_flow_analysis_traces_paths(
-        self, multi_file_codebase: list[CodeFile]
-    ) -> None:
+    def test_data_flow_analysis_traces_paths(self, multi_file_codebase: list[CodeFile]) -> None:
         """Test that data flow analysis traces transformation paths."""
         flows = analyze_data_flow(multi_file_codebase)
 
@@ -131,16 +120,12 @@ async def test_service_repository_integration(mock_repository):
         process_flows = [f for f in flows if "process_item" in f.start_point]
         assert len(process_flows) >= 1
 
-    def test_error_scenario_detection(
-        self, multi_file_codebase: list[CodeFile]
-    ) -> None:
+    def test_error_scenario_detection(self, multi_file_codebase: list[CodeFile]) -> None:
         """Test that error scenarios are detected."""
         scenarios = detect_error_scenarios(multi_file_codebase)
 
         # Should detect the ValueError in repository.py
-        value_errors = [
-            s for s in scenarios if s.exception_type == "ValueError"
-        ]
+        value_errors = [s for s in scenarios if s.exception_type == "ValueError"]
         assert len(value_errors) >= 1
 
         # Should detect the try/except in service.py
@@ -306,7 +291,5 @@ def handle():
         assert len(scenarios) >= 1
 
         # Should capture both exception types
-        multi_type = [
-            s for s in scenarios if s.exception_type and "|" in s.exception_type
-        ]
+        multi_type = [s for s in scenarios if s.exception_type and "|" in s.exception_type]
         assert len(multi_type) >= 1

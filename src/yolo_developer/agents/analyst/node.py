@@ -1012,7 +1012,14 @@ DIRECT_CONFLICT_PAIRS: tuple[tuple[frozenset[str], frozenset[str], str, str], ..
 IMPLICIT_CONFLICT_PATTERNS: dict[str, dict[str, frozenset[str] | str]] = {
     "resource_memory": {
         "high": frozenset(
-            ["in-memory", "cache all", "preload", "memory-intensive", "large dataset", "keep in ram"]
+            [
+                "in-memory",
+                "cache all",
+                "preload",
+                "memory-intensive",
+                "large dataset",
+                "keep in ram",
+            ]
         ),
         "low": frozenset(
             ["low memory", "minimal footprint", "embedded", "resource-constrained", "memory limit"]
@@ -1044,14 +1051,24 @@ IMPLICIT_CONFLICT_PATTERNS: dict[str, dict[str, frozenset[str] | str]] = {
         "description": "Performance tradeoff: high throughput vs low latency",
     },
     "consistency_availability": {
-        "high": frozenset(["acid", "transactional", "consistent reads", "linearizable", "strong consistency"]),
+        "high": frozenset(
+            ["acid", "transactional", "consistent reads", "linearizable", "strong consistency"]
+        ),
         "low": frozenset(
-            ["always available", "no downtime", "partition tolerant", "eventual", "high availability"]
+            [
+                "always available",
+                "no downtime",
+                "partition tolerant",
+                "eventual",
+                "high availability",
+            ]
         ),
         "description": "CAP theorem conflict: strong consistency vs high availability",
     },
     "optimization_read_write": {
-        "high": frozenset(["read-heavy", "query performance", "fast reads", "denormalized", "read optimized"]),
+        "high": frozenset(
+            ["read-heavy", "query performance", "fast reads", "denormalized", "read optimized"]
+        ),
         "low": frozenset(
             ["write-heavy", "fast writes", "insert performance", "normalized", "write optimized"]
         ),
@@ -1841,7 +1858,9 @@ def _generate_remediation(
         elif "physical_limit" in issue:
             suggestions.append("Define acceptable latency/sync thresholds instead of 'instant'")
         elif "logical_contradiction" in issue:
-            suggestions.append("Clarify which condition takes precedence in conflicting requirements")
+            suggestions.append(
+                "Clarify which condition takes precedence in conflicting requirements"
+            )
 
     # Additional suggestions based on complexity
     if complexity == ComplexityLevel.VERY_HIGH:
@@ -2189,13 +2208,9 @@ def _find_implicit_conflicts(
 
                 if (req1_high and req2_low) or (req1_low and req2_high):
                     conflict_type = (
-                        "implicit_resource"
-                        if "resource" in pattern_name
-                        else "implicit_behavior"
+                        "implicit_resource" if "resource" in pattern_name else "implicit_behavior"
                     )
-                    conflicts.append(
-                        (req1.id, req2.id, conflict_type, str(description))
-                    )
+                    conflicts.append((req1.id, req2.id, conflict_type, str(description)))
                     logger.debug(
                         "implicit_conflict_detected",
                         req1_id=req1.id,
@@ -2231,10 +2246,7 @@ def _classify_conflict_category(description: str) -> str:
         return "performance"
     if any(term in desc_lower for term in ["access", "public", "private", "restricted"]):
         return "access"
-    if any(
-        term in desc_lower
-        for term in ["architecture", "design", "pattern", "cardinality"]
-    ):
+    if any(term in desc_lower for term in ["architecture", "design", "pattern", "cardinality"]):
         return "architecture"
 
     return "default"
@@ -2407,7 +2419,11 @@ def _analyze_contradictions(
         req2 = req_lookup[req2_id]
 
         # Map string to ContradictionType enum
-        ct = ContradictionType.SEMANTIC if conflict_type_str == "semantic" else ContradictionType.DIRECT
+        ct = (
+            ContradictionType.SEMANTIC
+            if conflict_type_str == "semantic"
+            else ContradictionType.DIRECT
+        )
 
         severity = _assess_contradiction_severity(ct, req1, req2, description)
         suggestions = _generate_resolution_suggestions(ct, req1, req2)
@@ -3588,7 +3604,10 @@ def _identify_escalation_reason(
     if gap is not None:
         gap_text = (gap.description + " " + gap.rationale).lower()
         # Keywords aligned with _should_escalate_for_gap for consistency
-        if any(kw in gap_text for kw in ["domain", "business rule", "policy", "stakeholder", "regulation"]):
+        if any(
+            kw in gap_text
+            for kw in ["domain", "business rule", "policy", "stakeholder", "regulation"]
+        ):
             return EscalationReason.MISSING_DOMAIN_KNOWLEDGE
         if any(kw in gap_text for kw in ["scope", "in scope", "out of scope"]):
             return EscalationReason.SCOPE_CLARIFICATION
@@ -3738,7 +3757,9 @@ def _package_escalation(
         context_parts.append(f"- {contradiction.description}")
         context_parts.append(f"  Explanation: {contradiction.explanation}")
         if contradiction.resolution_suggestions:
-            context_parts.append(f"  Suggestions: {', '.join(contradiction.resolution_suggestions)}")
+            context_parts.append(
+                f"  Suggestions: {', '.join(contradiction.resolution_suggestions)}"
+            )
 
     context = "\n".join(context_parts)
 
@@ -3749,7 +3770,9 @@ def _package_escalation(
         "Analyzed for contradictions",
     ]
     if contradiction:
-        analysis_attempts.append("Evaluated resolution suggestions - none applicable without PM input")
+        analysis_attempts.append(
+            "Evaluated resolution suggestions - none applicable without PM input"
+        )
 
     return Escalation(
         id=escalation_id,
@@ -3816,9 +3839,7 @@ def _analyze_escalations(
             priority = _determine_escalation_priority(reason, severity)
 
             # Get involved requirements
-            involved_reqs = tuple(
-                r for r in requirements if r.id in contradiction.requirement_ids
-            )
+            involved_reqs = tuple(r for r in requirements if r.id in contradiction.requirement_ids)
 
             # Format decision request
             req_texts = [r.refined_text[:50] for r in involved_reqs[:2]]
@@ -3830,7 +3851,8 @@ def _analyze_escalations(
 
             # Get related gaps
             related_gaps = tuple(
-                g for g in gaps
+                g
+                for g in gaps
                 if any(rid in g.source_requirements for rid in contradiction.requirement_ids)
             )
 
@@ -3860,16 +3882,16 @@ def _analyze_escalations(
             reason = _identify_escalation_reason(None, gap, None)
             priority = _determine_escalation_priority(reason, gap.severity)
 
-            involved_reqs = tuple(
-                r for r in requirements if r.id in gap.source_requirements
-            )
+            involved_reqs = tuple(r for r in requirements if r.id in gap.source_requirements)
 
             # Format decision request based on gap
             gap_term = gap.description.split()[0] if gap.description else "this aspect"
             context_vars = {
                 "term": gap_term,
                 "scenario": gap.description[:60],
-                "requirement": involved_reqs[0].refined_text[:50] if involved_reqs else "the requirement",
+                "requirement": involved_reqs[0].refined_text[:50]
+                if involved_reqs
+                else "the requirement",
             }
             decision_request = _format_decision_request(reason, context_vars)
 
@@ -3897,7 +3919,11 @@ def _analyze_escalations(
             reason = _identify_escalation_reason(req, None, None)
 
             # Determine severity from requirement issues
-            severity = Severity.HIGH if req.implementability_status == "not_implementable" else Severity.MEDIUM
+            severity = (
+                Severity.HIGH
+                if req.implementability_status == "not_implementable"
+                else Severity.MEDIUM
+            )
             priority = _determine_escalation_priority(reason, severity)
 
             # Get related gaps
@@ -3906,7 +3932,9 @@ def _analyze_escalations(
             context_vars = {
                 "requirement": req.refined_text[:50],
                 "feature": req.refined_text[:30],
-                "scenario": req.implementability_issues[0] if req.implementability_issues else "unclear behavior",
+                "scenario": req.implementability_issues[0]
+                if req.implementability_issues
+                else "unclear behavior",
             }
             decision_request = _format_decision_request(reason, context_vars)
 

@@ -145,7 +145,10 @@ class TestGenerateAdrConsequences:
         consequences = _generate_adr_consequences(decision, analysis)
 
         # Should mention positive or pro or benefit
-        assert any(word in consequences.lower() for word in ["positive", "pro", "benefit", "good", "advantage"])
+        assert any(
+            word in consequences.lower()
+            for word in ["positive", "pro", "benefit", "good", "advantage"]
+        )
 
     def test_consequences_includes_negative_effects(self) -> None:
         """Test that consequences mention negative effects or trade-offs."""
@@ -157,7 +160,10 @@ class TestGenerateAdrConsequences:
         consequences = _generate_adr_consequences(decision, analysis)
 
         # Should mention negative or con or trade-off
-        assert any(word in consequences.lower() for word in ["negative", "con", "trade-off", "tradeoff", "cost", "complexity"])
+        assert any(
+            word in consequences.lower()
+            for word in ["negative", "con", "trade-off", "tradeoff", "cost", "complexity"]
+        )
 
     def test_consequences_includes_recommendations_when_not_compliant(self) -> None:
         """Test that consequences include 12-Factor recommendations when compliance < 100%."""

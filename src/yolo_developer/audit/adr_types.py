@@ -53,9 +53,7 @@ Values:
     superseded: ADR has been replaced by a newer decision
 """
 
-VALID_ADR_STATUSES: frozenset[str] = frozenset(
-    {"proposed", "accepted", "deprecated", "superseded"}
-)
+VALID_ADR_STATUSES: frozenset[str] = frozenset({"proposed", "accepted", "deprecated", "superseded"})
 """Set of valid ADR status values."""
 
 
@@ -104,9 +102,7 @@ class AutoADR:
     consequences: str
     source_decision_id: str
     story_ids: tuple[str, ...] = ()
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
         """Validate ADR data and log warnings for issues."""
@@ -132,9 +128,7 @@ class AutoADR:
         if not self.consequences:
             _logger.warning("AutoADR consequences is empty for id=%s", self.id)
         if not self.source_decision_id:
-            _logger.warning(
-                "AutoADR source_decision_id is empty for id=%s", self.id
-            )
+            _logger.warning("AutoADR source_decision_id is empty for id=%s", self.id)
         if not self.created_at:
             _logger.warning("AutoADR created_at is empty for id=%s", self.id)
 

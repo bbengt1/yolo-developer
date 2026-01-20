@@ -450,9 +450,7 @@ class TestCrystallizeRequirementsPlaceholder:
         """Placeholder should reduce confidence when vague terms detected."""
         from yolo_developer.agents.analyst.node import _crystallize_requirements
 
-        result = await _crystallize_requirements(
-            "Build a fast, easy, scalable, robust system"
-        )
+        result = await _crystallize_requirements("Build a fast, easy, scalable, robust system")
 
         assert len(result.requirements) == 1
         # Multiple vague terms should reduce confidence
@@ -1021,9 +1019,7 @@ class TestEnhanceWithGapAnalysis:
 
         # Story 5.4: Requirements are now categorized, so verify core fields match
         assert len(result.requirements) == len(initial_output.requirements)
-        for orig, enhanced in zip(
-            initial_output.requirements, result.requirements, strict=True
-        ):
+        for orig, enhanced in zip(initial_output.requirements, result.requirements, strict=True):
             assert enhanced.id == orig.id
             assert enhanced.original_text == orig.original_text
             assert enhanced.refined_text == orig.refined_text
@@ -1101,7 +1097,9 @@ class TestCalculateCategoryConfidence:
         """Clear functional keywords should have high confidence."""
         confidence = _calculate_category_confidence(
             "User can create and delete",
-            5, 0, 0,  # Clear functional winner
+            5,
+            0,
+            0,  # Clear functional winner
         )
         assert confidence >= 0.7
 
@@ -1109,11 +1107,15 @@ class TestCalculateCategoryConfidence:
         """Ambiguous (tie) categories should have lower confidence than clear winner."""
         tie_confidence = _calculate_category_confidence(
             "Some text",
-            2, 2, 0,  # Tie between functional and non-functional
+            2,
+            2,
+            0,  # Tie between functional and non-functional
         )
         clear_winner_confidence = _calculate_category_confidence(
             "Some text",
-            5, 0, 0,  # Clear functional winner
+            5,
+            0,
+            0,  # Clear functional winner
         )
         # Tie should have lower confidence than clear winner (differentiation bonus)
         assert tie_confidence <= clear_winner_confidence
@@ -1123,7 +1125,9 @@ class TestCalculateCategoryConfidence:
         # "fast" and "should" are vague terms
         confidence = _calculate_category_confidence(
             "System should be fast",
-            2, 1, 0,
+            2,
+            1,
+            0,
         )
         # Should be reduced due to vague terms
         assert confidence < 0.9
@@ -1133,7 +1137,9 @@ class TestCalculateCategoryConfidence:
         # Very strong signal
         confidence = _calculate_category_confidence(
             "Clear requirement",
-            10, 0, 0,
+            10,
+            0,
+            0,
         )
         assert 0.0 <= confidence <= 1.0
 
@@ -1724,7 +1730,9 @@ class TestGenerateRemediation:
 
         assert len(suggestions) >= 1
         # Should suggest defining limits
-        assert any("limit" in s.lower() or "bound" in s.lower() or "cap" in s.lower() for s in suggestions)
+        assert any(
+            "limit" in s.lower() or "bound" in s.lower() or "cap" in s.lower() for s in suggestions
+        )
 
     def test_generates_suggestions_for_high_complexity(self) -> None:
         """Should suggest breaking down high complexity requirements."""
@@ -1733,7 +1741,10 @@ class TestGenerateRemediation:
 
         assert len(suggestions) >= 1
         # Should suggest breaking down or phased approach
-        assert any("break" in s.lower() or "phase" in s.lower() or "piece" in s.lower() for s in suggestions)
+        assert any(
+            "break" in s.lower() or "phase" in s.lower() or "piece" in s.lower()
+            for s in suggestions
+        )
 
     def test_generates_suggestions_for_dependencies(self) -> None:
         """Should suggest contingency plans for many dependencies."""
@@ -2267,7 +2278,10 @@ class TestAssessContradictionSeverity:
             testable=True,
         )
         severity = _assess_contradiction_severity(
-            ContradictionType.IMPLICIT_RESOURCE, req1, req2, "Performance tradeoff: throughput vs latency"
+            ContradictionType.IMPLICIT_RESOURCE,
+            req1,
+            req2,
+            "Performance tradeoff: throughput vs latency",
         )
 
         assert severity == Severity.HIGH
@@ -2454,9 +2468,7 @@ class TestAnalyzeContradictions:
 
         assert len(contradictions) >= 1
         implicit_contradictions = [
-            c
-            for c in contradictions
-            if c.contradiction_type == ContradictionType.IMPLICIT_RESOURCE
+            c for c in contradictions if c.contradiction_type == ContradictionType.IMPLICIT_RESOURCE
         ]
         assert len(implicit_contradictions) >= 1
 

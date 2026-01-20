@@ -181,8 +181,12 @@ class TestInMemoryCostStoreFiltering:
     async def test_filter_multiple_criteria(self) -> None:
         """Test filtering with multiple criteria."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", agent_name="analyst", tier="routine"))
-        await store.store_cost(_make_record(cost_id="cost-002", agent_name="analyst", tier="complex"))
+        await store.store_cost(
+            _make_record(cost_id="cost-001", agent_name="analyst", tier="routine")
+        )
+        await store.store_cost(
+            _make_record(cost_id="cost-002", agent_name="analyst", tier="complex")
+        )
         await store.store_cost(_make_record(cost_id="cost-003", agent_name="pm", tier="routine"))
 
         filters = CostFilters(agent_name="analyst", tier="routine")
@@ -213,13 +217,15 @@ class TestInMemoryCostStoreAggregation:
     async def test_get_aggregation_single_record(self) -> None:
         """Test aggregation with a single record."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(
-            cost_id="cost-001",
-            prompt_tokens=100,
-            completion_tokens=50,
-            cost_usd=0.0015,
-            model="gpt-4o-mini",
-        ))
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-001",
+                prompt_tokens=100,
+                completion_tokens=50,
+                cost_usd=0.0015,
+                model="gpt-4o-mini",
+            )
+        )
 
         agg = await store.get_aggregation()
 
@@ -234,27 +240,33 @@ class TestInMemoryCostStoreAggregation:
     async def test_get_aggregation_multiple_records(self) -> None:
         """Test aggregation with multiple records."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(
-            cost_id="cost-001",
-            prompt_tokens=100,
-            completion_tokens=50,
-            cost_usd=0.0015,
-            model="gpt-4o-mini",
-        ))
-        await store.store_cost(_make_record(
-            cost_id="cost-002",
-            prompt_tokens=200,
-            completion_tokens=100,
-            cost_usd=0.015,
-            model="claude-sonnet",
-        ))
-        await store.store_cost(_make_record(
-            cost_id="cost-003",
-            prompt_tokens=50,
-            completion_tokens=25,
-            cost_usd=0.0008,
-            model="gpt-4o-mini",
-        ))
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-001",
+                prompt_tokens=100,
+                completion_tokens=50,
+                cost_usd=0.0015,
+                model="gpt-4o-mini",
+            )
+        )
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-002",
+                prompt_tokens=200,
+                completion_tokens=100,
+                cost_usd=0.015,
+                model="claude-sonnet",
+            )
+        )
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-003",
+                prompt_tokens=50,
+                completion_tokens=25,
+                cost_usd=0.0008,
+                model="gpt-4o-mini",
+            )
+        )
 
         agg = await store.get_aggregation()
 
@@ -270,21 +282,27 @@ class TestInMemoryCostStoreAggregation:
     async def test_get_aggregation_with_filters(self) -> None:
         """Test aggregation with filters applied."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(
-            cost_id="cost-001",
-            agent_name="analyst",
-            cost_usd=0.001,
-        ))
-        await store.store_cost(_make_record(
-            cost_id="cost-002",
-            agent_name="pm",
-            cost_usd=0.002,
-        ))
-        await store.store_cost(_make_record(
-            cost_id="cost-003",
-            agent_name="analyst",
-            cost_usd=0.003,
-        ))
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-001",
+                agent_name="analyst",
+                cost_usd=0.001,
+            )
+        )
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-002",
+                agent_name="pm",
+                cost_usd=0.002,
+            )
+        )
+        await store.store_cost(
+            _make_record(
+                cost_id="cost-003",
+                agent_name="analyst",
+                cost_usd=0.003,
+            )
+        )
 
         filters = CostFilters(agent_name="analyst")
         agg = await store.get_aggregation(filters)
@@ -300,9 +318,13 @@ class TestInMemoryCostStoreGroupedAggregation:
     async def test_grouped_aggregation_by_agent(self) -> None:
         """Test grouped aggregation by agent."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", agent_name="analyst", cost_usd=0.001))
+        await store.store_cost(
+            _make_record(cost_id="cost-001", agent_name="analyst", cost_usd=0.001)
+        )
         await store.store_cost(_make_record(cost_id="cost-002", agent_name="pm", cost_usd=0.002))
-        await store.store_cost(_make_record(cost_id="cost-003", agent_name="analyst", cost_usd=0.003))
+        await store.store_cost(
+            _make_record(cost_id="cost-003", agent_name="analyst", cost_usd=0.003)
+        )
 
         result = await store.get_grouped_aggregation("agent")
 
@@ -318,8 +340,12 @@ class TestInMemoryCostStoreGroupedAggregation:
     async def test_grouped_aggregation_by_story(self) -> None:
         """Test grouped aggregation by story."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", story_id="1-2-auth", cost_usd=0.001))
-        await store.store_cost(_make_record(cost_id="cost-002", story_id="1-3-profile", cost_usd=0.002))
+        await store.store_cost(
+            _make_record(cost_id="cost-001", story_id="1-2-auth", cost_usd=0.001)
+        )
+        await store.store_cost(
+            _make_record(cost_id="cost-002", story_id="1-3-profile", cost_usd=0.002)
+        )
         await store.store_cost(_make_record(cost_id="cost-003", story_id=None, cost_usd=0.003))
 
         result = await store.get_grouped_aggregation("story")
@@ -334,9 +360,15 @@ class TestInMemoryCostStoreGroupedAggregation:
     async def test_grouped_aggregation_by_model(self) -> None:
         """Test grouped aggregation by model."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", model="gpt-4o-mini", cost_usd=0.001))
-        await store.store_cost(_make_record(cost_id="cost-002", model="claude-sonnet", cost_usd=0.01))
-        await store.store_cost(_make_record(cost_id="cost-003", model="gpt-4o-mini", cost_usd=0.002))
+        await store.store_cost(
+            _make_record(cost_id="cost-001", model="gpt-4o-mini", cost_usd=0.001)
+        )
+        await store.store_cost(
+            _make_record(cost_id="cost-002", model="claude-sonnet", cost_usd=0.01)
+        )
+        await store.store_cost(
+            _make_record(cost_id="cost-003", model="gpt-4o-mini", cost_usd=0.002)
+        )
 
         result = await store.get_grouped_aggregation("model")
 
@@ -371,9 +403,13 @@ class TestInMemoryCostStoreGroupedAggregation:
     async def test_grouped_aggregation_with_filters(self) -> None:
         """Test grouped aggregation with filters applied."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", agent_name="analyst", tier="routine"))
+        await store.store_cost(
+            _make_record(cost_id="cost-001", agent_name="analyst", tier="routine")
+        )
         await store.store_cost(_make_record(cost_id="cost-002", agent_name="pm", tier="routine"))
-        await store.store_cost(_make_record(cost_id="cost-003", agent_name="analyst", tier="complex"))
+        await store.store_cost(
+            _make_record(cost_id="cost-003", agent_name="analyst", tier="complex")
+        )
 
         filters = CostFilters(tier="routine")
         result = await store.get_grouped_aggregation("agent", filters)

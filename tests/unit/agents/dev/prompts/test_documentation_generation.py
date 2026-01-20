@@ -6,8 +6,6 @@ for LLM-powered documentation enhancement.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestDocumentationGuidelines:
     """Tests for DOCUMENTATION_GUIDELINES constant."""

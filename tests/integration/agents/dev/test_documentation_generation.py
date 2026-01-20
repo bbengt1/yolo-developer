@@ -12,8 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from yolo_developer.agents.dev.doc_utils import (
-    ComplexSection,
-    DocumentationInfo,
     detect_complex_sections,
     extract_documentation_info,
     format_complex_sections_for_prompt,
@@ -23,7 +21,7 @@ from yolo_developer.agents.dev.doc_utils import (
 )
 
 if TYPE_CHECKING:
-    from yolo_developer.llm.router import LLMRouter
+    pass
 
 
 class TestDocumentationGenerationPipeline:
@@ -32,7 +30,7 @@ class TestDocumentationGenerationPipeline:
     @pytest.fixture
     def undocumented_code(self) -> str:
         """Sample code without documentation."""
-        return '''
+        return """
 def calculate_total(items, tax_rate=0.1):
     total = 0
     for item in items:
@@ -47,7 +45,7 @@ def process_order(order):
             if item.quantity > 0:
                 item.reserve()
     return order
-'''
+"""
 
     @pytest.fixture
     def mock_router(self) -> MagicMock:
@@ -113,9 +111,7 @@ def process_order(order):
         )
         return router
 
-    def test_extract_documentation_info_detects_missing_docs(
-        self, undocumented_code: str
-    ) -> None:
+    def test_extract_documentation_info_detects_missing_docs(self, undocumented_code: str) -> None:
         """Test that documentation analysis detects missing docstrings."""
         info = extract_documentation_info(undocumented_code)
 
@@ -124,18 +120,14 @@ def process_order(order):
         assert "calculate_total" in info.functions_missing_docstrings
         assert "process_order" in info.functions_missing_docstrings
 
-    def test_detect_complex_sections_finds_nested_loops(
-        self, undocumented_code: str
-    ) -> None:
+    def test_detect_complex_sections_finds_nested_loops(self, undocumented_code: str) -> None:
         """Test that complex section detection finds nested loops."""
         sections = detect_complex_sections(undocumented_code)
 
         nested = [s for s in sections if s.complexity_type == "nested_loop"]
         assert len(nested) >= 1
 
-    def test_validate_documentation_quality_reports_issues(
-        self, undocumented_code: str
-    ) -> None:
+    def test_validate_documentation_quality_reports_issues(self, undocumented_code: str) -> None:
         """Test that quality validation reports documentation issues."""
         report = validate_documentation_quality(undocumented_code)
 
@@ -178,9 +170,7 @@ def process_order(order):
         assert report.functions_with_returns >= 2
         assert report.is_acceptable() is True
 
-    def test_format_functions_produce_valid_prompts(
-        self, undocumented_code: str
-    ) -> None:
+    def test_format_functions_produce_valid_prompts(self, undocumented_code: str) -> None:
         """Test that formatting functions produce usable prompt content."""
         info = extract_documentation_info(undocumented_code)
         sections = detect_complex_sections(undocumented_code)

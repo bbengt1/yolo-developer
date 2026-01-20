@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from yolo_developer.audit.formatter_types import ColorScheme, FormatOptions
+    pass
 
 
 class TestFormatterStyle:

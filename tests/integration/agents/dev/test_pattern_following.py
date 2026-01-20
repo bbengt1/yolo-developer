@@ -208,7 +208,7 @@ class UserService:
     def test_detects_pattern_violations_in_generated_code(self) -> None:
         """Test that pattern violations are detected and flagged."""
         # Code with violations
-        non_compliant_code = '''
+        non_compliant_code = """
 def getUserData():
     pass
 
@@ -222,7 +222,7 @@ try:
     x = 1
 except:
     pass
-'''
+"""
 
         state: dict[str, Any] = {}
 

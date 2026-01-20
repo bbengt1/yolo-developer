@@ -321,9 +321,7 @@ class AmbiguityResult:
             "ambiguities": [amb.to_dict() for amb in self.ambiguities],
             "overall_confidence": self.overall_confidence,
             "resolution_prompts": [prompt.to_dict() for prompt in self.resolution_prompts],
-            "priority_scores": [
-                calculate_question_priority(amb) for amb in self.ambiguities
-            ],
+            "priority_scores": [calculate_question_priority(amb) for amb in self.ambiguities],
         }
 
 
@@ -450,14 +448,11 @@ def validate_question_quality(question: str) -> tuple[bool, list[str]]:
 
     # Check for vague phrases (case-insensitive)
     question_lower = question_stripped.lower()
-    found_vague_phrases = [
-        phrase for phrase in _VAGUE_PHRASES if phrase in question_lower
-    ]
+    found_vague_phrases = [phrase for phrase in _VAGUE_PHRASES if phrase in question_lower]
     if found_vague_phrases:
         phrases_str = ", ".join(f'"{p}"' for p in found_vague_phrases)
         suggestions.append(
-            f"Contains vague phrase(s): {phrases_str}. "
-            "Rewrite with specific, answerable questions."
+            f"Contains vague phrase(s): {phrases_str}. Rewrite with specific, answerable questions."
         )
 
     is_valid = len(suggestions) == 0

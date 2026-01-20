@@ -158,7 +158,11 @@ class TestConfigShowCommand:
         assert result.exit_code == 0
         output = strip_ansi(result.output)
         # API keys should show as masked or "not set", never actual values
-        assert "openai_api_key" not in output.lower() or "****" in output or "not set" in output.lower()
+        assert (
+            "openai_api_key" not in output.lower()
+            or "****" in output
+            or "not set" in output.lower()
+        )
 
     def test_show_config_json_output(self, temp_config_dir: Path) -> None:
         """Test that --json flag outputs valid JSON."""
@@ -215,9 +219,7 @@ class TestConfigSetCommand:
 
     def test_set_numeric_value(self, temp_config_dir: Path) -> None:
         """Test setting a numeric value."""
-        result = runner.invoke(
-            app, ["config", "set", "quality.test_coverage_threshold", "0.85"]
-        )
+        result = runner.invoke(app, ["config", "set", "quality.test_coverage_threshold", "0.85"])
         assert result.exit_code == 0
 
         # Verify the change was persisted
@@ -234,9 +236,7 @@ class TestConfigSetCommand:
 
     def test_set_protected_key_rejected(self, temp_config_dir: Path) -> None:
         """Test that setting API keys via CLI is rejected."""
-        result = runner.invoke(
-            app, ["config", "set", "llm.openai_api_key", "sk-secret"]
-        )
+        result = runner.invoke(app, ["config", "set", "llm.openai_api_key", "sk-secret"])
         assert result.exit_code != 0
         output = strip_ansi(result.output)
         assert "environment" in output.lower() or "protected" in output.lower()
@@ -251,9 +251,7 @@ class TestConfigSetCommand:
 
     def test_set_json_output(self, temp_config_dir: Path) -> None:
         """Test set command JSON output."""
-        result = runner.invoke(
-            app, ["config", "set", "project_name", "json-test", "--json"]
-        )
+        result = runner.invoke(app, ["config", "set", "project_name", "json-test", "--json"])
         assert result.exit_code == 0
         output = extract_json(result.output)
         assert output["key"] == "project_name"
@@ -410,9 +408,7 @@ class TestConfigEdgeCases:
 
     def test_deeply_nested_key(self, temp_config_dir: Path) -> None:
         """Test setting a deeply nested key (3+ levels)."""
-        result = runner.invoke(
-            app, ["config", "set", "quality.seed_thresholds.overall", "0.75"]
-        )
+        result = runner.invoke(app, ["config", "set", "quality.seed_thresholds.overall", "0.75"])
         assert result.exit_code == 0
 
         # Verify the change was persisted
@@ -423,9 +419,7 @@ class TestConfigEdgeCases:
     def test_set_boolean_value(self, temp_config_dir: Path) -> None:
         """Test setting a boolean value (if applicable)."""
         # This tests the value type conversion
-        result = runner.invoke(
-            app, ["config", "set", "quality.test_coverage_threshold", "0.9"]
-        )
+        result = runner.invoke(app, ["config", "set", "quality.test_coverage_threshold", "0.9"])
         assert result.exit_code == 0
 
     def test_empty_value(self, temp_config_dir: Path) -> None:

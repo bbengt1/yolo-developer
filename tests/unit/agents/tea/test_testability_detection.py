@@ -29,11 +29,11 @@ class TestDetectGlobalState:
         """Test detection of module-level mutable list."""
         from yolo_developer.agents.tea.testability import _detect_global_state
 
-        content = '''
+        content = """
 cache = []
 def foo():
     cache.append(1)
-'''
+"""
         issues = _detect_global_state(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "global_state"
@@ -44,11 +44,11 @@ def foo():
         """Test detection of module-level mutable dict."""
         from yolo_developer.agents.tea.testability import _detect_global_state
 
-        content = '''
+        content = """
 config = {}
 def foo():
     config["key"] = "value"
-'''
+"""
         issues = _detect_global_state(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "global_state"
@@ -58,9 +58,9 @@ def foo():
         """Test detection of dict() call at module level."""
         from yolo_developer.agents.tea.testability import _detect_global_state
 
-        content = '''
+        content = """
 registry = dict()
-'''
+"""
         issues = _detect_global_state(content, "test.py")
         assert len(issues) == 1
         assert "registry" in issues[0].description
@@ -69,9 +69,9 @@ registry = dict()
         """Test that private variables (_var) are ignored."""
         from yolo_developer.agents.tea.testability import _detect_global_state
 
-        content = '''
+        content = """
 _cache = []
-'''
+"""
         issues = _detect_global_state(content, "test.py")
         assert len(issues) == 0
 
@@ -79,9 +79,9 @@ _cache = []
         """Test that UPPER_CASE constants are ignored."""
         from yolo_developer.agents.tea.testability import _detect_global_state
 
-        content = '''
+        content = """
 DEFAULT_CONFIG = {}
-'''
+"""
         issues = _detect_global_state(content, "test.py")
         assert len(issues) == 0
 
@@ -108,11 +108,11 @@ class TestDetectTightCoupling:
         """Test detection of class instantiation in __init__."""
         from yolo_developer.agents.tea.testability import _detect_tight_coupling
 
-        content = '''
+        content = """
 class Service:
     def __init__(self):
         self.db = Database()
-'''
+"""
         issues = _detect_tight_coupling(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "tight_coupling"
@@ -123,12 +123,12 @@ class Service:
         """Test that builtin types like Dict, List are ignored."""
         from yolo_developer.agents.tea.testability import _detect_tight_coupling
 
-        content = '''
+        content = """
 class Service:
     def __init__(self):
         self.data = Dict()
         self.items = List()
-'''
+"""
         issues = _detect_tight_coupling(content, "test.py")
         assert len(issues) == 0
 
@@ -136,11 +136,11 @@ class Service:
         """Test that dependency injection pattern is not flagged."""
         from yolo_developer.agents.tea.testability import _detect_tight_coupling
 
-        content = '''
+        content = """
 class Service:
     def __init__(self, db):
         self.db = db
-'''
+"""
         issues = _detect_tight_coupling(content, "test.py")
         assert len(issues) == 0
 
@@ -160,11 +160,11 @@ class TestDetectHiddenDependencies:
         """Test detection of import inside function."""
         from yolo_developer.agents.tea.testability import _detect_hidden_dependencies
 
-        content = '''
+        content = """
 def foo():
     import json
     return json.dumps({})
-'''
+"""
         issues = _detect_hidden_dependencies(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "hidden_dependency"
@@ -175,11 +175,11 @@ def foo():
         """Test detection of from-import inside function."""
         from yolo_developer.agents.tea.testability import _detect_hidden_dependencies
 
-        content = '''
+        content = """
 def foo():
     from os import path
     return path.exists("file.txt")
-'''
+"""
         issues = _detect_hidden_dependencies(content, "test.py")
         assert len(issues) == 1
         assert "path" in issues[0].description
@@ -188,12 +188,12 @@ def foo():
         """Test that module-level imports are not flagged."""
         from yolo_developer.agents.tea.testability import _detect_hidden_dependencies
 
-        content = '''
+        content = """
 import json
 
 def foo():
     return json.dumps({})
-'''
+"""
         issues = _detect_hidden_dependencies(content, "test.py")
         assert len(issues) == 0
 
@@ -209,11 +209,11 @@ def foo():
         """Test detection of import inside async function."""
         from yolo_developer.agents.tea.testability import _detect_hidden_dependencies
 
-        content = '''
+        content = """
 async def async_foo():
     import aiohttp
     return await aiohttp.get("url")
-'''
+"""
         issues = _detect_hidden_dependencies(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "hidden_dependency"
@@ -229,7 +229,7 @@ class TestDetectComplexConditionals:
         from yolo_developer.agents.tea.testability import _detect_complex_conditionals
 
         # Create a function with high complexity
-        content = '''
+        content = """
 def complex_func(a, b, c, d, e, f, g, h, i, j, k, l):
     if a:
         if b:
@@ -250,7 +250,7 @@ def complex_func(a, b, c, d, e, f, g, h, i, j, k, l):
             pass
     while True:
         break
-'''
+"""
         issues = _detect_complex_conditionals(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "complex_conditional"
@@ -261,12 +261,12 @@ def complex_func(a, b, c, d, e, f, g, h, i, j, k, l):
         """Test that simple functions are not flagged."""
         from yolo_developer.agents.tea.testability import _detect_complex_conditionals
 
-        content = '''
+        content = """
 def simple_func(a):
     if a:
         return True
     return False
-'''
+"""
         issues = _detect_complex_conditionals(content, "test.py")
         assert len(issues) == 0
 
@@ -302,10 +302,10 @@ class TestDetectLongMethods:
         """Test that short functions are not flagged."""
         from yolo_developer.agents.tea.testability import _detect_long_methods
 
-        content = '''
+        content = """
 def short_func():
     return True
-'''
+"""
         issues = _detect_long_methods(content, "test.py")
         assert len(issues) == 0
 
@@ -337,7 +337,7 @@ class TestDetectDeepNesting:
         """Test detection of nesting > 4 levels."""
         from yolo_developer.agents.tea.testability import _detect_deep_nesting
 
-        content = '''
+        content = """
 def deeply_nested():
     if True:
         if True:
@@ -345,7 +345,7 @@ def deeply_nested():
                 if True:
                     if True:
                         pass
-'''
+"""
         issues = _detect_deep_nesting(content, "test.py")
         assert len(issues) == 1
         assert issues[0].pattern_type == "deep_nesting"
@@ -356,12 +356,12 @@ def deeply_nested():
         """Test that shallow nesting is not flagged."""
         from yolo_developer.agents.tea.testability import _detect_deep_nesting
 
-        content = '''
+        content = """
 def shallow_func():
     if True:
         if True:
             pass
-'''
+"""
         issues = _detect_deep_nesting(content, "test.py")
         assert len(issues) == 0
 
@@ -369,7 +369,7 @@ def shallow_func():
         """Test detection of mixed nesting types (if/for/while/with)."""
         from yolo_developer.agents.tea.testability import _detect_deep_nesting
 
-        content = '''
+        content = """
 def mixed_nesting():
     if True:
         for x in range(10):
@@ -377,7 +377,7 @@ def mixed_nesting():
                 with open("f") as f:
                     if True:
                         pass
-'''
+"""
         issues = _detect_deep_nesting(content, "test.py")
         assert len(issues) == 1
 

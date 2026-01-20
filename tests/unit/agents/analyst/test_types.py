@@ -1833,8 +1833,14 @@ class TestEscalationReason:
     def test_escalation_reason_from_string(self) -> None:
         """EscalationReason should be constructible from string value."""
         assert EscalationReason("unresolvable_ambiguity") == EscalationReason.UNRESOLVABLE_AMBIGUITY
-        assert EscalationReason("conflicting_requirements") == EscalationReason.CONFLICTING_REQUIREMENTS
-        assert EscalationReason("missing_domain_knowledge") == EscalationReason.MISSING_DOMAIN_KNOWLEDGE
+        assert (
+            EscalationReason("conflicting_requirements")
+            == EscalationReason.CONFLICTING_REQUIREMENTS
+        )
+        assert (
+            EscalationReason("missing_domain_knowledge")
+            == EscalationReason.MISSING_DOMAIN_KNOWLEDGE
+        )
 
     def test_escalation_reason_invalid_value(self) -> None:
         """EscalationReason should reject invalid values."""

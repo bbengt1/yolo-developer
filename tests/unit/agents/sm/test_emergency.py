@@ -468,7 +468,9 @@ class TestEvaluateRollbackOption:
         option = _evaluate_rollback_option(trigger, checkpoint)
 
         assert option.action == "rollback"
-        assert "rollback" in option.description.lower() or "checkpoint" in option.description.lower()
+        assert (
+            "rollback" in option.description.lower() or "checkpoint" in option.description.lower()
+        )
 
     def test_returns_none_without_checkpoint(self) -> None:
         """_evaluate_rollback_option returns None without checkpoint."""

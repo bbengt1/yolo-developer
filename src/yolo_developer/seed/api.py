@@ -127,9 +127,7 @@ async def parse_seed(
     """
     # Validate parameters
     if validate_sop and sop_store is None:
-        raise ValueError(
-            "sop_store is required when validate_sop is True"
-        )
+        raise ValueError("sop_store is required when validate_sop is True")
 
     logger.info(
         "parse_seed_started",
@@ -205,8 +203,7 @@ async def parse_seed(
         constraints=result.constraint_count,
         ambiguities=result.ambiguity_count if detect_ambiguities else 0,
         sop_conflicts=(
-            result.sop_validation.hard_conflict_count
-            + result.sop_validation.soft_conflict_count
+            result.sop_validation.hard_conflict_count + result.sop_validation.soft_conflict_count
             if result.sop_validation
             else 0
         ),

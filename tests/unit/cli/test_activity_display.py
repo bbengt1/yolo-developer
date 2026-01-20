@@ -312,9 +312,10 @@ class TestActivityDisplayContextManager:
         display = ActivityDisplay()
 
         # Should support context manager protocol
-        with patch.object(display, "start") as mock_start, patch.object(
-            display, "stop"
-        ) as mock_stop:
+        with (
+            patch.object(display, "start") as mock_start,
+            patch.object(display, "stop") as mock_stop,
+        ):
             with display:
                 pass
 

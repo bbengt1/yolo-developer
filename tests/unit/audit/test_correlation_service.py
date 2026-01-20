@@ -466,7 +466,9 @@ class TestTimelineView:
             decision_type="requirement_analysis",
             content="Test",
             rationale="Test",
-            agent=AgentIdentity(agent_name="analyst", agent_type="analyst", session_id="session-123"),
+            agent=AgentIdentity(
+                agent_name="analyst", agent_type="analyst", session_id="session-123"
+            ),
             context=DecisionContext(),
             timestamp="2026-01-18T10:00:00Z",
         )

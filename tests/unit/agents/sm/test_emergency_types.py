@@ -24,7 +24,13 @@ class TestEmergencyTypeConstants:
         """VALID_EMERGENCY_TYPES contains all expected emergency types."""
         from yolo_developer.agents.sm.emergency_types import VALID_EMERGENCY_TYPES
 
-        expected = {"health_degraded", "circular_logic", "gate_blocked", "agent_stuck", "system_error"}
+        expected = {
+            "health_degraded",
+            "circular_logic",
+            "gate_blocked",
+            "agent_stuck",
+            "system_error",
+        }
         assert VALID_EMERGENCY_TYPES == frozenset(expected)
 
     def test_valid_protocol_statuses_contains_all_statuses(self) -> None:

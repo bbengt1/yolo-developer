@@ -335,7 +335,14 @@ class TestEscalationCreation:
         from yolo_developer.agents.pm.escalation import _create_escalation
 
         req = {"id": "req-001", "refined_text": "Test", "category": "functional"}
-        questions = [{"question_text": "Test?", "source_requirement_id": "req-001", "ambiguity_type": "vague_term", "context": ""}]
+        questions = [
+            {
+                "question_text": "Test?",
+                "source_requirement_id": "req-001",
+                "ambiguity_type": "vague_term",
+                "context": "",
+            }
+        ]
 
         esc1 = _create_escalation(req, questions, "ambiguous_terms")
         esc2 = _create_escalation(req, questions, "ambiguous_terms")
@@ -350,7 +357,14 @@ class TestEscalationCreation:
         from yolo_developer.agents.pm.escalation import _create_escalation
 
         req = {"id": "req-001", "refined_text": "Test", "category": "functional"}
-        questions = [{"question_text": "Test?", "source_requirement_id": "req-001", "ambiguity_type": "vague_term", "context": ""}]
+        questions = [
+            {
+                "question_text": "Test?",
+                "source_requirement_id": "req-001",
+                "ambiguity_type": "vague_term",
+                "context": "",
+            }
+        ]
 
         esc = _create_escalation(req, questions, "ambiguous_terms")
         assert esc["source_agent"] == "pm"
@@ -360,7 +374,14 @@ class TestEscalationCreation:
         from yolo_developer.agents.pm.escalation import _create_escalation
 
         req = {"id": "req-001", "refined_text": "Test", "category": "functional"}
-        questions = [{"question_text": "Test?", "source_requirement_id": "req-001", "ambiguity_type": "vague_term", "context": ""}]
+        questions = [
+            {
+                "question_text": "Test?",
+                "source_requirement_id": "req-001",
+                "ambiguity_type": "vague_term",
+                "context": "",
+            }
+        ]
 
         esc = _create_escalation(req, questions, "ambiguous_terms")
         assert esc["target_agent"] == "analyst"
@@ -369,8 +390,19 @@ class TestEscalationCreation:
         """Test that original requirement is preserved in escalation."""
         from yolo_developer.agents.pm.escalation import _create_escalation
 
-        req = {"id": "req-007", "refined_text": "System should be fast", "category": "non_functional"}
-        questions = [{"question_text": "Test?", "source_requirement_id": "req-007", "ambiguity_type": "vague_term", "context": ""}]
+        req = {
+            "id": "req-007",
+            "refined_text": "System should be fast",
+            "category": "non_functional",
+        }
+        questions = [
+            {
+                "question_text": "Test?",
+                "source_requirement_id": "req-007",
+                "ambiguity_type": "vague_term",
+                "context": "",
+            }
+        ]
 
         esc = _create_escalation(req, questions, "ambiguous_terms")
         assert esc["requirement_id"] == "req-007"
@@ -380,7 +412,14 @@ class TestEscalationCreation:
         from yolo_developer.agents.pm.escalation import _create_escalation
 
         req = {"id": "req-001", "refined_text": "Test", "category": "functional"}
-        questions = [{"question_text": "Test?", "source_requirement_id": "req-001", "ambiguity_type": "vague_term", "context": ""}]
+        questions = [
+            {
+                "question_text": "Test?",
+                "source_requirement_id": "req-001",
+                "ambiguity_type": "vague_term",
+                "context": "",
+            }
+        ]
 
         esc = _create_escalation(req, questions, "missing_criteria")
         assert esc["reason"] == "missing_criteria"

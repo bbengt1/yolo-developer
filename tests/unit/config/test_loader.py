@@ -561,8 +561,13 @@ class TestLoaderCodeQuality:
         """
         import subprocess
 
+        from tests.conftest import UV_AVAILABLE, UV_CMD
+
+        if not UV_AVAILABLE:
+            pytest.skip("uv not available")
+
         result = subprocess.run(
-            ["uv", "run", "mypy", "src/yolo_developer/config/loader.py"],
+            [*UV_CMD, "run", "mypy", "src/yolo_developer/config/loader.py"],
             capture_output=True,
             text=True,
         )

@@ -62,9 +62,7 @@ class TestGenerateAcceptanceCriteria:
             "benefit": "access account",
             "title": "User Login",
         }
-        acs = await _generate_acceptance_criteria(
-            "req-001", "User can login", story_components
-        )
+        acs = await _generate_acceptance_criteria("req-001", "User can login", story_components)
 
         assert len(acs) >= 1
         assert acs[0].id == "AC1"
@@ -78,9 +76,7 @@ class TestGenerateAcceptanceCriteria:
             "benefit": "validate",
             "title": "Test",
         }
-        acs = await _generate_acceptance_criteria(
-            "req-001", "Test requirement", story_components
-        )
+        acs = await _generate_acceptance_criteria("req-001", "Test requirement", story_components)
 
         ac = acs[0]
         assert ac.given != ""
@@ -96,9 +92,7 @@ class TestGenerateAcceptanceCriteria:
             "benefit": "verify",
             "title": "Test",
         }
-        acs = await _generate_acceptance_criteria(
-            "req-001", "Test", story_components
-        )
+        acs = await _generate_acceptance_criteria("req-001", "Test", story_components)
 
         assert isinstance(acs[0].and_clauses, tuple)
 
@@ -262,7 +256,11 @@ class TestTransformRequirementsToStories:
     async def test_security_requirement_is_critical(self) -> None:
         """Security requirements should have critical priority."""
         reqs = [
-            {"id": "req-001", "refined_text": "User authentication with OAuth", "category": "functional"}
+            {
+                "id": "req-001",
+                "refined_text": "User authentication with OAuth",
+                "category": "functional",
+            }
         ]
 
         stories, _ = await _transform_requirements_to_stories(reqs)
@@ -272,7 +270,9 @@ class TestTransformRequirementsToStories:
     @pytest.mark.asyncio
     async def test_complexity_estimation(self) -> None:
         """Stories should have complexity estimation."""
-        reqs = [{"id": "req-001", "refined_text": "Simple display feature", "category": "functional"}]
+        reqs = [
+            {"id": "req-001", "refined_text": "Simple display feature", "category": "functional"}
+        ]
 
         stories, _ = await _transform_requirements_to_stories(reqs)
 
@@ -281,16 +281,24 @@ class TestTransformRequirementsToStories:
     @pytest.mark.asyncio
     async def test_handles_transformation_exception(self) -> None:
         """Should handle exceptions during single requirement transformation."""
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         reqs = [
             {"id": "req-001", "refined_text": "Normal requirement", "category": "functional"},
             {"id": "req-002", "refined_text": "Problematic requirement", "category": "functional"},
-            {"id": "req-003", "refined_text": "Another normal requirement", "category": "functional"},
+            {
+                "id": "req-003",
+                "refined_text": "Another normal requirement",
+                "category": "functional",
+            },
         ]
 
         # Mock _transform_single_requirement to fail for second requirement
-        original_transform = _transform_requirements_to_stories.__wrapped__ if hasattr(_transform_requirements_to_stories, '__wrapped__') else None
+        (
+            _transform_requirements_to_stories.__wrapped__
+            if hasattr(_transform_requirements_to_stories, "__wrapped__")
+            else None
+        )
 
         with patch(
             "yolo_developer.agents.pm.node._transform_single_requirement",
@@ -304,14 +312,24 @@ class TestTransformRequirementsToStories:
                 if req.get("id") == "req-002":
                     raise RuntimeError("Transformation failed")
                 # Return a mock story for other requirements
-                from yolo_developer.agents.pm.types import Story, StoryStatus, StoryPriority, AcceptanceCriterion
+                from yolo_developer.agents.pm.types import (
+                    AcceptanceCriterion,
+                    Story,
+                    StoryPriority,
+                    StoryStatus,
+                )
+
                 return Story(
                     id=f"story-{counter:03d}",
                     title="Test",
                     role="user",
                     action="test",
                     benefit="test",
-                    acceptance_criteria=(AcceptanceCriterion(id="AC1", given="x", when="y", then="z", and_clauses=()),),
+                    acceptance_criteria=(
+                        AcceptanceCriterion(
+                            id="AC1", given="x", when="y", then="z", and_clauses=()
+                        ),
+                    ),
                     priority=StoryPriority.HIGH,
                     status=StoryStatus.DRAFT,
                     source_requirements=(req.get("id"),),
@@ -404,9 +422,7 @@ class TestPmNode:
         assert "story_count" in result["pm_output"]
 
     @pytest.mark.asyncio
-    async def test_creates_stories_from_requirements(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_creates_stories_from_requirements(self, mock_state: dict[str, Any]) -> None:
         """pm_node should create stories from requirements."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -415,9 +431,7 @@ class TestPmNode:
         assert pm_output["story_count"] == 2
 
     @pytest.mark.asyncio
-    async def test_decision_has_correct_agent(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_decision_has_correct_agent(self, mock_state: dict[str, Any]) -> None:
         """Decision should have agent='pm'."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -425,9 +439,7 @@ class TestPmNode:
         assert decision.agent == "pm"
 
     @pytest.mark.asyncio
-    async def test_decision_has_related_artifacts(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_decision_has_related_artifacts(self, mock_state: dict[str, Any]) -> None:
         """Decision should include story IDs as related_artifacts."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -436,9 +448,7 @@ class TestPmNode:
         assert all(a.startswith("story-") for a in decision.related_artifacts)
 
     @pytest.mark.asyncio
-    async def test_decision_has_valid_timestamp(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_decision_has_valid_timestamp(self, mock_state: dict[str, Any]) -> None:
         """Decision should have a valid UTC timestamp."""
         before = datetime.now(timezone.utc)
         result = await pm_node(mock_state)  # type: ignore[arg-type]
@@ -451,9 +461,7 @@ class TestPmNode:
         assert before <= decision.timestamp <= after
 
     @pytest.mark.asyncio
-    async def test_message_has_agent_metadata(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_message_has_agent_metadata(self, mock_state: dict[str, Any]) -> None:
         """AIMessage should have agent='pm' in additional_kwargs."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -461,9 +469,7 @@ class TestPmNode:
         assert message.additional_kwargs.get("agent") == "pm"
 
     @pytest.mark.asyncio
-    async def test_message_content_has_summary(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_message_content_has_summary(self, mock_state: dict[str, Any]) -> None:
         """AIMessage content should summarize processing."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -472,9 +478,7 @@ class TestPmNode:
         assert "PM processing complete" in message.content
 
     @pytest.mark.asyncio
-    async def test_handles_empty_analyst_output(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_handles_empty_analyst_output(self, empty_state: dict[str, Any]) -> None:
         """pm_node should handle missing analyst_output."""
         result = await pm_node(empty_state)  # type: ignore[arg-type]
 
@@ -482,9 +486,7 @@ class TestPmNode:
         assert pm_output["story_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_handles_empty_requirements(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_handles_empty_requirements(self, empty_state: dict[str, Any]) -> None:
         """pm_node should handle empty requirements list."""
         empty_state["analyst_output"] = {"requirements": [], "escalations": []}
 
@@ -494,9 +496,7 @@ class TestPmNode:
         assert pm_output["story_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_processing_notes_summary(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_processing_notes_summary(self, mock_state: dict[str, Any]) -> None:
         """Processing notes should summarize transformation."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -506,9 +506,7 @@ class TestPmNode:
         assert "stories" in notes
 
     @pytest.mark.asyncio
-    async def test_handles_gaps_and_contradictions(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_handles_gaps_and_contradictions(self, empty_state: dict[str, Any]) -> None:
         """pm_node should extract gaps and contradictions from analyst_output."""
         empty_state["analyst_output"] = {
             "requirements": [],
@@ -524,9 +522,7 @@ class TestPmNode:
         assert result["pm_output"]["story_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_decision_rationale_mentions_llm(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_decision_rationale_mentions_llm(self, mock_state: dict[str, Any]) -> None:
         """Decision rationale should mention LLM-powered transformation."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -534,9 +530,7 @@ class TestPmNode:
         assert "LLM" in decision.rationale or "story extraction" in decision.rationale
 
     @pytest.mark.asyncio
-    async def test_processing_notes_include_validation(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_processing_notes_include_validation(self, mock_state: dict[str, Any]) -> None:
         """Processing notes should include testability validation summary (Story 6.3)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -558,9 +552,7 @@ class TestPmNode:
         assert pm_output["processing_notes"] != ""
 
     @pytest.mark.asyncio
-    async def test_validation_results_appear_in_notes(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_validation_results_appear_in_notes(self, empty_state: dict[str, Any]) -> None:
         """Validation results should appear in processing notes (Story 6.3)."""
         # Create requirements that will produce stories with potential issues
         empty_state["analyst_output"] = {
@@ -581,9 +573,7 @@ class TestPmNode:
         assert "Testability validation" in notes or "validation" in notes.lower()
 
     @pytest.mark.asyncio
-    async def test_prioritization_result_included(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_prioritization_result_included(self, mock_state: dict[str, Any]) -> None:
         """pm_node should include prioritization_result in output (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -608,9 +598,7 @@ class TestPmNode:
         assert len(prioritization["scores"]) == pm_output["story_count"]
 
     @pytest.mark.asyncio
-    async def test_prioritization_order_matches_stories(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_prioritization_order_matches_stories(self, mock_state: dict[str, Any]) -> None:
         """Recommended order should contain same story IDs (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -623,9 +611,7 @@ class TestPmNode:
         assert story_ids == order_ids
 
     @pytest.mark.asyncio
-    async def test_prioritization_summary_in_notes(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_prioritization_summary_in_notes(self, mock_state: dict[str, Any]) -> None:
         """Processing notes should include prioritization summary (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -633,9 +619,7 @@ class TestPmNode:
         assert "Prioritization:" in notes or "prioritized" in notes.lower()
 
     @pytest.mark.asyncio
-    async def test_prioritization_in_decision_rationale(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_prioritization_in_decision_rationale(self, mock_state: dict[str, Any]) -> None:
         """Decision rationale should mention prioritization (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -643,9 +627,7 @@ class TestPmNode:
         assert "Prioritization" in decision.rationale or "prioritized" in decision.rationale.lower()
 
     @pytest.mark.asyncio
-    async def test_empty_stories_prioritization(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_empty_stories_prioritization(self, empty_state: dict[str, Any]) -> None:
         """Prioritization should handle empty stories gracefully (Story 6.4)."""
         empty_state["analyst_output"] = {"requirements": [], "escalations": []}
 
@@ -658,9 +640,7 @@ class TestPmNode:
         assert prioritization["dependency_cycles"] == []
 
     @pytest.mark.asyncio
-    async def test_message_includes_quick_wins(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_message_includes_quick_wins(self, mock_state: dict[str, Any]) -> None:
         """Message content should mention quick wins (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -668,9 +648,7 @@ class TestPmNode:
         assert "Quick wins:" in message.content
 
     @pytest.mark.asyncio
-    async def test_message_includes_recommended_order(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_message_includes_recommended_order(self, mock_state: dict[str, Any]) -> None:
         """Message content should mention recommended order (Story 6.4)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -680,9 +658,7 @@ class TestPmNode:
     # Story 6.5: Dependency Analysis Integration Tests
 
     @pytest.mark.asyncio
-    async def test_dependency_analysis_result_included(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dependency_analysis_result_included(self, mock_state: dict[str, Any]) -> None:
         """pm_node should include dependency_analysis_result in output (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -696,9 +672,7 @@ class TestPmNode:
         assert "analysis_notes" in dep_result
 
     @pytest.mark.asyncio
-    async def test_dependency_graph_has_correct_structure(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dependency_graph_has_correct_structure(self, mock_state: dict[str, Any]) -> None:
         """Dependency graph should have correct structure (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -709,9 +683,7 @@ class TestPmNode:
         assert "reverse_adjacency_list" in graph
 
     @pytest.mark.asyncio
-    async def test_dependency_nodes_match_stories(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dependency_nodes_match_stories(self, mock_state: dict[str, Any]) -> None:
         """Dependency graph nodes should match story IDs (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -736,9 +708,7 @@ class TestPmNode:
             assert isinstance(story["dependencies"], list)
 
     @pytest.mark.asyncio
-    async def test_dependency_summary_in_notes(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dependency_summary_in_notes(self, mock_state: dict[str, Any]) -> None:
         """Processing notes should include dependency summary (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -746,9 +716,7 @@ class TestPmNode:
         assert "Dependencies:" in notes or "dependencies" in notes.lower()
 
     @pytest.mark.asyncio
-    async def test_dependency_summary_in_decision(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_dependency_summary_in_decision(self, mock_state: dict[str, Any]) -> None:
         """Decision rationale should mention dependencies (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -756,9 +724,7 @@ class TestPmNode:
         assert "Dependencies:" in decision.rationale or "dependencies" in decision.rationale.lower()
 
     @pytest.mark.asyncio
-    async def test_message_includes_dependencies_info(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_message_includes_dependencies_info(self, mock_state: dict[str, Any]) -> None:
         """Message content should mention dependency analysis (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 
@@ -767,9 +733,7 @@ class TestPmNode:
         assert "Critical path length:" in message.content
 
     @pytest.mark.asyncio
-    async def test_empty_stories_dependency_analysis(
-        self, empty_state: dict[str, Any]
-    ) -> None:
+    async def test_empty_stories_dependency_analysis(self, empty_state: dict[str, Any]) -> None:
         """Dependency analysis should handle empty stories gracefully (Story 6.5)."""
         empty_state["analyst_output"] = {"requirements": [], "escalations": []}
 
@@ -784,9 +748,7 @@ class TestPmNode:
         assert dep_result["has_cycles"] is False
 
     @pytest.mark.asyncio
-    async def test_no_cycles_in_normal_stories(
-        self, mock_state: dict[str, Any]
-    ) -> None:
+    async def test_no_cycles_in_normal_stories(self, mock_state: dict[str, Any]) -> None:
         """Normal stories should not have dependency cycles (Story 6.5)."""
         result = await pm_node(mock_state)  # type: ignore[arg-type]
 

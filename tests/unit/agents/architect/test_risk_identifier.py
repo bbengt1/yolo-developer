@@ -64,9 +64,7 @@ class TestTechnologyRiskDetection:
             _identify_technology_risks,
         )
 
-        story = _create_test_story(
-            description="Using deprecated API for authentication"
-        )
+        story = _create_test_story(description="Using deprecated API for authentication")
         decisions: list[DesignDecision] = []
 
         risks = _identify_technology_risks(story, decisions)
@@ -100,17 +98,14 @@ class TestTechnologyRiskDetection:
             _identify_technology_risks,
         )
 
-        story = _create_test_story(
-            description="May have incompatible version conflict with lib"
-        )
+        story = _create_test_story(description="May have incompatible version conflict with lib")
         decisions: list[DesignDecision] = []
 
         risks = _identify_technology_risks(story, decisions)
 
         assert len(risks) >= 1
         assert any(
-            "incompatible" in r.description.lower()
-            or "version" in r.description.lower()
+            "incompatible" in r.description.lower() or "version" in r.description.lower()
             for r in risks
         )
 
@@ -121,9 +116,7 @@ class TestTechnologyRiskDetection:
             _identify_technology_risks,
         )
 
-        story = _create_test_story(
-            description="Standard feature using stable libraries"
-        )
+        story = _create_test_story(description="Standard feature using stable libraries")
         decisions: list[DesignDecision] = []
 
         risks = _identify_technology_risks(story, decisions)
@@ -161,9 +154,7 @@ class TestIntegrationRiskDetection:
             _identify_integration_risks,
         )
 
-        story = _create_test_story(
-            description="Integrate with external API for payment processing"
-        )
+        story = _create_test_story(description="Integrate with external API for payment processing")
         decisions: list[DesignDecision] = []
 
         risks = _identify_integration_risks(story, decisions)
@@ -179,9 +170,7 @@ class TestIntegrationRiskDetection:
             _identify_integration_risks,
         )
 
-        story = _create_test_story(
-            description="API has rate limit of 100 requests per minute"
-        )
+        story = _create_test_story(description="API has rate limit of 100 requests per minute")
         decisions: list[DesignDecision] = []
 
         risks = _identify_integration_risks(story, decisions)
@@ -196,17 +185,14 @@ class TestIntegrationRiskDetection:
             _identify_integration_risks,
         )
 
-        story = _create_test_story(
-            description="Using proprietary vendor-specific cloud features"
-        )
+        story = _create_test_story(description="Using proprietary vendor-specific cloud features")
         decisions: list[DesignDecision] = []
 
         risks = _identify_integration_risks(story, decisions)
 
         assert len(risks) >= 1
         assert any(
-            "proprietary" in r.description.lower()
-            or "vendor" in r.description.lower()
+            "proprietary" in r.description.lower() or "vendor" in r.description.lower()
             for r in risks
         )
 
@@ -217,17 +203,14 @@ class TestIntegrationRiskDetection:
             _identify_integration_risks,
         )
 
-        story = _create_test_story(
-            description="Implement OAuth with credential management"
-        )
+        story = _create_test_story(description="Implement OAuth with credential management")
         decisions: list[DesignDecision] = []
 
         risks = _identify_integration_risks(story, decisions)
 
         assert len(risks) >= 1
         assert any(
-            "oauth" in r.description.lower() or "credential" in r.description.lower()
-            for r in risks
+            "oauth" in r.description.lower() or "credential" in r.description.lower() for r in risks
         )
 
     @pytest.mark.asyncio
@@ -278,17 +261,14 @@ class TestScalabilityRiskDetection:
             _identify_scalability_risks,
         )
 
-        story = _create_test_story(
-            description="Store session state in memory with sticky session"
-        )
+        story = _create_test_story(description="Store session state in memory with sticky session")
         decisions: list[DesignDecision] = []
 
         risks = _identify_scalability_risks(story, decisions)
 
         assert len(risks) >= 1
         assert any(
-            "session" in r.description.lower() or "memory" in r.description.lower()
-            for r in risks
+            "session" in r.description.lower() or "memory" in r.description.lower() for r in risks
         )
 
     @pytest.mark.asyncio
@@ -298,17 +278,14 @@ class TestScalabilityRiskDetection:
             _identify_scalability_risks,
         )
 
-        story = _create_test_story(
-            description="Using single database with no replication"
-        )
+        story = _create_test_story(description="Using single database with no replication")
         decisions: list[DesignDecision] = []
 
         risks = _identify_scalability_risks(story, decisions)
 
         assert len(risks) >= 1
         assert any(
-            "database" in r.description.lower()
-            or "replication" in r.description.lower()
+            "database" in r.description.lower() or "replication" in r.description.lower()
             for r in risks
         )
 
@@ -359,7 +336,6 @@ class TestMitigationSuggestionEngine:
         from yolo_developer.agents.architect.risk_identifier import (
             _generate_mitigations,
         )
-        from yolo_developer.agents.architect.types import TechnicalRisk
 
         risks = [
             TechnicalRisk(
@@ -388,7 +364,6 @@ class TestMitigationSuggestionEngine:
         from yolo_developer.agents.architect.risk_identifier import (
             _estimate_mitigation_effort,
         )
-        from yolo_developer.agents.architect.types import TechnicalRisk
 
         # Critical scalability risk should have high effort
         critical_risk = TechnicalRisk(
@@ -410,7 +385,6 @@ class TestMitigationSuggestionEngine:
         from yolo_developer.agents.architect.risk_identifier import (
             _generate_mitigations,
         )
-        from yolo_developer.agents.architect.types import TechnicalRisk
 
         risks = [
             TechnicalRisk(
@@ -437,7 +411,6 @@ class TestMitigationSuggestionEngine:
         from yolo_developer.agents.architect.risk_identifier import (
             _generate_mitigations,
         )
-        from yolo_developer.agents.architect.types import TechnicalRisk
 
         risks = [
             TechnicalRisk(
@@ -513,9 +486,7 @@ class TestLLMIntegration:
             identify_technical_risks,
         )
 
-        story = _create_test_story(
-            description="Using deprecated API with external service"
-        )
+        story = _create_test_story(description="Using deprecated API with external service")
         decisions: list[DesignDecision] = []
 
         with patch(

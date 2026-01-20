@@ -42,9 +42,7 @@ class TestAnalystNodeIntegration:
     def sample_state(self) -> YoloState:
         """Create a sample YoloState for testing."""
         return {
-            "messages": [
-                HumanMessage(content="Build a todo application with user authentication")
-            ],
+            "messages": [HumanMessage(content="Build a todo application with user authentication")],
             "current_agent": "analyst",
             "handoff_context": None,
             "decisions": [],
@@ -56,6 +54,7 @@ class TestAnalystNodeIntegration:
         sample_state: YoloState,
     ) -> None:
         """analyst_node should work with testability gate when gate passes."""
+
         # Register a passing testability gate
         async def passing_gate(ctx: GateContext) -> GateResult:
             return GateResult(passed=True, gate_name="testability")
@@ -94,6 +93,7 @@ class TestAnalystNodeIntegration:
         sample_state: YoloState,
     ) -> None:
         """analyst_node should be blocked when testability gate fails."""
+
         # Register a failing testability gate
         async def failing_gate(ctx: GateContext) -> GateResult:
             return GateResult(
@@ -224,19 +224,21 @@ class TestLLMResponseParsing:
 
     def test_parse_valid_json_response(self) -> None:
         """_parse_llm_response should parse valid JSON correctly."""
-        response = json.dumps({
-            "requirements": [
-                {
-                    "id": "req-001",
-                    "original_text": "Original",
-                    "refined_text": "Refined",
-                    "category": "functional",
-                    "testable": True,
-                }
-            ],
-            "identified_gaps": ["Gap 1"],
-            "contradictions": ["Contradiction 1"],
-        })
+        response = json.dumps(
+            {
+                "requirements": [
+                    {
+                        "id": "req-001",
+                        "original_text": "Original",
+                        "refined_text": "Refined",
+                        "category": "functional",
+                        "testable": True,
+                    }
+                ],
+                "identified_gaps": ["Gap 1"],
+                "contradictions": ["Contradiction 1"],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -258,11 +260,13 @@ class TestLLMResponseParsing:
 
     def test_parse_empty_requirements(self) -> None:
         """_parse_llm_response should handle empty requirements list."""
-        response = json.dumps({
-            "requirements": [],
-            "identified_gaps": [],
-            "contradictions": [],
-        })
+        response = json.dumps(
+            {
+                "requirements": [],
+                "identified_gaps": [],
+                "contradictions": [],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -272,16 +276,18 @@ class TestLLMResponseParsing:
 
     def test_parse_missing_fields(self) -> None:
         """_parse_llm_response should handle missing optional fields."""
-        response = json.dumps({
-            "requirements": [
-                {
-                    "id": "req-001",
-                    "original_text": "Test",
-                    "refined_text": "Test refined",
-                    # Missing category and testable - should use defaults
-                }
-            ],
-        })
+        response = json.dumps(
+            {
+                "requirements": [
+                    {
+                        "id": "req-001",
+                        "original_text": "Test",
+                        "refined_text": "Test refined",
+                        # Missing category and testable - should use defaults
+                    }
+                ],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -359,7 +365,9 @@ class TestCrystallizationIntegration:
         # Decision should have analyst attribution
         assert decision.agent == "analyst"
         # Decision should include requirement count in summary
-        assert "requirement" in decision.summary.lower() or "crystallized" in decision.summary.lower()
+        assert (
+            "requirement" in decision.summary.lower() or "crystallized" in decision.summary.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_backward_compatibility_with_mocked_llm(self) -> None:
@@ -424,22 +432,24 @@ class TestCrystallizationIntegration:
     @pytest.mark.asyncio
     async def test_llm_response_with_new_fields_parses_correctly(self) -> None:
         """Test parsing LLM response that includes new fields."""
-        response = json.dumps({
-            "requirements": [
-                {
-                    "id": "req-001",
-                    "original_text": "System should be fast",
-                    "refined_text": "Response time < 200ms at 95th percentile",
-                    "category": "non-functional",
-                    "testable": True,
-                    "scope_notes": "Applies to GET endpoints; POST excluded",
-                    "implementation_hints": ["Use async handlers", "Add response caching"],
-                    "confidence": 0.9,
-                }
-            ],
-            "identified_gaps": [],
-            "contradictions": [],
-        })
+        response = json.dumps(
+            {
+                "requirements": [
+                    {
+                        "id": "req-001",
+                        "original_text": "System should be fast",
+                        "refined_text": "Response time < 200ms at 95th percentile",
+                        "category": "non-functional",
+                        "testable": True,
+                        "scope_notes": "Applies to GET endpoints; POST excluded",
+                        "implementation_hints": ["Use async handlers", "Add response caching"],
+                        "confidence": 0.9,
+                    }
+                ],
+                "identified_gaps": [],
+                "contradictions": [],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -459,9 +469,7 @@ class TestGapAnalysisIntegration:
         """Test complete gap analysis flow from seed content to structured gaps."""
         state: YoloState = {
             "messages": [
-                HumanMessage(
-                    content="Build user login system with email/password authentication"
-                )
+                HumanMessage(content="Build user login system with email/password authentication")
             ],
             "current_agent": "analyst",
             "handoff_context": None,
@@ -491,9 +499,7 @@ class TestGapAnalysisIntegration:
         """Test that gap analysis identifies different types of gaps."""
         state: YoloState = {
             "messages": [
-                HumanMessage(
-                    content="Build REST API with user data input and database storage"
-                )
+                HumanMessage(content="Build REST API with user data input and database storage")
             ],
             "current_agent": "analyst",
             "handoff_context": None,
@@ -562,9 +568,7 @@ class TestGapAnalysisIntegration:
     async def test_gap_severity_counts_in_decision(self) -> None:
         """Test that decision includes gap severity counts."""
         state: YoloState = {
-            "messages": [
-                HumanMessage(content="Build user authentication with login form")
-            ],
+            "messages": [HumanMessage(content="Build user authentication with login form")],
             "current_agent": "analyst",
             "handoff_context": None,
             "decisions": [],
@@ -605,29 +609,31 @@ class TestGapAnalysisIntegration:
 
     def test_parse_llm_response_with_structured_gaps(self) -> None:
         """Test parsing LLM response that includes structured_gaps."""
-        response = json.dumps({
-            "requirements": [
-                {
-                    "id": "req-001",
-                    "original_text": "User login",
-                    "refined_text": "User authenticates",
-                    "category": "functional",
-                    "testable": True,
-                }
-            ],
-            "identified_gaps": [],
-            "structured_gaps": [
-                {
-                    "id": "gap-001",
-                    "description": "Missing logout functionality",
-                    "gap_type": "implied_requirement",
-                    "severity": "high",
-                    "source_requirements": ["req-001"],
-                    "rationale": "Login implies logout needed",
-                }
-            ],
-            "contradictions": [],
-        })
+        response = json.dumps(
+            {
+                "requirements": [
+                    {
+                        "id": "req-001",
+                        "original_text": "User login",
+                        "refined_text": "User authenticates",
+                        "category": "functional",
+                        "testable": True,
+                    }
+                ],
+                "identified_gaps": [],
+                "structured_gaps": [
+                    {
+                        "id": "gap-001",
+                        "description": "Missing logout functionality",
+                        "gap_type": "implied_requirement",
+                        "severity": "high",
+                        "source_requirements": ["req-001"],
+                        "rationale": "Login implies logout needed",
+                    }
+                ],
+                "contradictions": [],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -640,21 +646,23 @@ class TestGapAnalysisIntegration:
 
     def test_parse_llm_response_with_invalid_gap_type(self) -> None:
         """Test parsing handles invalid gap_type gracefully."""
-        response = json.dumps({
-            "requirements": [],
-            "identified_gaps": [],
-            "structured_gaps": [
-                {
-                    "id": "gap-001",
-                    "description": "Test",
-                    "gap_type": "invalid_type",  # Invalid
-                    "severity": "high",
-                    "source_requirements": [],
-                    "rationale": "Test",
-                }
-            ],
-            "contradictions": [],
-        })
+        response = json.dumps(
+            {
+                "requirements": [],
+                "identified_gaps": [],
+                "structured_gaps": [
+                    {
+                        "id": "gap-001",
+                        "description": "Test",
+                        "gap_type": "invalid_type",  # Invalid
+                        "severity": "high",
+                        "source_requirements": [],
+                        "rationale": "Test",
+                    }
+                ],
+                "contradictions": [],
+            }
+        )
 
         result = _parse_llm_response(response)
 
@@ -823,9 +831,7 @@ class TestCategorizationIntegration:
     async def test_categorization_rationale_includes_keywords(self) -> None:
         """Test that categorization rationale mentions detected keywords."""
         state: YoloState = {
-            "messages": [
-                HumanMessage(content="User can create, edit, and delete items")
-            ],
+            "messages": [HumanMessage(content="User can create, edit, and delete items")],
             "current_agent": "analyst",
             "handoff_context": None,
             "decisions": [],

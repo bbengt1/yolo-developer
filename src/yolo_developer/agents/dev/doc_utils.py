@@ -474,7 +474,11 @@ def validate_documentation_quality(code: str) -> DocumentationQualityReport:
                 if node.returns is not None:
                     report.warnings.append(f"Function '{node.name}' missing Returns section")
 
-            if "example:" in docstring_lower or "examples:" in docstring_lower or ">>>" in docstring:
+            if (
+                "example:" in docstring_lower
+                or "examples:" in docstring_lower
+                or ">>>" in docstring
+            ):
                 report.functions_with_examples += 1
 
     return report

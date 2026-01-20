@@ -221,9 +221,7 @@ class TestAuditExportServiceExportToFile:
         assert os.path.exists(file_path)
 
     @pytest.mark.asyncio
-    async def test_export_to_file_explicit_format_overrides_extension(
-        self, tmp_path
-    ) -> None:
+    async def test_export_to_file_explicit_format_overrides_extension(self, tmp_path) -> None:
         """Test explicit format overrides file extension."""
         from yolo_developer.audit.export import AuditExportService
 
@@ -336,9 +334,7 @@ class TestExportServiceInvalidFormat:
             await service.export(format="invalid")  # type: ignore[arg-type]
 
     @pytest.mark.asyncio
-    async def test_export_to_file_unknown_extension_raises_error(
-        self, tmp_path
-    ) -> None:
+    async def test_export_to_file_unknown_extension_raises_error(self, tmp_path) -> None:
         """Test export_to_file with unknown extension raises ValueError."""
         from yolo_developer.audit.export import AuditExportService
 

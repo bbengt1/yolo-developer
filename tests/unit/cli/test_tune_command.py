@@ -30,12 +30,6 @@ import pytest
 import yaml
 from rich.console import Console
 
-
-def strip_ansi(text: str) -> str:
-    """Remove ANSI escape codes from text."""
-    ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
-    return ansi_pattern.sub("", text)
-
 from yolo_developer.cli.commands.tune import (
     AGENT_COLORS,
     CONFIGURABLE_AGENTS,
@@ -56,6 +50,13 @@ from yolo_developer.cli.commands.tune import (
     save_custom_template,
     tune_command,
 )
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_pattern.sub("", text)
+
 
 # =============================================================================
 # Fixtures
@@ -147,9 +148,7 @@ class TestTemplateStorage:
         """has_custom_template returns False when no template exists."""
         assert has_custom_template("analyst") is False
 
-    def test_has_custom_template_true(
-        self, mock_cwd: Path, templates_dir: Path
-    ) -> None:
+    def test_has_custom_template_true(self, mock_cwd: Path, templates_dir: Path) -> None:
         """has_custom_template returns True when template exists."""
         (templates_dir / "analyst.yaml").write_text("agent: analyst")
         assert has_custom_template("analyst") is True
@@ -168,9 +167,7 @@ class TestTemplateStorage:
         assert loaded["agent"] == "analyst"
         assert loaded["system_prompt"] == sample_template["system_prompt"]
 
-    def test_load_custom_template_invalid_yaml(
-        self, mock_cwd: Path, templates_dir: Path
-    ) -> None:
+    def test_load_custom_template_invalid_yaml(self, mock_cwd: Path, templates_dir: Path) -> None:
         """load_custom_template returns None for invalid YAML."""
         (templates_dir / "analyst.yaml").write_text("{ invalid: yaml: :")
         assert load_custom_template("analyst") is None
@@ -198,9 +195,7 @@ class TestTemplateStorage:
         save_custom_template("analyst", "prompt", None)
         assert tpl_dir.exists()
 
-    def test_reset_template_exists(
-        self, mock_cwd: Path, templates_dir: Path
-    ) -> None:
+    def test_reset_template_exists(self, mock_cwd: Path, templates_dir: Path) -> None:
         """reset_template removes existing custom template."""
         (templates_dir / "analyst.yaml").write_text("agent: analyst")
         assert has_custom_template("analyst")
@@ -452,11 +447,14 @@ class TestEditTemplate:
         def mock_editor(temp_path: str) -> None:
             """Simulate editing the temp file."""
             with open(temp_path, "w") as f:
-                yaml.dump({
-                    "agent": "analyst",
-                    "version": "1.0",
-                    "system_prompt": "Edited system prompt",
-                }, f)
+                yaml.dump(
+                    {
+                        "agent": "analyst",
+                        "version": "1.0",
+                        "system_prompt": "Edited system prompt",
+                    },
+                    f,
+                )
 
         with (
             patch("yolo_developer.cli.commands.tune.console", test_console),
@@ -511,6 +509,7 @@ class TestEditTemplate:
             patch("yolo_developer.cli.display.console", test_console),
             patch("subprocess.run") as mock_run,
         ):
+
             def run_side_effect(args: list[str], check: bool = False) -> Any:
                 mock_editor_empty(args[1])
                 return type("MockResult", (), {"returncode": 0})()
@@ -530,16 +529,20 @@ class TestEditTemplate:
         def mock_editor_wrong_agent(temp_path: str) -> None:
             """Simulate changing agent name in temp file."""
             with open(temp_path, "w") as f:
-                yaml.dump({
-                    "agent": "pm",  # Wrong agent!
-                    "system_prompt": "Edited prompt",
-                }, f)
+                yaml.dump(
+                    {
+                        "agent": "pm",  # Wrong agent!
+                        "system_prompt": "Edited prompt",
+                    },
+                    f,
+                )
 
         with (
             patch("yolo_developer.cli.commands.tune.console", test_console),
             patch("yolo_developer.cli.display.console", test_console),
             patch("subprocess.run") as mock_run,
         ):
+
             def run_side_effect(args: list[str], check: bool = False) -> Any:
                 mock_editor_wrong_agent(args[1])
                 return type("MockResult", (), {"returncode": 0})()
@@ -566,6 +569,7 @@ class TestEditTemplate:
             patch("yolo_developer.cli.display.console", test_console),
             patch("subprocess.run") as mock_run,
         ):
+
             def run_side_effect(args: list[str], check: bool = False) -> Any:
                 mock_editor_invalid_yaml(args[1])
                 return type("MockResult", (), {"returncode": 0})()
@@ -585,16 +589,20 @@ class TestEditTemplate:
         def mock_editor_no_agent(temp_path: str) -> None:
             """Simulate removing agent key from temp file."""
             with open(temp_path, "w") as f:
-                yaml.dump({
-                    "system_prompt": "Edited prompt",
-                    # Missing "agent" key!
-                }, f)
+                yaml.dump(
+                    {
+                        "system_prompt": "Edited prompt",
+                        # Missing "agent" key!
+                    },
+                    f,
+                )
 
         with (
             patch("yolo_developer.cli.commands.tune.console", test_console),
             patch("yolo_developer.cli.display.console", test_console),
             patch("subprocess.run") as mock_run,
         ):
+
             def run_side_effect(args: list[str], check: bool = False) -> Any:
                 mock_editor_no_agent(args[1])
                 return type("MockResult", (), {"returncode": 0})()
@@ -708,9 +716,7 @@ class TestTuneCommand:
         result = strip_ansi(output.getvalue())
         assert "ANALYST Agent Template" in result
 
-    def test_tune_command_reset(
-        self, mock_cwd: Path, templates_dir: Path
-    ) -> None:
+    def test_tune_command_reset(self, mock_cwd: Path, templates_dir: Path) -> None:
         """tune_command with --reset removes custom template."""
         (templates_dir / "analyst.yaml").write_text("agent: analyst")
         assert has_custom_template("analyst")
@@ -759,10 +765,14 @@ class TestTuneCommand:
     def test_tune_command_import(self, mock_cwd: Path) -> None:
         """tune_command with --import loads template."""
         import_path = mock_cwd / "test_import.yaml"
-        import_path.write_text(yaml.dump({
-            "agent": "analyst",
-            "system_prompt": "Imported via command",
-        }))
+        import_path.write_text(
+            yaml.dump(
+                {
+                    "agent": "analyst",
+                    "system_prompt": "Imported via command",
+                }
+            )
+        )
 
         output = StringIO()
         test_console = Console(file=output, force_terminal=True)
@@ -840,9 +850,7 @@ class TestEdgeCases:
             # Should not raise
             assert isinstance(template, dict)
 
-    def test_custom_template_yaml_error_handling(
-        self, mock_cwd: Path, templates_dir: Path
-    ) -> None:
+    def test_custom_template_yaml_error_handling(self, mock_cwd: Path, templates_dir: Path) -> None:
         """load_custom_template handles malformed YAML gracefully."""
         (templates_dir / "analyst.yaml").write_text("invalid: yaml: content: :")
         result = load_custom_template("analyst")

@@ -148,9 +148,7 @@ class TestDurationFormatting:
 class TestAggregateVelocity:
     """Tests for _aggregate_burn_down_velocity function."""
 
-    def test_aggregate_velocity_with_data(
-        self, sample_velocity_metrics: VelocityMetrics
-    ) -> None:
+    def test_aggregate_velocity_with_data(self, sample_velocity_metrics: VelocityMetrics) -> None:
         """Test velocity aggregation with valid data."""
         result = _aggregate_burn_down_velocity(sample_velocity_metrics)
         assert result.name == "velocity"
@@ -231,9 +229,7 @@ class TestAggregateCycleTime:
 class TestAggregateChurnRate:
     """Tests for _aggregate_churn_rate function."""
 
-    def test_aggregate_churn_rate_healthy(
-        self, sample_health_status: HealthStatus
-    ) -> None:
+    def test_aggregate_churn_rate_healthy(self, sample_health_status: HealthStatus) -> None:
         """Test churn rate aggregation with healthy value."""
         result = _aggregate_churn_rate(sample_health_status)
         assert result.name == "churn_rate"
@@ -292,9 +288,7 @@ class TestAggregateChurnRate:
 class TestAggregateIdleTimes:
     """Tests for _aggregate_idle_times function."""
 
-    def test_aggregate_idle_times_with_data(
-        self, sample_health_status: HealthStatus
-    ) -> None:
+    def test_aggregate_idle_times_with_data(self, sample_health_status: HealthStatus) -> None:
         """Test idle times aggregation with valid data."""
         result = _aggregate_idle_times(sample_health_status)
         assert "analyst" in result
@@ -483,7 +477,11 @@ class TestFormatForDashboard:
     def test_format_cycle_time_display(self, sample_snapshot: TelemetrySnapshot) -> None:
         """Test cycle time display formatting."""
         result = format_for_dashboard(sample_snapshot)
-        assert "avg" in result.cycle_time_display or "min" in result.cycle_time_display or "h" in result.cycle_time_display
+        assert (
+            "avg" in result.cycle_time_display
+            or "min" in result.cycle_time_display
+            or "h" in result.cycle_time_display
+        )
 
     def test_format_health_summary(self, sample_snapshot: TelemetrySnapshot) -> None:
         """Test health summary formatting."""
@@ -636,13 +634,18 @@ class TestGetDashboardTelemetry:
         # Create a mock health status that will raise an exception when accessed
         bad_health = MagicMock()
         # Make the metrics attribute raise when accessed
-        type(bad_health).metrics = property(lambda self: (_ for _ in ()).throw(Exception("Test error")))
+        type(bad_health).metrics = property(
+            lambda self: (_ for _ in ()).throw(Exception("Test error"))
+        )
 
         # Should not raise, should return default metrics
         result = await get_dashboard_telemetry(sample_state, health_status=bad_health)
         assert isinstance(result, DashboardMetrics)
         # Error case returns "Telemetry collection failed" and "Data unavailable"
-        assert "failed" in result.health_summary.lower() or "unavailable" in result.velocity_display.lower()
+        assert (
+            "failed" in result.health_summary.lower()
+            or "unavailable" in result.velocity_display.lower()
+        )
 
 
 # =============================================================================

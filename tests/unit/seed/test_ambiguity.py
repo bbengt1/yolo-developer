@@ -477,7 +477,11 @@ class TestDetectAmbiguities:
     @pytest.mark.asyncio
     async def test_detect_ambiguities_with_ambiguous_content(self) -> None:
         """Test detect_ambiguities returns ambiguities for vague content."""
-        from yolo_developer.seed.ambiguity import AmbiguitySeverity, AmbiguityType, detect_ambiguities
+        from yolo_developer.seed.ambiguity import (
+            AmbiguitySeverity,
+            AmbiguityType,
+            detect_ambiguities,
+        )
 
         # Mock LLM response with ambiguities
         mock_llm_response: dict[str, Any] = {
@@ -603,9 +607,9 @@ class TestDetectAmbiguities:
         from yolo_developer.seed.ambiguity import detect_ambiguities
 
         # LLM sometimes wraps JSON in markdown
-        markdown_wrapped = '''```json
+        markdown_wrapped = """```json
 {"ambiguities": [{"type": "PRIORITY", "severity": "LOW", "source_text": "nice to have", "location": "line 5", "description": "Unclear priority", "question": "Is this required?", "suggestions": ["Required", "Optional"]}]}
-```'''
+```"""
 
         with patch(
             "yolo_developer.seed.ambiguity.litellm.acompletion",

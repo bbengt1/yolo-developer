@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 
 class TestAuditFormatterProtocol:
     """Tests for AuditFormatter Protocol."""
@@ -33,12 +31,10 @@ class TestAuditFormatterProtocol:
     def test_audit_formatter_is_runtime_checkable(self) -> None:
         """Test that AuditFormatter is runtime_checkable."""
         from yolo_developer.audit.formatter_protocol import AuditFormatter
-        from yolo_developer.audit.types import (
-            AgentIdentity,
-            Decision,
-            DecisionContext,
-        )
         from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
+        from yolo_developer.audit.types import (
+            Decision,
+        )
 
         # Create a mock formatter that implements the protocol
         class MockFormatter:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
 from yolo_developer.seed.sop import (
@@ -211,9 +209,7 @@ class TestSOPConflict:
         assert "constraint" in result
         assert result["constraint"]["id"] == "arch-001"
 
-    def test_default_empty_resolution_options(
-        self, sample_constraint: SOPConstraint
-    ) -> None:
+    def test_default_empty_resolution_options(self, sample_constraint: SOPConstraint) -> None:
         """Test default empty resolution options."""
         conflict = SOPConflict(
             constraint=sample_constraint,
@@ -332,9 +328,7 @@ class TestInMemorySOPStore:
         assert constraints[0].id == "arch-001"
 
     @pytest.mark.asyncio
-    async def test_get_constraints_by_category(
-        self, store: InMemorySOPStore
-    ) -> None:
+    async def test_get_constraints_by_category(self, store: InMemorySOPStore) -> None:
         """Test filtering constraints by category."""
         arch_constraint = SOPConstraint(
             id="arch-001",
@@ -417,18 +411,14 @@ class TestInMemorySOPStore:
         assert len(constraints) == 0
 
     @pytest.mark.asyncio
-    async def test_remove_nonexistent_constraint(
-        self, store: InMemorySOPStore
-    ) -> None:
+    async def test_remove_nonexistent_constraint(self, store: InMemorySOPStore) -> None:
         """Test removing a nonexistent constraint."""
         removed = await store.remove_constraint("nonexistent")
 
         assert removed is False
 
     @pytest.mark.asyncio
-    async def test_clear(
-        self, store: InMemorySOPStore, sample_constraint: SOPConstraint
-    ) -> None:
+    async def test_clear(self, store: InMemorySOPStore, sample_constraint: SOPConstraint) -> None:
         """Test clearing all constraints."""
         await store.add_constraint(sample_constraint)
 
@@ -500,9 +490,7 @@ class TestValidateAgainstSOP:
         await store.add_constraint(sample_constraint)
 
         mock_response = AsyncMock()
-        mock_response.choices = [
-            AsyncMock(message=AsyncMock(content='{"conflicts": []}'))
-        ]
+        mock_response.choices = [AsyncMock(message=AsyncMock(content='{"conflicts": []}'))]
 
         with patch("yolo_developer.seed.sop.litellm.acompletion", return_value=mock_response):
             result = await validate_against_sop("Build a REST API", store)
@@ -547,9 +535,7 @@ class TestValidateAgainstSOP:
         assert result.hard_conflict_count == 1
 
     @pytest.mark.asyncio
-    async def test_soft_conflict_passes(
-        self, store: InMemorySOPStore
-    ) -> None:
+    async def test_soft_conflict_passes(self, store: InMemorySOPStore) -> None:
         """Test validation passes with only SOFT conflicts."""
         from unittest.mock import AsyncMock, patch
 
@@ -917,9 +903,7 @@ class TestParseSeedSOPValidation:
         )
 
         with (
-            patch(
-                "yolo_developer.seed.api.LLMSeedParser"
-            ) as mock_parser_class,
+            patch("yolo_developer.seed.api.LLMSeedParser") as mock_parser_class,
             patch(
                 "yolo_developer.seed.api._validate_against_sop",
                 new_callable=AsyncMock,

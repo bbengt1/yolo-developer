@@ -215,9 +215,7 @@ class TestATAMReviewResultDataclass:
         """Test ATAMReviewResult with passing review."""
         from yolo_developer.agents.architect.types import (
             ATAMReviewResult,
-            ATAMRiskAssessment,
             ATAMScenario,
-            ATAMTradeOffConflict,
         )
 
         scenario = ATAMScenario(

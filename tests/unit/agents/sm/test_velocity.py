@@ -199,11 +199,17 @@ class TestCalculateSprintVelocity:
         """Test velocity with custom story points per story."""
         stories = [
             StoryProgress(
-                story_id="1-1", title="Story 1", status="completed", duration_ms=3600000.0,
+                story_id="1-1",
+                title="Story 1",
+                status="completed",
+                duration_ms=3600000.0,
                 story_points=2.0,
             ),
             StoryProgress(
-                story_id="1-2", title="Story 2", status="completed", duration_ms=3600000.0,
+                story_id="1-2",
+                title="Story 2",
+                status="completed",
+                duration_ms=3600000.0,
                 story_points=3.0,
             ),
         ]
@@ -740,7 +746,10 @@ class TestTrackSprintVelocity:
         """Test tracking with custom story points."""
         stories = [
             StoryProgress(
-                story_id="1-1", title="Story 1", status="completed", duration_ms=3600000.0,
+                story_id="1-1",
+                title="Story 1",
+                status="completed",
+                duration_ms=3600000.0,
                 story_points=3.0,
             ),
         ]

@@ -116,9 +116,7 @@ class TestValidateTechnologyChoices:
         compliant_decision: DesignDecision,
     ) -> None:
         """Test that compliant decisions produce no violations."""
-        violations = _validate_technology_choices(
-            [compliant_decision], sample_tech_stack
-        )
+        violations = _validate_technology_choices([compliant_decision], sample_tech_stack)
         assert len(violations) == 0
 
     def test_non_compliant_decision_flagged(
@@ -127,9 +125,7 @@ class TestValidateTechnologyChoices:
         non_compliant_decision: DesignDecision,
     ) -> None:
         """Test that non-compliant decisions produce violations."""
-        violations = _validate_technology_choices(
-            [non_compliant_decision], sample_tech_stack
-        )
+        violations = _validate_technology_choices([non_compliant_decision], sample_tech_stack)
         assert len(violations) > 0
         # Check case-insensitively since technology names are title-cased
         assert any(v.technology.lower() == "sqlite" for v in violations)
@@ -140,9 +136,7 @@ class TestValidateTechnologyChoices:
         non_compliant_decision: DesignDecision,
     ) -> None:
         """Test that violations include severity level."""
-        violations = _validate_technology_choices(
-            [non_compliant_decision], sample_tech_stack
-        )
+        violations = _validate_technology_choices([non_compliant_decision], sample_tech_stack)
         assert len(violations) > 0
         assert violations[0].severity in ("critical", "high", "medium", "low")
 
@@ -152,9 +146,7 @@ class TestValidateTechnologyChoices:
         non_compliant_decision: DesignDecision,
     ) -> None:
         """Test that violations include suggested alternative."""
-        violations = _validate_technology_choices(
-            [non_compliant_decision], sample_tech_stack
-        )
+        violations = _validate_technology_choices([non_compliant_decision], sample_tech_stack)
         assert len(violations) > 0
         assert violations[0].suggested_alternative
 
@@ -215,17 +207,13 @@ class TestSuggestStackPatterns:
             "tooling": ["uv", "ruff", "mypy"],
         }
 
-    def test_suggests_pytest_patterns(
-        self, python_tech_stack: dict[str, str | list[str]]
-    ) -> None:
+    def test_suggests_pytest_patterns(self, python_tech_stack: dict[str, str | list[str]]) -> None:
         """Test that pytest patterns are suggested for Python stack."""
         patterns = _suggest_stack_patterns(python_tech_stack, [])
         pattern_names = [p.pattern_name for p in patterns]
         assert any("pytest" in name.lower() for name in pattern_names)
 
-    def test_suggests_uv_patterns(
-        self, python_tech_stack: dict[str, str | list[str]]
-    ) -> None:
+    def test_suggests_uv_patterns(self, python_tech_stack: dict[str, str | list[str]]) -> None:
         """Test that uv patterns are suggested for Python stack."""
         patterns = _suggest_stack_patterns(python_tech_stack, [])
         pattern_names = [p.pattern_name for p in patterns]
@@ -323,9 +311,7 @@ class TestValidateTechStackConstraints:
             assert len(result.summary) > 0
 
     @pytest.mark.asyncio
-    async def test_critical_violation_sets_non_compliant(
-        self, mock_config: MagicMock
-    ) -> None:
+    async def test_critical_violation_sets_non_compliant(self, mock_config: MagicMock) -> None:
         """Test that critical violation sets overall_compliance to False."""
         decisions = [
             DesignDecision(
@@ -421,9 +407,7 @@ class TestLLMIntegration:
             new_callable=AsyncMock,
             return_value=mock_response,
         ):
-            result = await _analyze_tech_stack_with_llm(
-                {"testing": "pytest"}, sample_decisions
-            )
+            result = await _analyze_tech_stack_with_llm({"testing": "pytest"}, sample_decisions)
 
             assert result is not None
             assert result.overall_compliance is True
@@ -485,9 +469,7 @@ class TestLLMIntegration:
             new_callable=AsyncMock,
             return_value="not valid json",
         ):
-            result = await _analyze_tech_stack_with_llm(
-                {"testing": "pytest"}, sample_decisions
-            )
+            result = await _analyze_tech_stack_with_llm({"testing": "pytest"}, sample_decisions)
 
             assert result is None
 
@@ -505,9 +487,7 @@ class TestLLMIntegration:
             new_callable=AsyncMock,
             side_effect=Exception("LLM error"),
         ):
-            result = await _analyze_tech_stack_with_llm(
-                {"testing": "pytest"}, sample_decisions
-            )
+            result = await _analyze_tech_stack_with_llm({"testing": "pytest"}, sample_decisions)
 
             assert result is None
 
@@ -551,9 +531,7 @@ class TestLLMIntegration:
         assert hasattr(_call_tech_stack_llm, "retry")
 
     @pytest.mark.asyncio
-    async def test_validate_with_llm_disabled(
-        self, sample_decisions: list[DesignDecision]
-    ) -> None:
+    async def test_validate_with_llm_disabled(self, sample_decisions: list[DesignDecision]) -> None:
         """Test validation with LLM explicitly disabled."""
         mock_config = MagicMock()
         mock_config.project_name = "test-project"

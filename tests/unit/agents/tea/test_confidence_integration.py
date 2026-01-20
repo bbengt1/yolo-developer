@@ -20,7 +20,6 @@ class TestTEANodeConfidenceIntegration:
     async def test_tea_node_includes_confidence_result(self) -> None:
         """Test that tea_node includes ConfidenceResult in output."""
         from yolo_developer.agents.tea import tea_node
-        from yolo_developer.agents.tea.types import TEAOutput
         from yolo_developer.orchestrator.state import YoloState
 
         # Minimal state with some dev output

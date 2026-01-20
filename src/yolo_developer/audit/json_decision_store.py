@@ -123,9 +123,7 @@ class JsonDecisionStore:
         """
         with self._lock:
             decisions_dict = self._load_decisions()
-            decisions = [
-                self._dict_to_decision(d) for d in decisions_dict.values()
-            ]
+            decisions = [self._dict_to_decision(d) for d in decisions_dict.values()]
 
         # Apply filters if provided
         if filters is not None:

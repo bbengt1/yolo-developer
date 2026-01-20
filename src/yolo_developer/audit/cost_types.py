@@ -112,17 +112,11 @@ class TokenUsage:
     def __post_init__(self) -> None:
         """Validate token usage data and log warnings for issues."""
         if self.prompt_tokens < 0:
-            _logger.warning(
-                "TokenUsage prompt_tokens is negative: %d", self.prompt_tokens
-            )
+            _logger.warning("TokenUsage prompt_tokens is negative: %d", self.prompt_tokens)
         if self.completion_tokens < 0:
-            _logger.warning(
-                "TokenUsage completion_tokens is negative: %d", self.completion_tokens
-            )
+            _logger.warning("TokenUsage completion_tokens is negative: %d", self.completion_tokens)
         if self.total_tokens < 0:
-            _logger.warning(
-                "TokenUsage total_tokens is negative: %d", self.total_tokens
-            )
+            _logger.warning("TokenUsage total_tokens is negative: %d", self.total_tokens)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON output.

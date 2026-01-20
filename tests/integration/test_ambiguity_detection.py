@@ -46,15 +46,17 @@ def create_mock_ambiguity_response(
     severities = ["HIGH", "MEDIUM", "LOW"]
 
     for i in range(1, ambiguity_count + 1):
-        ambiguities.append({
-            "type": types[(i - 1) % len(types)],
-            "severity": severities[(i - 1) % len(severities)],
-            "source_text": f"ambiguous phrase {i}",
-            "location": f"line {i * 5}",
-            "description": f"This phrase is ambiguous because reason {i}",
-            "question": f"What do you mean by 'ambiguous phrase {i}'?",
-            "suggestions": [f"Option A{i}", f"Option B{i}", f"Option C{i}"],
-        })
+        ambiguities.append(
+            {
+                "type": types[(i - 1) % len(types)],
+                "severity": severities[(i - 1) % len(severities)],
+                "source_text": f"ambiguous phrase {i}",
+                "location": f"line {i * 5}",
+                "description": f"This phrase is ambiguous because reason {i}",
+                "question": f"What do you mean by 'ambiguous phrase {i}'?",
+                "suggestions": [f"Option A{i}", f"Option B{i}", f"Option C{i}"],
+            }
+        )
 
     return {"ambiguities": ambiguities}
 
@@ -431,6 +433,7 @@ class TestCLIAmbiguityIntegration:
 
         # Extract and verify JSON
         import re
+
         # Remove ANSI codes
         clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
 
@@ -607,7 +610,11 @@ class TestAmbiguityResolutionFlow:
 
         assert result.exit_code == 0
         # Should show selection was made
-        assert "Selected" in result.output or "< 100ms" in result.output or "clarification" in result.output.lower()
+        assert (
+            "Selected" in result.output
+            or "< 100ms" in result.output
+            or "clarification" in result.output.lower()
+        )
 
     def test_interactive_custom_resolution(self) -> None:
         """Test interactive mode with user providing custom resolution."""

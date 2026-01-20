@@ -185,7 +185,6 @@ class TestVelocityMetrics:
         assert d["variance_stories"] == 2.0
         assert "calculated_at" in d
 
-
     def test_post_init_warning_negative_avg_stories(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that negative average_stories_per_sprint logs a warning."""
         with caplog.at_level(logging.WARNING):

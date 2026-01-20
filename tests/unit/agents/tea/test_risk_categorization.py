@@ -15,7 +15,6 @@ import pytest
 
 from yolo_developer.agents.tea.types import Finding, ValidationResult
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -177,7 +176,14 @@ class TestGetImpactDescription:
         """Test that all known categories return non-empty descriptions."""
         from yolo_developer.agents.tea.risk import _get_impact_description
 
-        categories = ["test_coverage", "code_quality", "documentation", "security", "performance", "architecture"]
+        categories = [
+            "test_coverage",
+            "code_quality",
+            "documentation",
+            "security",
+            "performance",
+            "architecture",
+        ]
         risk_levels = ["critical", "high", "low"]
 
         for category in categories:
@@ -204,7 +210,10 @@ class TestCategorizeFinding:
         assert risk.finding == critical_finding
         assert risk.risk_level == "critical"
         assert risk.requires_acknowledgment is False
-        assert "critical" in risk.impact_description.lower() or "security" in risk.impact_description.lower()
+        assert (
+            "critical" in risk.impact_description.lower()
+            or "security" in risk.impact_description.lower()
+        )
 
     def test_categorize_high_finding_requires_acknowledgment(self, high_finding: Finding) -> None:
         """Test that high severity findings require acknowledgment."""
@@ -260,7 +269,14 @@ class TestCategorizeFinding:
         from yolo_developer.agents.tea.risk import categorize_finding
 
         # Test different categories
-        categories = ["test_coverage", "code_quality", "documentation", "security", "performance", "architecture"]
+        categories = [
+            "test_coverage",
+            "code_quality",
+            "documentation",
+            "security",
+            "performance",
+            "architecture",
+        ]
 
         for category in categories:
             finding = Finding(
@@ -475,7 +491,10 @@ class TestGenerateRiskReport:
         report = generate_risk_report((risk,))
 
         assert len(report.blocking_reasons) > 0
-        assert "R-F001" in report.blocking_reasons[0] or "critical" in report.blocking_reasons[0].lower()
+        assert (
+            "R-F001" in report.blocking_reasons[0]
+            or "critical" in report.blocking_reasons[0].lower()
+        )
 
     def test_generate_report_includes_acknowledgment_required(self, high_finding: Finding) -> None:
         """Test that acknowledgment requirements are included for high risks."""
@@ -491,19 +510,41 @@ class TestGenerateRiskReport:
         from yolo_developer.agents.tea.risk import categorize_finding, generate_risk_report
 
         # Create multiple findings of each severity
-        findings = [
-            Finding(finding_id=f"F-CRIT-{i}", category="security", severity="critical",
-                    description="Critical", location="src/a.py", remediation="Fix")
-            for i in range(2)
-        ] + [
-            Finding(finding_id=f"F-HIGH-{i}", category="code_quality", severity="high",
-                    description="High", location="src/b.py", remediation="Fix")
-            for i in range(3)
-        ] + [
-            Finding(finding_id=f"F-LOW-{i}", category="documentation", severity="low",
-                    description="Low", location="src/c.py", remediation="Fix")
-            for i in range(4)
-        ]
+        findings = (
+            [
+                Finding(
+                    finding_id=f"F-CRIT-{i}",
+                    category="security",
+                    severity="critical",
+                    description="Critical",
+                    location="src/a.py",
+                    remediation="Fix",
+                )
+                for i in range(2)
+            ]
+            + [
+                Finding(
+                    finding_id=f"F-HIGH-{i}",
+                    category="code_quality",
+                    severity="high",
+                    description="High",
+                    location="src/b.py",
+                    remediation="Fix",
+                )
+                for i in range(3)
+            ]
+            + [
+                Finding(
+                    finding_id=f"F-LOW-{i}",
+                    category="documentation",
+                    severity="low",
+                    description="Low",
+                    location="src/c.py",
+                    remediation="Fix",
+                )
+                for i in range(4)
+            ]
+        )
 
         risks = tuple(categorize_finding(f) for f in findings)
         report = generate_risk_report(risks)
@@ -571,7 +612,10 @@ class TestCheckRiskDeploymentBlocking:
 
     def test_no_blocking_with_empty_report(self) -> None:
         """Test that empty report doesn't block deployment."""
-        from yolo_developer.agents.tea.risk import check_risk_deployment_blocking, generate_risk_report
+        from yolo_developer.agents.tea.risk import (
+            check_risk_deployment_blocking,
+            generate_risk_report,
+        )
 
         report = generate_risk_report(())
 
@@ -580,7 +624,9 @@ class TestCheckRiskDeploymentBlocking:
         assert is_blocked is False
         assert len(reasons) == 0
 
-    def test_blocking_reasons_include_critical_descriptions(self, critical_finding: Finding) -> None:
+    def test_blocking_reasons_include_critical_descriptions(
+        self, critical_finding: Finding
+    ) -> None:
         """Test that blocking reasons include critical risk descriptions."""
         from yolo_developer.agents.tea.risk import (
             categorize_finding,
@@ -659,7 +705,10 @@ class TestGetAcknowledgmentRequirements:
 
     def test_empty_acknowledgment_for_no_high_risks(self) -> None:
         """Test empty acknowledgment when no high risks."""
-        from yolo_developer.agents.tea.risk import generate_risk_report, get_acknowledgment_requirements
+        from yolo_developer.agents.tea.risk import (
+            generate_risk_report,
+            get_acknowledgment_requirements,
+        )
 
         report = generate_risk_report(())
 
@@ -710,8 +759,14 @@ class TestGetAcknowledgmentRequirements:
         )
 
         findings = [
-            Finding(finding_id=f"F-HIGH-{i}", category="code_quality", severity="high",
-                    description=f"High issue {i}", location=f"src/file{i}.py", remediation="Fix")
+            Finding(
+                finding_id=f"F-HIGH-{i}",
+                category="code_quality",
+                severity="high",
+                description=f"High issue {i}",
+                location=f"src/file{i}.py",
+                remediation="Fix",
+            )
             for i in range(3)
         ]
 

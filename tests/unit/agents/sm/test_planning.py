@@ -118,7 +118,7 @@ class TestAnalyzeDependencies:
             SprintStory(story_id="B", title="B", dependencies=("A",)),
             SprintStory(story_id="C", title="C", dependencies=("B",)),
         ]
-        graph, in_degree, story_map = _analyze_dependencies(stories)
+        graph, in_degree, _story_map = _analyze_dependencies(stories)
 
         assert in_degree["A"] == 0
         assert in_degree["B"] == 1
@@ -133,7 +133,7 @@ class TestAnalyzeDependencies:
             SprintStory(story_id="B", title="B"),
             SprintStory(story_id="C", title="C", dependencies=("A", "B")),
         ]
-        graph, in_degree, story_map = _analyze_dependencies(stories)
+        graph, in_degree, _story_map = _analyze_dependencies(stories)
 
         assert in_degree["A"] == 0
         assert in_degree["B"] == 0
@@ -146,7 +146,7 @@ class TestAnalyzeDependencies:
         stories = [
             SprintStory(story_id="B", title="B", dependencies=("A",)),  # A not in sprint
         ]
-        graph, in_degree, story_map = _analyze_dependencies(stories)
+        _graph, in_degree, story_map = _analyze_dependencies(stories)
 
         assert in_degree["B"] == 0  # External dependency ignored
         assert "A" not in story_map
@@ -245,8 +245,7 @@ class TestCheckCapacity:
     def test_exceeds_max_stories(self) -> None:
         """Test capacity limit by story count."""
         stories = [
-            SprintStory(story_id=str(i), title=str(i), estimated_points=1)
-            for i in range(15)
+            SprintStory(story_id=str(i), title=str(i), estimated_points=1) for i in range(15)
         ]
         config = PlanningConfig(max_stories=10, max_points=100)
         selected, total = _check_capacity(stories, config)
@@ -396,10 +395,7 @@ class TestPlanSprint:
     @pytest.mark.asyncio
     async def test_planning_with_capacity_limit(self) -> None:
         """Test sprint planning respects capacity."""
-        stories = [
-            {"story_id": str(i), "title": str(i), "estimated_points": 5}
-            for i in range(20)
-        ]
+        stories = [{"story_id": str(i), "title": str(i), "estimated_points": 5} for i in range(20)]
         config = PlanningConfig(max_stories=5, max_points=25)
         plan = await plan_sprint(stories, config)
 

@@ -156,9 +156,7 @@ def _generate_atam_scenarios(
     return scenarios
 
 
-def _generate_scenario_analysis(
-    decision: DesignDecision, attribute: str, score: float
-) -> str:
+def _generate_scenario_analysis(decision: DesignDecision, attribute: str, score: float) -> str:
     """Generate analysis text for a scenario based on design decision.
 
     Args:
@@ -169,7 +167,9 @@ def _generate_scenario_analysis(
     Returns:
         Analysis text describing how the decision addresses the attribute.
     """
-    score_descriptor = "excellent" if score >= 0.8 else "adequate" if score >= 0.6 else "needs improvement"
+    score_descriptor = (
+        "excellent" if score >= 0.8 else "adequate" if score >= 0.6 else "needs improvement"
+    )
 
     return (
         f"Decision '{decision.description}' provides {score_descriptor} support "
@@ -238,9 +238,9 @@ def _detect_trade_off_conflicts(
                         )
 
                         # Avoid duplicate conflicts (A-B same as B-A)
-                        existing = {
-                            (c.attribute_a, c.attribute_b) for c in conflicts
-                        } | {(c.attribute_b, c.attribute_a) for c in conflicts}
+                        existing = {(c.attribute_a, c.attribute_b) for c in conflicts} | {
+                            (c.attribute_b, c.attribute_a) for c in conflicts
+                        }
                         if (attr_a, impacted_by_a) not in existing:
                             conflicts.append(conflict)
 
@@ -318,9 +318,7 @@ def _assess_risk_impact(
 
     for risk in risk_report.risks:
         # Map risk category to quality attributes
-        affected_attrs = RISK_CATEGORY_TO_ATTRIBUTES.get(
-            risk.category, ["reliability"]
-        )
+        affected_attrs = RISK_CATEGORY_TO_ATTRIBUTES.get(risk.category, ["reliability"])
 
         # Evaluate mitigation feasibility based on effort
         feasibility = _evaluate_mitigation_feasibility(
@@ -430,9 +428,7 @@ def _make_review_decision(
     failure_reasons: list[str] = []
 
     # Check for critical unmitigated risks
-    unmitigated_critical = [
-        a for a in risk_assessments if a.unmitigated
-    ]
+    unmitigated_critical = [a for a in risk_assessments if a.unmitigated]
     if unmitigated_critical:
         failure_reasons.append(
             f"Critical unmitigated risks: {len(unmitigated_critical)} risks lack feasible mitigations"
@@ -498,7 +494,9 @@ def _calculate_confidence(
 
     # Risk mitigation component (0.0 - 0.25)
     if risk_assessments:
-        mitigated_ratio = sum(1 for a in risk_assessments if not a.unmitigated) / len(risk_assessments)
+        mitigated_ratio = sum(1 for a in risk_assessments if not a.unmitigated) / len(
+            risk_assessments
+        )
     else:
         mitigated_ratio = 1.0  # No risks = fully mitigated
     risk_score = mitigated_ratio * 0.25
@@ -630,8 +628,7 @@ async def _analyze_atam_with_llm(
     """
     # Format inputs for prompt
     decisions_text = "\n".join(
-        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})"
-        for d in decisions
+        f"- {d.decision_type}: {d.description} (Rationale: {d.rationale})" for d in decisions
     )
 
     quality_text = "Not provided"

@@ -21,7 +21,6 @@ References:
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
@@ -236,9 +235,7 @@ class TestLogsCommand:
     """Tests for logs_command function."""
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_no_data(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_no_data(self, mock_load: AsyncMock) -> None:
         """Test logs command with no audit data (AC1)."""
         mock_load.return_value = []
 
@@ -247,9 +244,7 @@ class TestLogsCommand:
         mock_load.assert_called_once()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_with_agent_filter(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_with_agent_filter(self, mock_load: AsyncMock) -> None:
         """Test logs command with agent filter (AC2)."""
         mock_load.return_value = []
 
@@ -260,9 +255,7 @@ class TestLogsCommand:
         assert call_args.kwargs.get("agent_name") == "analyst"
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_agent_filter_case_insensitive(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_agent_filter_case_insensitive(self, mock_load: AsyncMock) -> None:
         """Test that agent filter is case-insensitive (AC2).
 
         The lowercasing is done once at entry point in logs_command,
@@ -277,9 +270,7 @@ class TestLogsCommand:
         assert call_args.kwargs.get("agent_name") == "analyst"
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_with_since_filter(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_with_since_filter(self, mock_load: AsyncMock) -> None:
         """Test logs command with since filter (AC3)."""
         mock_load.return_value = []
 
@@ -294,9 +285,7 @@ class TestLogsCommand:
         logs_command(since="invalid_time")
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_default_pagination(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_default_pagination(self, mock_load: AsyncMock) -> None:
         """Test logs command default pagination of 20 (AC4)."""
         # Create 30 decisions
         decisions = [
@@ -311,7 +300,7 @@ class TestLogsCommand:
                     session_id="session-123",
                 ),
                 context=DecisionContext(),
-                timestamp=f"2026-01-19T{10+i//60:02d}:{i%60:02d}:00+00:00",
+                timestamp=f"2026-01-19T{10 + i // 60:02d}:{i % 60:02d}:00+00:00",
                 severity="info",
             )
             for i in range(30)
@@ -324,9 +313,7 @@ class TestLogsCommand:
         mock_load.assert_called_once()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_custom_limit(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_custom_limit(self, mock_load: AsyncMock) -> None:
         """Test logs command with custom limit (AC4)."""
         mock_load.return_value = []
 
@@ -335,9 +322,7 @@ class TestLogsCommand:
         mock_load.assert_called_once()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_show_all(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_show_all(self, mock_load: AsyncMock) -> None:
         """Test logs command with --all flag (AC4)."""
         # Create 30 decisions
         decisions = [
@@ -352,7 +337,7 @@ class TestLogsCommand:
                     session_id="session-123",
                 ),
                 context=DecisionContext(),
-                timestamp=f"2026-01-19T{10+i//60:02d}:{i%60:02d}:00+00:00",
+                timestamp=f"2026-01-19T{10 + i // 60:02d}:{i % 60:02d}:00+00:00",
                 severity="info",
             )
             for i in range(30)
@@ -390,9 +375,7 @@ class TestLogsCommand:
         mock_load.assert_called_once()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_verbose_mode(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_verbose_mode(self, mock_load: AsyncMock) -> None:
         """Test logs command verbose mode (AC1)."""
         decision = Decision(
             id="dec-001",
@@ -418,9 +401,7 @@ class TestLogsCommand:
         mock_load.assert_called_once()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_type_filter(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_type_filter(self, mock_load: AsyncMock) -> None:
         """Test logs command with decision type filter."""
         mock_load.return_value = []
 
@@ -430,9 +411,7 @@ class TestLogsCommand:
         assert call_args.kwargs.get("decision_type") == "architecture_choice"
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_invalid_decision_type(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_invalid_decision_type(self, mock_load: AsyncMock) -> None:
         """Test logs command with invalid decision type shows warning."""
         mock_load.return_value = []
 
@@ -443,9 +422,7 @@ class TestLogsCommand:
         mock_load.assert_not_called()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_invalid_limit(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_invalid_limit(self, mock_load: AsyncMock) -> None:
         """Test logs command with invalid limit shows warning."""
         mock_load.return_value = []
 
@@ -456,9 +433,7 @@ class TestLogsCommand:
         mock_load.assert_not_called()
 
     @patch("yolo_developer.cli.commands.logs._load_decisions")
-    def test_logs_command_negative_limit(
-        self, mock_load: AsyncMock
-    ) -> None:
+    def test_logs_command_negative_limit(self, mock_load: AsyncMock) -> None:
         """Test logs command with negative limit shows warning."""
         mock_load.return_value = []
 
@@ -487,10 +462,14 @@ class TestLogsCommandCLI:
             app,
             [
                 "logs",
-                "--agent", "analyst",
-                "--since", "1h",
-                "--type", "requirement_analysis",
-                "--limit", "50",
+                "--agent",
+                "analyst",
+                "--since",
+                "1h",
+                "--type",
+                "requirement_analysis",
+                "--limit",
+                "50",
                 "--verbose",
             ],
         )
@@ -503,10 +482,14 @@ class TestLogsCommandCLI:
             app,
             [
                 "logs",
-                "-a", "analyst",
-                "-s", "1h",
-                "-t", "requirement_analysis",
-                "-l", "10",
+                "-a",
+                "analyst",
+                "-s",
+                "1h",
+                "-t",
+                "requirement_analysis",
+                "-l",
+                "10",
                 "-v",
             ],
         )

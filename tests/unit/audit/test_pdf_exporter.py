@@ -325,9 +325,7 @@ class TestPdfRedactionContent:
         )
         options = ExportOptions(redaction_config=redaction)
 
-        result = exporter.export_full_audit(
-            [decision], [artifact], [link], options=options
-        )
+        result = exporter.export_full_audit([decision], [artifact], [link], options=options)
 
         # PDF is valid and has reasonable size
         assert result.startswith(b"%PDF")

@@ -173,9 +173,7 @@ def extract_public_functions(code: str) -> list[FunctionInfo]:
     return functions
 
 
-def _extract_function_info(
-    node: ast.FunctionDef | ast.AsyncFunctionDef, code: str
-) -> FunctionInfo:
+def _extract_function_info(node: ast.FunctionDef | ast.AsyncFunctionDef, code: str) -> FunctionInfo:
     """Extract FunctionInfo from an AST function node.
 
     Args:

@@ -6,8 +6,6 @@ generation of integration tests for cross-component functionality.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestIntegrationTestTemplate:
     """Tests for INTEGRATION_TEST_TEMPLATE constant."""
@@ -54,7 +52,10 @@ class TestIntegrationTestTemplate:
         )
 
         assert "error" in INTEGRATION_TEST_TEMPLATE.lower()
-        assert "graceful" in INTEGRATION_TEST_TEMPLATE.lower() or "degradation" in INTEGRATION_TEST_TEMPLATE.lower()
+        assert (
+            "graceful" in INTEGRATION_TEST_TEMPLATE.lower()
+            or "degradation" in INTEGRATION_TEST_TEMPLATE.lower()
+        )
 
     def test_template_includes_pytest_structure(self) -> None:
         """Test that template includes pytest structure guidance."""

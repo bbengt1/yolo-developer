@@ -285,9 +285,7 @@ def _analyze_backing_services(story: dict[str, Any]) -> FactorResult:
     text = _get_story_text(story)
 
     # Check if story involves backing services
-    has_backing_service = any(
-        re.search(p, text, re.IGNORECASE) for p in BACKING_SERVICE_PATTERNS
-    )
+    has_backing_service = any(re.search(p, text, re.IGNORECASE) for p in BACKING_SERVICE_PATTERNS)
 
     if not has_backing_service:
         return FactorResult(
@@ -781,16 +779,12 @@ async def analyze_twelve_factor(story: dict[str, Any]) -> TwelveFactorAnalysis:
         factor_results[factor_name] = result
 
     # Determine applicable factors
-    applicable_factors = tuple(
-        name for name, result in factor_results.items() if result.applies
-    )
+    applicable_factors = tuple(name for name, result in factor_results.items() if result.applies)
 
     # Calculate overall compliance
     if applicable_factors:
         compliant_count = sum(
-            1
-            for name in applicable_factors
-            if factor_results[name].compliant is True
+            1 for name in applicable_factors if factor_results[name].compliant is True
         )
         overall_compliance = compliant_count / len(applicable_factors)
     else:
@@ -986,16 +980,12 @@ async def analyze_twelve_factor_with_llm(
             )
 
     # Determine applicable factors
-    applicable_factors = tuple(
-        name for name, result in factor_results.items() if result.applies
-    )
+    applicable_factors = tuple(name for name, result in factor_results.items() if result.applies)
 
     # Calculate overall compliance
     if applicable_factors:
         compliant_count = sum(
-            1
-            for name in applicable_factors
-            if factor_results[name].compliant is True
+            1 for name in applicable_factors if factor_results[name].compliant is True
         )
         overall_compliance = compliant_count / len(applicable_factors)
     else:

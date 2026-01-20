@@ -77,9 +77,7 @@ class TestJsonDecisionStore:
         assert retrieved.agent.agent_name == "analyst"
 
     @pytest.mark.asyncio
-    async def test_get_decision_returns_none_for_missing(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_decision_returns_none_for_missing(self, tmp_path: Path) -> None:
         """Test that get_decision returns None for non-existent decisions."""
         decisions_file = tmp_path / "audit" / "decisions.json"
         store = JsonDecisionStore(decisions_file)
@@ -89,9 +87,7 @@ class TestJsonDecisionStore:
         assert retrieved is None
 
     @pytest.mark.asyncio
-    async def test_get_decisions_returns_all_decisions(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_decisions_returns_all_decisions(self, tmp_path: Path) -> None:
         """Test that get_decisions returns all stored decisions."""
         decisions_file = tmp_path / "audit" / "decisions.json"
         store = JsonDecisionStore(decisions_file)
@@ -105,9 +101,7 @@ class TestJsonDecisionStore:
         assert len(decisions) == 3
 
     @pytest.mark.asyncio
-    async def test_get_decisions_filters_by_agent_name(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_decisions_filters_by_agent_name(self, tmp_path: Path) -> None:
         """Test filtering decisions by agent name."""
         decisions_file = tmp_path / "audit" / "decisions.json"
         store = JsonDecisionStore(decisions_file)
@@ -123,9 +117,7 @@ class TestJsonDecisionStore:
         assert all(d.agent.agent_name == "analyst" for d in decisions)
 
     @pytest.mark.asyncio
-    async def test_get_decisions_filters_by_decision_type(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_decisions_filters_by_decision_type(self, tmp_path: Path) -> None:
         """Test filtering decisions by decision type."""
         decisions_file = tmp_path / "audit" / "decisions.json"
         store = JsonDecisionStore(decisions_file)
@@ -133,9 +125,7 @@ class TestJsonDecisionStore:
         await store.log_decision(
             self._create_decision("dec-001", decision_type="requirement_analysis")
         )
-        await store.log_decision(
-            self._create_decision("dec-002", decision_type="story_creation")
-        )
+        await store.log_decision(self._create_decision("dec-002", decision_type="story_creation"))
 
         filters = DecisionFilters(decision_type="requirement_analysis")
         decisions = await store.get_decisions(filters)
@@ -158,9 +148,7 @@ class TestJsonDecisionStore:
         assert await store.get_decision_count() == 2
 
     @pytest.mark.asyncio
-    async def test_persistence_across_store_instances(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_persistence_across_store_instances(self, tmp_path: Path) -> None:
         """Test that decisions persist across store instances (AC5)."""
         decisions_file = tmp_path / "audit" / "decisions.json"
 
@@ -182,15 +170,9 @@ class TestJsonDecisionStore:
         store = JsonDecisionStore(decisions_file)
 
         # Add decisions in reverse chronological order
-        await store.log_decision(
-            self._create_decision("dec-003", timestamp="2026-01-03T00:00:00Z")
-        )
-        await store.log_decision(
-            self._create_decision("dec-001", timestamp="2026-01-01T00:00:00Z")
-        )
-        await store.log_decision(
-            self._create_decision("dec-002", timestamp="2026-01-02T00:00:00Z")
-        )
+        await store.log_decision(self._create_decision("dec-003", timestamp="2026-01-03T00:00:00Z"))
+        await store.log_decision(self._create_decision("dec-001", timestamp="2026-01-01T00:00:00Z"))
+        await store.log_decision(self._create_decision("dec-002", timestamp="2026-01-02T00:00:00Z"))
 
         decisions = await store.get_decisions()
 
@@ -234,23 +216,15 @@ class TestJsonDecisionStore:
         assert decisions == []
 
     @pytest.mark.asyncio
-    async def test_get_decisions_filters_by_time_range(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_decisions_filters_by_time_range(self, tmp_path: Path) -> None:
         """Test filtering decisions by time range (AC1)."""
         decisions_file = tmp_path / "audit" / "decisions.json"
         store = JsonDecisionStore(decisions_file)
 
         # Create decisions at different timestamps
-        await store.log_decision(
-            self._create_decision("dec-001", timestamp="2026-01-01T00:00:00Z")
-        )
-        await store.log_decision(
-            self._create_decision("dec-002", timestamp="2026-01-02T00:00:00Z")
-        )
-        await store.log_decision(
-            self._create_decision("dec-003", timestamp="2026-01-03T00:00:00Z")
-        )
+        await store.log_decision(self._create_decision("dec-001", timestamp="2026-01-01T00:00:00Z"))
+        await store.log_decision(self._create_decision("dec-002", timestamp="2026-01-02T00:00:00Z"))
+        await store.log_decision(self._create_decision("dec-003", timestamp="2026-01-03T00:00:00Z"))
 
         # Filter by start_time only
         filters = DecisionFilters(start_time="2026-01-02T00:00:00Z")

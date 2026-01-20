@@ -5,7 +5,6 @@ Tests for extract_token_usage, extract_cost, and calculate_cost_if_missing funct
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest

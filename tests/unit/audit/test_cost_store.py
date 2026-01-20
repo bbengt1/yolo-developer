@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from yolo_developer.audit.cost_store import CostFilters, CostStore
-from yolo_developer.audit.cost_types import CostAggregation, CostRecord, TokenUsage
+from yolo_developer.audit.cost_types import CostAggregation, CostRecord
 
 
 class TestCostFilters:
@@ -90,9 +90,7 @@ class TestCostStoreProtocol:
 
     def test_cost_store_is_protocol(self) -> None:
         """Test that CostStore is a protocol."""
-        assert hasattr(CostStore, "__protocol_attrs__") or hasattr(
-            CostStore, "_is_protocol"
-        )
+        assert hasattr(CostStore, "__protocol_attrs__") or hasattr(CostStore, "_is_protocol")
 
     def test_cost_store_has_required_methods(self) -> None:
         """Test that CostStore protocol has required methods."""
@@ -104,6 +102,7 @@ class TestCostStoreProtocol:
 
     def test_cost_store_is_runtime_checkable(self) -> None:
         """Test that CostStore can be used with isinstance."""
+
         # Create a minimal implementation
         class MockCostStore:
             async def store_cost(self, record: CostRecord) -> None:
@@ -112,14 +111,10 @@ class TestCostStoreProtocol:
             async def get_cost(self, cost_id: str) -> CostRecord | None:
                 return None
 
-            async def get_costs(
-                self, filters: CostFilters | None = None
-            ) -> list[CostRecord]:
+            async def get_costs(self, filters: CostFilters | None = None) -> list[CostRecord]:
                 return []
 
-            async def get_aggregation(
-                self, filters: CostFilters | None = None
-            ) -> CostAggregation:
+            async def get_aggregation(self, filters: CostFilters | None = None) -> CostAggregation:
                 return CostAggregation(
                     total_prompt_tokens=0,
                     total_completion_tokens=0,
