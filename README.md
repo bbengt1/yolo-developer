@@ -1,252 +1,421 @@
 # YOLO Developer
 
-Autonomous multi-agent AI development system using the BMad Method. YOLO Developer orchestrates specialized AI agents through a LangGraph-based engine to autonomously handle software development tasks from requirements to implementation.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-6500+-brightgreen.svg)](#testing)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-## Project Status
+**Autonomous multi-agent AI development system** that orchestrates specialized AI agents through LangGraph to handle software development tasks from requirements to implementation.
 
-**Current Phase:** Core Infrastructure Complete (Epics 1-7)
+Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assisted development.
 
-| Epic | Status | Description |
-|------|--------|-------------|
-| 1. Project Initialization | Done | Configuration system with YAML + env vars |
-| 2. Memory & Context Layer | Done | ChromaDB vector storage, pattern learning |
-| 3. Quality Gate Framework | Done | Blocking gates, confidence scoring, metrics |
-| 4. Seed Input & Validation | Done | NL parsing, ambiguity detection, SOP validation |
-| 5. Analyst Agent | Done | Requirement crystallization, contradiction flagging |
-| 6. PM Agent | Done | Story generation, prioritization, dependencies |
-| 7. Architect Agent | Done | ADRs, 12-Factor, ATAM review, pattern matching |
-| 8. Dev Agent | Backlog | Code generation, tests, documentation |
-| 9. TEA Agent | Backlog | Test coverage, risk categorization |
-| 10. Orchestration & SM | Backlog | LangGraph workflow, sprint management |
-| 11. Audit Trail | Backlog | Decision logging, traceability |
-| 12. CLI Interface | Backlog | Full Typer CLI commands |
-| 13. Python SDK | Backlog | Programmatic API access |
-| 14. MCP Integration | Backlog | Claude Code compatibility |
+---
 
-**Test Coverage:** 2,884 tests
+## Table of Contents
 
-## Architecture
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [CLI Commands](#cli-commands)
+- [Python SDK](#python-sdk)
+- [MCP Integration](#mcp-integration)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Roadmap](#roadmap)
+- [License](#license)
 
-```
-src/yolo_developer/
-├── agents/              # AI Agent modules
-│   ├── analyst/         # Requirement analysis (Epic 5)
-│   ├── pm/              # Story generation (Epic 6)
-│   ├── architect/       # Design decisions (Epic 7)
-│   └── prompts/         # Shared prompt templates
-├── config/              # Pydantic configuration (Epic 1)
-├── gates/               # Quality gate framework (Epic 3)
-│   └── gates/           # Individual gate implementations
-├── memory/              # Memory & context layer (Epic 2)
-│   └── analyzers/       # Pattern analyzers
-├── seed/                # Seed input validation (Epic 4)
-├── orchestrator/        # LangGraph orchestration (Epic 10 - partial)
-├── cli/                 # CLI interface (Epic 12 - partial)
-├── sdk/                 # Python SDK (Epic 13 - planned)
-├── mcp/                 # MCP server (Epic 14 - planned)
-└── audit/               # Audit trail (Epic 11 - planned)
-```
+---
 
-## Implemented Features
+## Features
 
-### Configuration System (Epic 1)
-- Pydantic v2 schema with full type validation
-- Three-layer priority: defaults -> YAML -> environment variables
-- Secret management via `SecretStr` (API keys never exported)
-- Configuration export/import for project portability
+### Multi-Agent Orchestration
+- **6 Specialized Agents**: Analyst, PM, Architect, Dev, TEA (Test Engineering), and SM (Scrum Master)
+- **LangGraph Workflow**: State-machine orchestration with conditional routing and agent handoffs
+- **Conflict Mediation**: Automatic resolution of inter-agent disagreements
+- **Human Escalation**: Configurable breakpoints for human review
 
-```python
-from yolo_developer.config import load_config
+### Intelligent Analysis
+- **Requirement Crystallization**: Transform vague inputs into actionable requirements
+- **Ambiguity Detection**: Identify unclear specifications with clarification questions
+- **Contradiction Flagging**: Detect conflicting requirements automatically
+- **12-Factor Compliance**: Architecture validation against cloud-native principles
 
-config = load_config()  # Loads from ./yolo.yaml with env overrides
-```
+### Quality Assurance
+- **Quality Gate Framework**: Blocking gates with confidence scoring (0.0-1.0)
+- **ADR Generation**: Automatic Architecture Decision Records
+- **Test Coverage Validation**: Configurable thresholds with gap analysis
+- **Definition of Done**: Automated DoD validation per story
 
-### Memory & Context Layer (Epic 2)
-- **ChromaDB Vector Storage:** Semantic search for decisions and patterns
-- **JSON Graph Storage:** Relationship tracking between artifacts
-- **Pattern Learning:** Automatic detection of codebase naming/structure patterns
-- **Session Persistence:** Context preservation across agent handoffs
-- **Project Isolation:** Multi-project support with tenant separation
+### Memory & Context
+- **ChromaDB Vector Storage**: Semantic search for decisions and patterns
+- **Pattern Learning**: Automatic detection of codebase naming/structure conventions
+- **Session Persistence**: Context preservation across agent handoffs
+- **Project Isolation**: Multi-tenant support with data separation
 
-```python
-from yolo_developer.memory import create_memory_store, PatternLearner
+### Observability
+- **Audit Trail**: Complete decision logging with traceability
+- **Token Cost Tracking**: LLM usage monitoring per agent
+- **Real-time Activity Display**: Live progress visualization
+- **Export Formats**: JSON, Markdown, and structured reports
 
-store = await create_memory_store(config)
-learner = PatternLearner(store)
-patterns = await learner.learn_patterns_from_codebase("/path/to/project")
-```
-
-### Quality Gate Framework (Epic 3)
-- **Decorator-based gates:** `@quality_gate("testability", blocking=True)`
-- **Built-in gates:** Testability, AC Measurability, Architecture Validation, Definition of Done
-- **Confidence scoring:** 0.0-1.0 scores with configurable thresholds
-- **Metrics tracking:** Historical gate performance over time
-- **Failure reports:** Detailed remediation guidance
-
-```python
-from yolo_developer.gates import quality_gate, GateResult
-
-@quality_gate("architecture_validation", blocking=True)
-async def architect_node(state):
-    # Gate automatically validates output
-    return state_update
-```
-
-### Seed Input & Validation (Epic 4)
-- Natural language document parsing (Markdown, plain text)
-- Ambiguity detection with clarification question generation
-- SOP constraint validation
-- Semantic validation reports
-- Quality threshold rejection
-
-```python
-from yolo_developer.seed import parse_seed_document, detect_ambiguities
-
-parsed = await parse_seed_document(content)
-ambiguities = await detect_ambiguities(parsed.requirements)
-```
-
-### Analyst Agent (Epic 5)
-- Requirement crystallization from vague inputs
-- Missing requirement identification
-- Requirement categorization (functional, non-functional, constraint)
-- Implementability validation
-- Contradiction flagging between requirements
-- Escalation to PM for clarification
-
-### PM Agent (Epic 6)
-- Transform requirements to user stories
-- Acceptance criteria testability validation
-- Story prioritization (MoSCoW, value-based)
-- Dependency identification between stories
-- Epic breakdown for large features
-- Escalation to Analyst for requirement gaps
-
-### Architect Agent (Epic 7)
-- **12-Factor Analysis:** Compliance checking against 12-Factor App principles
-- **ADR Generation:** Architecture Decision Records with context and consequences
-- **Quality Attribute Evaluation:** Performance, security, reliability, scalability, maintainability
-- **Technical Risk Identification:** Risk categorization with mitigation strategies
-- **Tech Stack Validation:** Constraint checking against configured technology stack
-- **ATAM Review:** Architecture Tradeoff Analysis Method evaluation
-- **Pattern Matching:** Design validation against learned codebase patterns
-
-```python
-from yolo_developer.agents.architect import (
-    architect_node,
-    analyze_twelve_factor,
-    generate_adr,
-    run_pattern_matching,
-)
-
-result = await architect_node(state)
-# Returns: design_decisions, ADRs, quality evaluations, risk reports, ATAM reviews
-```
+---
 
 ## Installation
+
+### Prerequisites
+
+- Python 3.10 or higher
+- [uv](https://github.com/astral-sh/uv) package manager
+
+### Install from Source
 
 ```bash
 # Clone the repository
 git clone https://github.com/bbengt1/yolo-developer.git
 cd yolo-developer
 
-# Install dependencies with uv
+# Install dependencies
 uv sync
+
+# Verify installation
+uv run yolo --help
 ```
+
+### Install with Development Dependencies
+
+```bash
+uv sync --all-extras
+```
+
+---
+
+## Quick Start
+
+### 1. Initialize a Project
+
+```bash
+# Create a new YOLO project in the current directory
+yolo init
+
+# Or specify a project name
+yolo init --name my-project
+```
+
+### 2. Configure API Keys
+
+```bash
+# Set your LLM API keys (never stored in config files)
+export YOLO_LLM__OPENAI_API_KEY=sk-...
+export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. Seed Requirements
+
+```bash
+# From a requirements document
+yolo seed requirements.md
+
+# Or inline text
+yolo seed --text "Build a REST API for user management with JWT authentication"
+```
+
+### 4. Run Autonomous Development
+
+```bash
+# Start the autonomous development sprint
+yolo run
+
+# Check status
+yolo status
+
+# View logs
+yolo logs
+```
+
+---
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `yolo init` | Initialize a new YOLO project |
+| `yolo seed <file>` | Seed requirements from a document |
+| `yolo run` | Execute autonomous development sprint |
+| `yolo status` | Display current sprint status |
+| `yolo logs` | View agent activity logs |
+| `yolo config` | Manage project configuration |
+| `yolo tune` | Adjust quality thresholds |
+| `yolo mcp` | Start MCP server for Claude Code |
+
+Run `yolo <command> --help` for detailed usage.
+
+---
+
+## Python SDK
+
+```python
+from yolo_developer import YoloClient
+
+# Initialize client
+client = YoloClient()
+
+# Seed requirements programmatically
+result = await client.seed("Build a user authentication system")
+
+# Run autonomous sprint
+sprint = await client.run()
+
+# Access audit trail
+audit = await client.get_audit_trail()
+for entry in audit.entries:
+    print(f"{entry.agent}: {entry.decision}")
+
+# Register event hooks
+@client.on("agent.completed")
+async def on_agent_done(event):
+    print(f"Agent {event.agent} completed: {event.summary}")
+```
+
+---
+
+## MCP Integration
+
+YOLO Developer exposes an MCP (Model Context Protocol) server for integration with Claude Code and other MCP-compatible clients.
+
+### Start MCP Server
+
+```bash
+# STDIO transport (default, for Claude Desktop)
+yolo mcp
+
+# HTTP transport for remote access
+yolo mcp --transport http --port 8080
+```
+
+### Claude Desktop Configuration
+
+Add to your Claude Desktop `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "yolo-developer": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo", "mcp"]
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `yolo_seed` | Provide seed requirements (text or file) |
+| `yolo_run` | Execute autonomous sprint (coming soon) |
+| `yolo_status` | Query sprint status (coming soon) |
+| `yolo_audit` | Access audit trail (coming soon) |
+
+---
+
+## Architecture
+
+```
+src/yolo_developer/
+├── agents/              # AI Agent modules
+│   ├── analyst/         # Requirement analysis & crystallization
+│   ├── pm/              # Story generation & prioritization
+│   ├── architect/       # Design decisions, ADRs, ATAM review
+│   ├── dev/             # Code generation & testing
+│   ├── tea/             # Test coverage & risk assessment
+│   └── sm/              # Sprint management & orchestration
+├── orchestrator/        # LangGraph workflow engine
+├── memory/              # ChromaDB vector storage & patterns
+├── gates/               # Quality gate framework
+├── seed/                # Input validation & ambiguity detection
+├── audit/               # Decision logging & traceability
+├── cli/                 # Typer CLI interface
+├── sdk/                 # Python SDK client
+├── mcp/                 # FastMCP server
+└── config/              # Pydantic configuration
+```
+
+### Agent Workflow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Analyst   │────▶│     PM      │────▶│  Architect  │
+│ (Req. Eng.) │     │  (Stories)  │     │  (Design)   │
+└─────────────┘     └─────────────┘     └─────────────┘
+                                              │
+                    ┌─────────────┐     ┌─────▼───────┐
+                    │     TEA     │◀────│    Dev      │
+                    │  (Testing)  │     │   (Code)    │
+                    └─────────────┘     └─────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │     SM      │
+                    │ (Orchestr.) │
+                    └─────────────┘
+```
+
+---
 
 ## Configuration
 
-Create a `yolo.yaml` in your project root:
+### Configuration File
+
+Create `yolo.yaml` in your project root:
 
 ```yaml
 project_name: my-project
 
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  # API keys via environment variables only
+  smart_model: gpt-4o           # For complex reasoning
+  routine_model: gpt-4o-mini    # For routine tasks
+  # API keys must be set via environment variables
 
 quality:
   test_coverage_threshold: 0.8
   gate_pass_threshold: 0.7
+  blocking_gates:
+    - testability
+    - architecture_validation
 
 memory:
   vector_store: chromadb
   persist_directory: .yolo/memory
+
+agents:
+  max_iterations: 10
+  timeout_seconds: 300
 ```
 
-Environment variables use `YOLO_` prefix:
+### Environment Variables
+
+Environment variables use `YOLO_` prefix with `__` as nested delimiter:
+
 ```bash
+# API Keys (required)
 export YOLO_LLM__OPENAI_API_KEY=sk-...
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
+
+# Override configuration values
+export YOLO_PROJECT_NAME=my-project
 export YOLO_QUALITY__TEST_COVERAGE_THRESHOLD=0.9
+export YOLO_MEMORY__PERSIST_DIRECTORY=/custom/path
 ```
 
-## Usage
+### Configuration Priority
 
-```bash
-# Show available commands
-yolo --help
+1. **Defaults** (built-in)
+2. **YAML file** (`yolo.yaml`)
+3. **Environment variables** (highest priority)
 
-# Initialize a new project
-yolo init
-
-# Seed with requirements document
-yolo seed requirements.md
-```
+---
 
 ## Development
 
-```bash
-# Install with dev dependencies
-uv sync --all-extras
+### Running Tests
 
+```bash
 # Run all tests
 uv run pytest
 
-# Run tests with coverage
+# Run with coverage report
 uv run pytest --cov=src/yolo_developer --cov-report=term-missing
 
 # Run specific test file
 uv run pytest tests/unit/agents/architect/test_pattern_matcher.py -v
 
-# Type checking
+# Run only unit tests
+uv run pytest tests/unit -v
+```
+
+### Code Quality
+
+```bash
+# Type checking (strict mode)
 uv run mypy src/yolo_developer
 
-# Linting and formatting
+# Linting
 uv run ruff check src tests
+
+# Formatting
 uv run ruff format src tests
 ```
 
+### Project Structure
+
+```
+tests/
+├── unit/           # Unit tests (~2700 tests)
+├── integration/    # Integration tests (~3800 tests)
+├── e2e/            # End-to-end tests
+└── fixtures/       # Shared test fixtures
+```
+
+---
+
 ## Roadmap
 
-### Next Up: Epic 8 - Dev Agent
-- Code generation following learned patterns
-- Unit and integration test generation
-- Documentation generation
-- Definition of Done validation
+### Current Status
 
-### Future Epics
-- **Epic 9:** TEA (Test Engineering Agent) for coverage validation
-- **Epic 10:** Orchestration with SM Agent for sprint management
-- **Epic 11:** Audit trail and observability
-- **Epic 12:** Complete CLI interface
-- **Epic 13:** Python SDK for programmatic access
-- **Epic 14:** MCP integration for Claude Code
+| Epic | Status | Description |
+|------|--------|-------------|
+| 1-13 | **Complete** | Core infrastructure, all agents, CLI, SDK |
+| 14 | **In Progress** | MCP Integration (2/6 stories done) |
+
+### Upcoming
+
+- [ ] Complete MCP tool implementations (`yolo_run`, `yolo_status`, `yolo_audit`)
+- [ ] Claude Code compatibility testing
+- [ ] Performance optimization for large codebases
+- [ ] Plugin system for custom agents
+- [ ] Web dashboard for sprint visualization
+
+---
 
 ## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
 | Runtime | Python 3.10+ |
+| Package Manager | uv |
 | Orchestration | LangGraph |
 | Vector Store | ChromaDB |
 | Configuration | Pydantic v2 + YAML |
 | CLI | Typer + Rich |
+| MCP Server | FastMCP 2.x |
 | Testing | pytest + pytest-asyncio |
 | Linting | ruff |
 | Type Checking | mypy (strict) |
 
+---
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes with tests
+4. Run quality checks (`uv run ruff check && uv run mypy src`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+---
+
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+- Built with the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assisted development
+- Powered by [LangGraph](https://github.com/langchain-ai/langgraph) for agent orchestration
+- Uses [FastMCP](https://gofastmcp.com) for MCP protocol support
