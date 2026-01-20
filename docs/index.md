@@ -159,6 +159,7 @@ Deep dive into agents, orchestration, memory, and quality gates.
 |:------|:--------|:------------|
 | [#2](https://github.com/bbengt1/yolo-developer/issues/2) | **Brownfield Support** | Add YOLO to existing projects with deep codebase scanning |
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | **Plugin System** | Create and integrate custom agents into the workflow |
+| [#11](https://github.com/bbengt1/yolo-developer/issues/11) | **Course Correction** | Mid-sprint requirement changes with impact analysis |
 
 #### Performance
 

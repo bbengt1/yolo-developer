@@ -392,6 +392,7 @@ tests/
 |-------|---------|--------|
 | [#2](https://github.com/bbengt1/yolo-developer/issues/2) | Brownfield Project Support | `enhancement` `epic` |
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
+| [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
 
 #### Performance
 | Issue | Feature | Labels |
