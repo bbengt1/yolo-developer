@@ -76,3 +76,7 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - README.md
+  - vendor
+  - vendor/bundle
+  - vendor/cache
+  - .bundle
