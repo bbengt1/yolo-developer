@@ -22,7 +22,7 @@ The server is configured with:
 
 Tools available:
     - yolo_seed: Provide seed requirements for development (Story 14.2)
-    - yolo_run: Execute autonomous sprint (coming in Story 14.3)
+    - yolo_run: Execute autonomous sprint (Story 14.3)
     - yolo_status: Query sprint status (coming in Story 14.4)
     - yolo_audit: Access audit trail (coming in Story 14.5)
 """
@@ -37,9 +37,14 @@ from yolo_developer.mcp.server import (
 )
 from yolo_developer.mcp.tools import (
     StoredSeed,
+    StoredSprint,
     clear_seeds,
+    clear_sprints,
     get_seed,
+    get_sprint,
     store_seed,
+    store_sprint,
+    yolo_run,
     yolo_seed,
 )
 
@@ -54,11 +59,16 @@ from yolo_developer.mcp.tools import (
 __all__ = [
     "SERVER_INSTRUCTIONS",
     "StoredSeed",
+    "StoredSprint",
     "TransportType",
     "clear_seeds",
+    "clear_sprints",
     "get_seed",
+    "get_sprint",
     "mcp",
     "run_server",
     "store_seed",
+    "store_sprint",
+    "yolo_run",
     "yolo_seed",
 ]

@@ -70,8 +70,19 @@ Example:
   yolo_seed(content="Build a REST API for user management")
   yolo_seed(file_path="/path/to/requirements.txt")
 
+## yolo_run
+Execute a sprint from a previously seeded requirements document.
+
+Parameters:
+- seed_id (optional): Seed identifier returned by yolo_seed (preferred)
+- seed_content (optional): Raw seed content (used if seed_id not provided)
+
+Returns sprint_id for status queries and thread_id for checkpointing.
+
+Example:
+  yolo_run(seed_id="550e8400-e29b-41d4-a716-446655440000")
+
 ## Coming Soon
-- yolo_run: Execute autonomous sprint
 - yolo_status: Query sprint status
 - yolo_audit: Access audit trail
 

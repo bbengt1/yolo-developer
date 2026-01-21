@@ -10,18 +10,20 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastmcp import Client
 
 from yolo_developer.mcp import mcp
-from yolo_developer.mcp.tools import clear_seeds, get_seed
+from yolo_developer.mcp.tools import clear_seeds, clear_sprints, get_seed, get_sprint, store_seed
 
 
 @pytest.fixture(autouse=True)
 def clear_seed_storage() -> None:
     """Clear seed storage before each test."""
     clear_seeds()
+    clear_sprints()
 
 
 @pytest.mark.asyncio
@@ -39,6 +41,15 @@ async def test_server_lists_yolo_seed_tool() -> None:
         tools = await client.list_tools()
         tool_names = [t.name for t in tools]
         assert "yolo_seed" in tool_names
+
+
+@pytest.mark.asyncio
+async def test_server_lists_yolo_run_tool() -> None:
+    """Test server includes yolo_run in available tools."""
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        tool_names = [t.name for t in tools]
+        assert "yolo_run" in tool_names
 
 
 @pytest.mark.asyncio
@@ -129,6 +140,53 @@ class TestYoloSeedIntegration:
             assert yolo_seed_tool.inputSchema is not None
 
 
+class TestYoloRunIntegration:
+    """Integration tests for yolo_run MCP tool via FastMCP Client."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_via_client_with_seed_id(self) -> None:
+        """Test yolo_run starts sprint via MCP client."""
+        seed = store_seed(content="Seed for MCP run", source="text")
+
+        with patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock):
+            async with Client(mcp) as client:
+                result = await client.call_tool("yolo_run", {"seed_id": seed.seed_id})
+
+        assert_result_started(result)
+        sprint_id = extract_sprint_id(result)
+        assert sprint_id is not None
+        sprint = get_sprint(sprint_id)
+        assert sprint is not None
+        assert sprint.seed_id == seed.seed_id
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_seed_content_rejects_invalid_seed(self) -> None:
+        """Test yolo_run rejects invalid seed content via MCP client."""
+        with (
+            patch("yolo_developer.mcp.tools.parse_seed", new_callable=AsyncMock),
+            patch("yolo_developer.mcp.tools.generate_validation_report"),
+            patch(
+                "yolo_developer.mcp.tools.validate_quality_thresholds",
+                return_value=type("Result", (), {"passed": False})(),
+            ),
+        ):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "yolo_run",
+                    {"seed_content": "Invalid seed content"},
+                )
+
+        assert_result_error(result)
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_missing_seed_returns_error(self) -> None:
+        """Test yolo_run returns error for unknown seed_id via client."""
+        async with Client(mcp) as client:
+            result = await client.call_tool("yolo_run", {"seed_id": "missing-seed"})
+
+        assert_result_error(result)
+
+
 def assert_result_accepted(result: Any, source: str = "text") -> None:
     """Assert that the tool result indicates accepted status."""
     # FastMCP wraps tool results - extract content
@@ -191,6 +249,35 @@ def assert_result_error(result: Any) -> None:
     assert "error" in data, f"Expected error message in result: {data}"
 
 
+def assert_result_started(result: Any) -> None:
+    """Assert that the tool result indicates sprint started."""
+    if hasattr(result, "content"):
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    elif isinstance(result, dict):
+        data = result
+    elif isinstance(result, list) and len(result) > 0:
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    else:
+        raise AssertionError(f"Unexpected result type: {type(result)}")
+
+    assert data.get("status") == "started", f"Expected started status, got: {data}"
+    assert "sprint_id" in data, f"Expected sprint_id in result: {data}"
+
+
 def extract_seed_id(result: Any) -> str | None:
     """Extract seed_id from tool result."""
     if hasattr(result, "content"):
@@ -217,3 +304,31 @@ def extract_seed_id(result: Any) -> str | None:
         return None
 
     return data.get("seed_id")
+
+
+def extract_sprint_id(result: Any) -> str | None:
+    """Extract sprint_id from tool result."""
+    if hasattr(result, "content"):
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    elif isinstance(result, dict):
+        data = result
+    elif isinstance(result, list) and len(result) > 0:
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            data = json.loads(content.text)
+        else:
+            data = content
+    else:
+        return None
+
+    return data.get("sprint_id")

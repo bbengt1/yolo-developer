@@ -19,14 +19,21 @@ References:
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
+
+import structlog
+from langchain_core.messages import HumanMessage
 
 from yolo_developer.mcp.server import mcp
+from yolo_developer.seed import parse_seed
+from yolo_developer.seed.rejection import validate_quality_thresholds
+from yolo_developer.seed.report import generate_validation_report
 
 
 @dataclass
@@ -50,10 +57,39 @@ class StoredSeed:
     file_path: str | None = None
 
 
+@dataclass
+class StoredSprint:
+    """A stored sprint with metadata for MCP status queries.
+
+    Attributes:
+        sprint_id: Unique identifier for the sprint.
+        seed_id: Seed identifier used to start the sprint.
+        status: Current sprint status ("running", "completed", "failed").
+        started_at: Timestamp when sprint execution started.
+        thread_id: Thread ID used for checkpointing.
+        completed_at: Timestamp when sprint completed (if finished).
+        error: Error message if sprint failed.
+    """
+
+    sprint_id: str
+    seed_id: str
+    status: Literal["running", "completed", "failed"]
+    started_at: datetime
+    thread_id: str
+    completed_at: datetime | None = None
+    error: str | None = None
+
+
+logger = structlog.get_logger(__name__)
+
 # In-memory storage for seeds
 # This is a simple MVP implementation; can be replaced with persistent storage later
 _seeds: dict[str, StoredSeed] = {}
 _seeds_lock = threading.Lock()  # Thread safety for concurrent MCP requests
+_sprints: dict[str, StoredSprint] = {}
+_sprints_lock = threading.Lock()
+_sprint_tasks: dict[str, asyncio.Task[None]] = {}
+_sprint_tasks_lock = threading.Lock()
 
 
 def store_seed(
@@ -124,6 +160,131 @@ def clear_seeds() -> None:
     """
     with _seeds_lock:
         _seeds.clear()
+
+
+def store_sprint(
+    seed_id: str,
+    thread_id: str,
+) -> StoredSprint:
+    """Store a sprint and return the stored sprint object."""
+    sprint_id = f"sprint-{uuid.uuid4().hex[:8]}"
+    sprint = StoredSprint(
+        sprint_id=sprint_id,
+        seed_id=seed_id,
+        status="running",
+        started_at=datetime.now(timezone.utc),
+        thread_id=thread_id,
+    )
+    with _sprints_lock:
+        _sprints[sprint_id] = sprint
+    return sprint
+
+
+def get_sprint(sprint_id: str) -> StoredSprint | None:
+    """Retrieve a sprint by its ID."""
+    with _sprints_lock:
+        return _sprints.get(sprint_id)
+
+
+def clear_sprints() -> None:
+    """Clear all stored sprints.
+
+    Intended for tests to reset state between runs.
+    """
+    with _sprints_lock:
+        _sprints.clear()
+    with _sprint_tasks_lock:
+        for task in _sprint_tasks.values():
+            task.cancel()
+        _sprint_tasks.clear()
+
+
+def _register_sprint_task(sprint_id: str, task: asyncio.Task[None]) -> None:
+    """Track a sprint task for cleanup and status monitoring."""
+    with _sprint_tasks_lock:
+        _sprint_tasks[sprint_id] = task
+
+
+def _clear_sprint_task(sprint_id: str) -> None:
+    """Remove a completed sprint task from the registry."""
+    with _sprint_tasks_lock:
+        _sprint_tasks.pop(sprint_id, None)
+
+
+def _update_sprint_status(
+    sprint_id: str,
+    status: Literal["running", "completed", "failed"],
+    *,
+    completed_at: datetime | None = None,
+    error: str | None = None,
+) -> None:
+    with _sprints_lock:
+        sprint = _sprints.get(sprint_id)
+        if sprint is None:
+            return
+        sprint.status = status
+        sprint.completed_at = completed_at
+        sprint.error = error
+
+
+async def _run_sprint(
+    sprint_id: str,
+    thread_id: str,
+    seed_id: str,
+    seed_content: str,
+) -> None:
+    """Execute the sprint workflow and update sprint status."""
+    from yolo_developer.orchestrator import WorkflowConfig, create_initial_state, stream_workflow
+    from yolo_developer.orchestrator.session import SessionManager
+    from yolo_developer.orchestrator.state import YoloState
+
+    session_manager = SessionManager(Path(".yolo/sessions"))
+    config = WorkflowConfig(entry_point="analyst", enable_checkpointing=True)
+    initial_state = create_initial_state(
+        starting_agent="analyst",
+        messages=[HumanMessage(content=seed_content)],
+    )
+    final_state: YoloState | None = None
+
+    try:
+        async for event in stream_workflow(
+            initial_state,
+            config=config,
+            thread_id=thread_id,
+        ):
+            agent_name = next(iter(event.keys())) if event else None
+            if agent_name and agent_name in event:
+                final_state = cast(YoloState, event[agent_name])
+                await session_manager.save_session(final_state, session_id=thread_id)
+
+        if final_state is not None:
+            await session_manager.save_session(final_state, session_id=thread_id)
+
+        _update_sprint_status(
+            sprint_id,
+            "completed",
+            completed_at=datetime.now(timezone.utc),
+        )
+        logger.info(
+            "mcp_sprint_completed",
+            sprint_id=sprint_id,
+            seed_id=seed_id,
+        )
+    except Exception as exc:
+        _update_sprint_status(
+            sprint_id,
+            "failed",
+            completed_at=datetime.now(timezone.utc),
+            error=str(exc),
+        )
+        logger.exception(
+            "mcp_sprint_failed",
+            sprint_id=sprint_id,
+            seed_id=seed_id,
+            error=str(exc),
+        )
+    finally:
+        _clear_sprint_task(sprint_id)
 
 
 @mcp.tool
@@ -215,4 +376,80 @@ async def yolo_seed(
     }
 
 
-__all__ = ["StoredSeed", "clear_seeds", "get_seed", "store_seed", "yolo_seed"]
+@mcp.tool
+async def yolo_run(
+    seed_id: str | None = None,
+    seed_content: str | None = None,
+) -> dict[str, Any]:
+    """Execute a sprint based on a provided seed.
+
+    Provide either seed_id (preferred) or seed_content. If both are provided,
+    seed_id takes precedence.
+    """
+    if seed_id is None and seed_content is None:
+        return {
+            "status": "error",
+            "error": "Either seed_id or seed_content must be provided",
+        }
+
+    seed: StoredSeed | None = None
+    if seed_id is not None:
+        seed = get_seed(seed_id)
+        if seed is None:
+            return {
+                "status": "error",
+                "error": f"Seed not found for seed_id: {seed_id}",
+            }
+    else:
+        assert seed_content is not None
+        if not seed_content.strip():
+            return {
+                "status": "error",
+                "error": "seed_content cannot be empty or whitespace-only",
+            }
+
+        seed_result = await parse_seed(seed_content)
+        report = generate_validation_report(seed_result)
+        rejection = validate_quality_thresholds(report.quality_metrics)
+        if not rejection.passed:
+            return {
+                "status": "error",
+                "error": "Seed failed validation; run yolo_seed for details",
+            }
+
+        seed = store_seed(content=seed_content, source="text")
+        seed_id = seed.seed_id
+
+    thread_id = f"thread-{uuid.uuid4().hex[:8]}"
+    sprint = store_sprint(seed_id=seed_id, thread_id=thread_id)
+    task = asyncio.create_task(
+        _run_sprint(
+            sprint_id=sprint.sprint_id,
+            thread_id=thread_id,
+            seed_id=seed_id,
+            seed_content=seed.content,
+        )
+    )
+    _register_sprint_task(sprint.sprint_id, task)
+
+    return {
+        "status": "started",
+        "sprint_id": sprint.sprint_id,
+        "seed_id": seed_id,
+        "thread_id": thread_id,
+        "started_at": sprint.started_at.isoformat(),
+    }
+
+
+__all__ = [
+    "StoredSeed",
+    "StoredSprint",
+    "clear_seeds",
+    "clear_sprints",
+    "get_seed",
+    "get_sprint",
+    "store_seed",
+    "store_sprint",
+    "yolo_run",
+    "yolo_seed",
+]

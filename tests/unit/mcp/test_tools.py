@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -15,9 +15,10 @@ import pytest
 @pytest.fixture(autouse=True)
 def clear_seed_storage() -> None:
     """Clear seed storage before each test to ensure test isolation."""
-    from yolo_developer.mcp.tools import clear_seeds
+    from yolo_developer.mcp.tools import clear_seeds, clear_sprints
 
     clear_seeds()
+    clear_sprints()
 
 
 # Helper to call the underlying function since @mcp.tool wraps it
@@ -30,6 +31,15 @@ async def call_yolo_seed(**kwargs: str | None) -> dict:
         return await yolo_seed.fn(**kwargs)
     # Fallback for direct function access
     return await yolo_seed(**kwargs)
+
+
+async def call_yolo_run(**kwargs: str | None) -> dict:
+    """Call yolo_run tool's underlying function directly for testing."""
+    from yolo_developer.mcp.tools import yolo_run
+
+    if hasattr(yolo_run, "fn"):
+        return await yolo_run.fn(**kwargs)
+    return await yolo_run(**kwargs)
 
 
 class TestYoloSeedTool:
@@ -244,6 +254,90 @@ class TestSeedStorage:
         assert result is None
 
 
+class TestYoloRunTool:
+    """Tests for the yolo_run MCP tool."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_seed_id_starts_sprint(self) -> None:
+        """Test yolo_run starts a sprint with a valid seed_id."""
+        from yolo_developer.mcp.tools import get_sprint, store_seed
+
+        seed = store_seed(content="Seed for sprint", source="text")
+
+        with patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock) as mock_run:
+            result = await call_yolo_run(seed_id=seed.seed_id)
+
+        assert result["status"] == "started"
+        assert "sprint_id" in result
+        assert result["seed_id"] == seed.seed_id
+
+        sprint = get_sprint(result["sprint_id"])
+        assert sprint is not None
+        assert sprint.seed_id == seed.seed_id
+        assert sprint.status == "running"
+        assert mock_run.called
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_seed_content_creates_seed(self) -> None:
+        """Test yolo_run stores seed_content and starts sprint."""
+        from yolo_developer.mcp.tools import get_seed, get_sprint
+
+        with (
+            patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock),
+            patch("yolo_developer.mcp.tools.parse_seed", new_callable=AsyncMock),
+            patch("yolo_developer.mcp.tools.generate_validation_report"),
+            patch(
+                "yolo_developer.mcp.tools.validate_quality_thresholds",
+                return_value=type("Result", (), {"passed": True})(),
+            ),
+        ):
+            result = await call_yolo_run(seed_content="Seed content")
+
+        assert result["status"] == "started"
+        assert "seed_id" in result
+        assert "sprint_id" in result
+
+        seed = get_seed(result["seed_id"])
+        assert seed is not None
+        assert seed.content == "Seed content"
+
+        sprint = get_sprint(result["sprint_id"])
+        assert sprint is not None
+        assert sprint.seed_id == result["seed_id"]
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_missing_seed_id_returns_error(self) -> None:
+        """Test yolo_run returns error for unknown seed_id."""
+        result = await call_yolo_run(seed_id="missing-seed")
+
+        assert result["status"] == "error"
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_empty_seed_content_returns_error(self) -> None:
+        """Test yolo_run rejects empty seed content."""
+        result = await call_yolo_run(seed_content="   ")
+
+        assert result["status"] == "error"
+        assert "empty" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_with_invalid_seed_content_returns_error(self) -> None:
+        """Test yolo_run returns error when seed validation fails."""
+        with (
+            patch("yolo_developer.mcp.tools.parse_seed", new_callable=AsyncMock),
+            patch("yolo_developer.mcp.tools.generate_validation_report"),
+            patch(
+                "yolo_developer.mcp.tools.validate_quality_thresholds",
+                return_value=type("Result", (), {"passed": False})(),
+            ),
+        ):
+            result = await call_yolo_run(seed_content="Invalid seed content")
+
+        assert result["status"] == "error"
+        assert "validation" in result["error"].lower()
+
+
 class TestToolRegistration:
     """Tests for MCP tool registration."""
 
@@ -275,6 +369,22 @@ class TestToolRegistration:
         assert "yolo_seed" in tool_names
 
     @pytest.mark.asyncio
+    async def test_mcp_server_lists_yolo_run_tool(self) -> None:
+        """Test MCP server includes yolo_run in list_tools."""
+        from yolo_developer.mcp import mcp
+
+        tools = await mcp.get_tools()
+
+        if isinstance(tools, dict):
+            tool_names = list(tools.keys())
+        elif isinstance(tools, list):
+            tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
+        else:
+            tool_names = [str(t) for t in tools]
+
+        assert "yolo_run" in tool_names
+
+    @pytest.mark.asyncio
     async def test_yolo_seed_tool_has_description(self) -> None:
         """Test yolo_seed tool has a description for LLM understanding."""
         from yolo_developer.mcp.tools import yolo_seed
@@ -292,3 +402,21 @@ class TestToolRegistration:
         assert description is not None
         assert len(description) > 0
         assert "seed" in description.lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_tool_has_description(self) -> None:
+        """Test yolo_run tool has a description for LLM understanding."""
+        from yolo_developer.mcp.tools import yolo_run
+
+        if hasattr(yolo_run, "description"):
+            description = yolo_run.description
+        elif hasattr(yolo_run, "fn") and yolo_run.fn.__doc__:
+            description = yolo_run.fn.__doc__
+        elif hasattr(yolo_run, "__doc__"):
+            description = yolo_run.__doc__
+        else:
+            description = None
+
+        assert description is not None
+        assert len(description) > 0
+        assert "sprint" in description.lower()
