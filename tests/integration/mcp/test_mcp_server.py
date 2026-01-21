@@ -16,7 +16,14 @@ import pytest
 from fastmcp import Client
 
 from yolo_developer.mcp import mcp
-from yolo_developer.mcp.tools import clear_seeds, clear_sprints, get_seed, get_sprint, store_seed
+from yolo_developer.mcp.tools import (
+    clear_seeds,
+    clear_sprints,
+    get_seed,
+    get_sprint,
+    store_seed,
+    store_sprint,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -50,6 +57,15 @@ async def test_server_lists_yolo_run_tool() -> None:
         tools = await client.list_tools()
         tool_names = [t.name for t in tools]
         assert "yolo_run" in tool_names
+
+
+@pytest.mark.asyncio
+async def test_server_lists_yolo_status_tool() -> None:
+    """Test server includes yolo_status in available tools."""
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        tool_names = [t.name for t in tools]
+        assert "yolo_status" in tool_names
 
 
 @pytest.mark.asyncio
@@ -187,6 +203,45 @@ class TestYoloRunIntegration:
         assert_result_error(result)
 
 
+class TestYoloStatusIntegration:
+    """Integration tests for yolo_status MCP tool via FastMCP Client."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_via_client_returns_status(self) -> None:
+        """Test yolo_status returns sprint metadata via MCP client."""
+        seed = store_seed(content="Seed for status", source="text")
+        sprint = get_sprint(
+            store_sprint(
+                seed_id=seed.seed_id,
+                thread_id="thread-integration",
+            ).sprint_id
+        )
+        assert sprint is not None
+
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "yolo_status",
+                {"sprint_id": sprint.sprint_id},
+            )
+
+        data = extract_result_data(result)
+        assert data.get("status") == "running"
+        assert data.get("sprint_id") == sprint.sprint_id
+        assert data.get("seed_id") == seed.seed_id
+        assert data.get("thread_id") == "thread-integration"
+        assert data.get("started_at") == sprint.started_at.isoformat()
+        assert data.get("completed_at") is None
+        assert data.get("error") is None
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_unknown_sprint_returns_error(self) -> None:
+        """Test yolo_status returns error for unknown sprint_id via client."""
+        async with Client(mcp) as client:
+            result = await client.call_tool("yolo_status", {"sprint_id": "missing-sprint"})
+
+        assert_result_error(result)
+
+
 def assert_result_accepted(result: Any, source: str = "text") -> None:
     """Assert that the tool result indicates accepted status."""
     # FastMCP wraps tool results - extract content
@@ -276,6 +331,32 @@ def assert_result_started(result: Any) -> None:
 
     assert data.get("status") == "started", f"Expected started status, got: {data}"
     assert "sprint_id" in data, f"Expected sprint_id in result: {data}"
+
+
+def extract_result_data(result: Any) -> dict[str, Any]:
+    """Extract tool result data from FastMCP response."""
+    if hasattr(result, "content"):
+        content = result.content
+        if isinstance(content, list) and len(content) > 0:
+            content = content[0]
+        if hasattr(content, "text"):
+            import json
+
+            return json.loads(content.text)
+        if isinstance(content, dict):
+            return content
+        return {"content": content}
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, list) and len(result) > 0:
+        content = result[0]
+        if hasattr(content, "text"):
+            import json
+
+            return json.loads(content.text)
+        if isinstance(content, dict):
+            return content
+    return {}
 
 
 def extract_seed_id(result: Any) -> str | None:

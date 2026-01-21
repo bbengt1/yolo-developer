@@ -54,6 +54,25 @@ yolo mcp
 yolo mcp --transport http --port 8080
 ```
 
+### 1a. Quick MCP Tool Verification (CLI)
+
+This uses an in-process FastMCP client to list tool names. Use this for local sanity checks; for real clients (Claude Desktop or HTTP) you still need a running MCP server.
+
+```bash
+uv run python - <<'PY'
+import asyncio
+from fastmcp import Client
+from yolo_developer.mcp import mcp
+
+async def main() -> None:
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        print([t.name for t in tools])
+
+asyncio.run(main())
+PY
+```
+
 ### 2. Configure Claude Desktop
 
 Add to your Claude Desktop configuration file:
@@ -162,7 +181,7 @@ Provide seed requirements for autonomous development.
 
 ---
 
-### yolo_run (Coming Soon)
+### yolo_run
 
 Execute an autonomous development sprint.
 
@@ -170,31 +189,35 @@ Execute an autonomous development sprint.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
-| `seed_id` | string | No | Specific seed ID (uses latest if omitted) |
-| `agents` | array | No | List of agents to run |
-| `dry_run` | boolean | No | Simulate without changes |
+| `seed_id` | string | No* | Seed ID returned by `yolo_seed` (preferred) |
+| `seed_content` | string | No* | Raw seed content (used if `seed_id` not provided) |
+
+*One of `seed_id` or `seed_content` must be provided.
 
 #### Returns
 
 ```json
 {
-  "status": "completed",
-  "sprint_id": "sprint_xyz789",
-  "duration_seconds": 1503,
-  "stories_completed": 8,
-  "test_coverage": 0.87,
-  "artifacts": {
-    "adrs": 3,
-    "stories": 8,
-    "source_files": 24,
-    "test_files": 45
-  }
+  "status": "started",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00"
+}
+```
+
+#### Error Responses
+
+```json
+{
+  "status": "error",
+  "error": "Seed not found for seed_id: ..."
 }
 ```
 
 ---
 
-### yolo_status (Coming Soon)
+### yolo_status
 
 Query current sprint status.
 
@@ -202,30 +225,64 @@ Query current sprint status.
 
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
-| `sprint_id` | string | No | Specific sprint (uses current if omitted) |
-| `include_stories` | boolean | No | Include story details |
-| `include_gates` | boolean | No | Include quality gate details |
+| `sprint_id` | string | Yes | Sprint identifier returned by `yolo_run` |
 
 #### Returns
 
 ```json
 {
-  "status": "IN_PROGRESS",
-  "progress": 0.6,
-  "current_agent": "DEV",
-  "stories": {
-    "total": 8,
-    "completed": 5,
-    "in_progress": 1,
-    "pending": 2
-  },
-  "quality_gates": {
-    "all_passing": true,
-    "scores": {
-      "testability": 0.89,
-      "architecture": 0.85
-    }
-  }
+  "status": "running",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00",
+  "completed_at": null,
+  "error": null
+}
+```
+
+#### Error Responses
+
+```json
+{
+  "status": "error",
+  "error": "Sprint not found"
+}
+```
+
+---
+
+## yolo_status Walkthrough
+
+1) Seed requirements
+```bash
+cat <<'EOF' > requirements.md
+Build a REST API for user management with JWT authentication.
+EOF
+yolo seed requirements.md
+```
+
+2) Start a sprint and capture `sprint_id`
+```json
+{
+  "status": "started",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00"
+}
+```
+
+3) Query sprint status
+```json
+{
+  "status": "running",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00",
+  "completed_at": null,
+  "error": null
 }
 ```
 
@@ -415,27 +472,19 @@ mcp:
 >
 > [Calls yolo_run]
 >
-> Sprint completed! Here's what was generated:
+> Sprint started. Here's the identifier you can use to track progress:
 >
-> **User Stories (6):**
-> - US-001: Todo CRUD Operations
-> - US-002: User Authentication
-> - US-003: Todo Completion Toggle
-> - US-004: Due Date Management
-> - US-005: Category Tagging
-> - US-006: Reminder Notifications
+> ```json
+> {
+>   "status": "started",
+>   "sprint_id": "sprint-abcdef12",
+>   "seed_id": "seed_abc123",
+>   "thread_id": "thread-1234abcd",
+>   "started_at": "2026-01-21T09:12:34.567890+00:00"
+> }
+> ```
 >
-> **Architecture Decisions:**
-> - ADR-001: JWT for stateless authentication
-> - ADR-002: PostgreSQL for persistence
-> - ADR-003: Event-driven reminders
->
-> **Code Generated:**
-> - 18 source files
-> - 32 test files
-> - 87% test coverage
->
-> All quality gates passed. Would you like me to show you the generated code structure?
+> Want me to check the sprint status now?
 
 ---
 
@@ -449,25 +498,19 @@ mcp:
 >
 > [Calls yolo_status]
 >
-> **Sprint Status: IN_PROGRESS (60% complete)**
+> ```json
+> {
+>   "status": "running",
+>   "sprint_id": "sprint-abcdef12",
+>   "seed_id": "seed_abc123",
+>   "thread_id": "thread-1234abcd",
+>   "started_at": "2026-01-21T09:12:34.567890+00:00",
+>   "completed_at": null,
+>   "error": null
+> }
+> ```
 >
-> | Story | Status |
-> |-------|--------|
-> | US-001: Todo CRUD | ✅ Complete |
-> | US-002: Authentication | ✅ Complete |
-> | US-003: Completion Toggle | ✅ Complete |
-> | US-004: Due Dates | 🔄 In Progress |
-> | US-005: Categories | ⏳ Pending |
-> | US-006: Reminders | ⏳ Pending |
->
-> **Current Agent:** DEV
-> **Task:** Implementing date picker component
->
-> **Quality Gates:** All passing
-> - Testability: 0.91
-> - Architecture: 0.88
->
-> Estimated completion: ~8 minutes
+> The sprint is still running. I can check again or wait for completion.
 
 ---
 

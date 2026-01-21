@@ -5,6 +5,8 @@ to external clients via the FastMCP server.
 
 Tools:
     - yolo_seed: Provide seed requirements for autonomous development
+    - yolo_run: Execute autonomous sprint
+    - yolo_status: Query sprint status
 
 Example:
     >>> from yolo_developer.mcp import mcp
@@ -22,7 +24,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -184,6 +186,15 @@ def get_sprint(sprint_id: str) -> StoredSprint | None:
     """Retrieve a sprint by its ID."""
     with _sprints_lock:
         return _sprints.get(sprint_id)
+
+
+def _get_sprint_snapshot(sprint_id: str) -> StoredSprint | None:
+    """Return a snapshot of sprint data to avoid concurrent mutation issues."""
+    with _sprints_lock:
+        sprint = _sprints.get(sprint_id)
+        if sprint is None:
+            return None
+        return replace(sprint)
 
 
 def clear_sprints() -> None:
@@ -441,6 +452,33 @@ async def yolo_run(
     }
 
 
+@mcp.tool
+async def yolo_status(sprint_id: str) -> dict[str, Any]:
+    """Query the status of a sprint by sprint_id."""
+    if not sprint_id or not sprint_id.strip():
+        return {
+            "status": "error",
+            "error": "sprint_id must be provided",
+        }
+
+    sprint = _get_sprint_snapshot(sprint_id)
+    if sprint is None:
+        return {
+            "status": "error",
+            "error": "Sprint not found",
+        }
+
+    return {
+        "status": sprint.status,
+        "sprint_id": sprint.sprint_id,
+        "seed_id": sprint.seed_id,
+        "thread_id": sprint.thread_id,
+        "started_at": sprint.started_at.isoformat(),
+        "completed_at": sprint.completed_at.isoformat() if sprint.completed_at else None,
+        "error": sprint.error,
+    }
+
+
 __all__ = [
     "StoredSeed",
     "StoredSprint",
@@ -452,4 +490,5 @@ __all__ = [
     "store_sprint",
     "yolo_run",
     "yolo_seed",
+    "yolo_status",
 ]

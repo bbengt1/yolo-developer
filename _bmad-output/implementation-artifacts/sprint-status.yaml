@@ -205,7 +205,7 @@ development_status:
   14-1-fastmcp-server-setup: done
   14-2-yolo-seed-mcp-tool: done
   14-3-yolo-run-mcp-tool: done
-  14-4-yolo-status-mcp-tool: backlog
+  14-4-yolo-status-mcp-tool: done
   14-5-yolo-audit-mcp-tool: backlog
   14-6-claude-code-compatibility: backlog
   epic-14-retrospective: optional

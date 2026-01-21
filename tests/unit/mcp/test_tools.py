@@ -42,6 +42,15 @@ async def call_yolo_run(**kwargs: str | None) -> dict:
     return await yolo_run(**kwargs)
 
 
+async def call_yolo_status(**kwargs: str | None) -> dict:
+    """Call yolo_status tool's underlying function directly for testing."""
+    from yolo_developer.mcp.tools import yolo_status
+
+    if hasattr(yolo_status, "fn"):
+        return await yolo_status.fn(**kwargs)
+    return await yolo_status(**kwargs)
+
+
 class TestYoloSeedTool:
     """Tests for the yolo_seed MCP tool."""
 
@@ -338,6 +347,44 @@ class TestYoloRunTool:
         assert "validation" in result["error"].lower()
 
 
+class TestYoloStatusTool:
+    """Tests for the yolo_status MCP tool."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_with_valid_sprint_id_returns_status(self) -> None:
+        """Test yolo_status returns sprint metadata for known sprint."""
+        from yolo_developer.mcp.tools import store_seed, store_sprint
+
+        seed = store_seed(content="Seed for status", source="text")
+        sprint = store_sprint(seed_id=seed.seed_id, thread_id="thread-test")
+
+        result = await call_yolo_status(sprint_id=sprint.sprint_id)
+
+        assert result["status"] == "running"
+        assert result["sprint_id"] == sprint.sprint_id
+        assert result["seed_id"] == seed.seed_id
+        assert result["thread_id"] == "thread-test"
+        assert result["started_at"] == sprint.started_at.isoformat()
+        assert result["completed_at"] is None
+        assert result["error"] is None
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_with_unknown_sprint_returns_error(self) -> None:
+        """Test yolo_status returns error for unknown sprint_id."""
+        result = await call_yolo_status(sprint_id="missing-sprint")
+
+        assert result["status"] == "error"
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_with_empty_sprint_id_returns_error(self) -> None:
+        """Test yolo_status returns error for empty sprint_id."""
+        result = await call_yolo_status(sprint_id="   ")
+
+        assert result["status"] == "error"
+        assert "sprint_id" in result["error"].lower()
+
+
 class TestToolRegistration:
     """Tests for MCP tool registration."""
 
@@ -385,6 +432,22 @@ class TestToolRegistration:
         assert "yolo_run" in tool_names
 
     @pytest.mark.asyncio
+    async def test_mcp_server_lists_yolo_status_tool(self) -> None:
+        """Test MCP server includes yolo_status in list_tools."""
+        from yolo_developer.mcp import mcp
+
+        tools = await mcp.get_tools()
+
+        if isinstance(tools, dict):
+            tool_names = list(tools.keys())
+        elif isinstance(tools, list):
+            tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
+        else:
+            tool_names = [str(t) for t in tools]
+
+        assert "yolo_status" in tool_names
+
+    @pytest.mark.asyncio
     async def test_yolo_seed_tool_has_description(self) -> None:
         """Test yolo_seed tool has a description for LLM understanding."""
         from yolo_developer.mcp.tools import yolo_seed
@@ -420,3 +483,21 @@ class TestToolRegistration:
         assert description is not None
         assert len(description) > 0
         assert "sprint" in description.lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_tool_has_description(self) -> None:
+        """Test yolo_status tool has a description for LLM understanding."""
+        from yolo_developer.mcp.tools import yolo_status
+
+        if hasattr(yolo_status, "description"):
+            description = yolo_status.description
+        elif hasattr(yolo_status, "fn") and yolo_status.fn.__doc__:
+            description = yolo_status.fn.__doc__
+        elif hasattr(yolo_status, "__doc__"):
+            description = yolo_status.__doc__
+        else:
+            description = None
+
+        assert description is not None
+        assert len(description) > 0
+        assert "status" in description.lower()

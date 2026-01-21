@@ -11,7 +11,7 @@ Example:
     >>> # Or with HTTP transport
     >>> mcp.run(transport="http", port=8000)
 
-The server exposes the following tools (implemented in future stories):
+The server exposes the following tools:
     - yolo_seed: Provide seed requirements for development
     - yolo_run: Execute autonomous sprint
     - yolo_status: Query sprint status
@@ -82,8 +82,18 @@ Returns sprint_id for status queries and thread_id for checkpointing.
 Example:
   yolo_run(seed_id="550e8400-e29b-41d4-a716-446655440000")
 
+## yolo_status
+Query the current status of a sprint by sprint_id.
+
+Parameters:
+- sprint_id (required): Sprint identifier returned by yolo_run
+
+Returns sprint status, timestamps, and error details if the sprint failed.
+
+Example:
+  yolo_status(sprint_id="sprint-abcdef12")
+
 ## Coming Soon
-- yolo_status: Query sprint status
 - yolo_audit: Access audit trail
 
 Use these tools to integrate YOLO Developer into your AI workflow.

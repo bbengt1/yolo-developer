@@ -116,8 +116,11 @@ export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
 # From a requirements document
 yolo seed requirements.md
 
-# Or inline text
-yolo seed --text "Build a REST API for user management with JWT authentication"
+# Or create a quick requirements file
+cat <<'EOF' > requirements.md
+Build a REST API for user management with JWT authentication.
+EOF
+yolo seed requirements.md
 ```
 
 ### 4. Run Autonomous Development
@@ -193,6 +196,25 @@ yolo mcp
 yolo mcp --transport http --port 8080
 ```
 
+### Quick MCP Tool Verification (CLI)
+
+This uses an in-process FastMCP client to list tool names. Use this for local sanity checks; for real clients (Claude Desktop or HTTP) you still need a running MCP server.
+
+```bash
+uv run python - <<'PY'
+import asyncio
+from fastmcp import Client
+from yolo_developer.mcp import mcp
+
+async def main() -> None:
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        print([t.name for t in tools])
+
+asyncio.run(main())
+PY
+```
+
 ### Claude Desktop Configuration
 
 Add to your Claude Desktop `claude_desktop_config.json`:
@@ -213,9 +235,51 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 | Tool | Description |
 |------|-------------|
 | `yolo_seed` | Provide seed requirements (text or file) |
-| `yolo_run` | Execute autonomous sprint (coming soon) |
-| `yolo_status` | Query sprint status (coming soon) |
+| `yolo_run` | Execute autonomous sprint |
+| `yolo_status` | Query sprint status |
 | `yolo_audit` | Access audit trail (coming soon) |
+
+### yolo_status Walkthrough
+
+1) Seed requirements
+```bash
+cat <<'EOF' > requirements.md
+Build a REST API for user management with JWT authentication.
+EOF
+yolo seed requirements.md
+```
+
+2) Start a sprint (returns `sprint_id`)
+```json
+{
+  "status": "started",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00"
+}
+```
+
+3) Query sprint status
+```json
+{
+  "status": "running",
+  "sprint_id": "sprint-abcdef12",
+  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
+  "thread_id": "thread-1234abcd",
+  "started_at": "2026-01-21T09:12:34.567890+00:00",
+  "completed_at": null,
+  "error": null
+}
+```
+
+4) Unknown sprint_id error
+```json
+{
+  "status": "error",
+  "error": "Sprint not found"
+}
+```
 
 ---
 
