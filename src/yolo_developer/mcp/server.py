@@ -93,8 +93,22 @@ Returns sprint status, timestamps, and error details if the sprint failed.
 Example:
   yolo_status(sprint_id="sprint-abcdef12")
 
-## Coming Soon
-- yolo_audit: Access audit trail
+## yolo_audit
+Access audit trail entries with optional filtering and pagination.
+
+Parameters:
+- agent (optional): Filter by agent name (e.g., "analyst")
+- decision_type (optional): Filter by decision type (e.g., "requirement_analysis")
+- artifact_type (optional): Filter by artifact type (e.g., "requirement")
+- start_time (optional): ISO-8601 start timestamp (inclusive)
+- end_time (optional): ISO-8601 end timestamp (inclusive)
+- limit (optional): Max entries to return (default 100)
+- offset (optional): Number of entries to skip (default 0)
+
+Returns audit entries, pagination metadata, and total count.
+
+Example:
+  yolo_audit(agent="analyst", limit=25, offset=0)
 
 Use these tools to integrate YOLO Developer into your AI workflow.
 """

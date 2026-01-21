@@ -508,7 +508,7 @@ async def _call_llm_for_documentation(
         LLM response string.
     """
     messages = [{"role": "user", "content": prompt}]
-    response = await router.call(messages=messages, tier="complex")
+    response = await router.call_task(messages=messages, task_type="documentation")
     return response
 
 

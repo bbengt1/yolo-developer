@@ -7,6 +7,7 @@ Tools:
     - yolo_seed: Provide seed requirements for autonomous development
     - yolo_run: Execute autonomous sprint
     - yolo_status: Query sprint status
+    - yolo_audit: Query audit trail entries
 
 Example:
     >>> from yolo_developer.mcp import mcp
@@ -32,6 +33,14 @@ from typing import Any, Literal, cast
 import structlog
 from langchain_core.messages import HumanMessage
 
+from yolo_developer.audit import (
+    AuditFilters,
+    InMemoryTraceabilityStore,
+    JsonDecisionStore,
+    get_audit_filter_service,
+)
+from yolo_developer.audit.traceability_types import VALID_ARTIFACT_TYPES
+from yolo_developer.audit.types import VALID_DECISION_TYPES
 from yolo_developer.mcp.server import mcp
 from yolo_developer.seed import parse_seed
 from yolo_developer.seed.rejection import validate_quality_thresholds
@@ -92,6 +101,23 @@ _sprints: dict[str, StoredSprint] = {}
 _sprints_lock = threading.Lock()
 _sprint_tasks: dict[str, asyncio.Task[None]] = {}
 _sprint_tasks_lock = threading.Lock()
+
+
+def _parse_iso_timestamp(
+    value: str | None, field_name: str
+) -> tuple[str | None, datetime | None, str | None]:
+    """Parse an ISO-8601 timestamp string, returning normalized value or error."""
+    if value is None:
+        return None, None, None
+    stripped = value.strip()
+    if not stripped:
+        return None, None, f"{field_name} cannot be empty"
+    try:
+        normalized = stripped[:-1] + "+00:00" if stripped.endswith("Z") else stripped
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None, None, f"{field_name} must be an ISO-8601 timestamp"
+    return parsed.isoformat(), parsed, None
 
 
 def store_seed(
@@ -479,6 +505,129 @@ async def yolo_status(sprint_id: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool
+async def yolo_audit(
+    agent: str | None = None,
+    decision_type: str | None = None,
+    artifact_type: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Access audit trail entries with optional filters and pagination."""
+    if not isinstance(limit, int) or not isinstance(offset, int):
+        return {
+            "status": "error",
+            "error": "limit and offset must be integers",
+        }
+    if limit < 0 or offset < 0:
+        return {
+            "status": "error",
+            "error": "limit and offset must be >= 0",
+        }
+    if decision_type is not None and decision_type not in VALID_DECISION_TYPES:
+        return {
+            "status": "error",
+            "error": f"decision_type must be one of: {sorted(VALID_DECISION_TYPES)}",
+        }
+    if artifact_type is not None and artifact_type not in VALID_ARTIFACT_TYPES:
+        return {
+            "status": "error",
+            "error": f"artifact_type must be one of: {sorted(VALID_ARTIFACT_TYPES)}",
+        }
+
+    normalized_start, start_dt, error = _parse_iso_timestamp(start_time, "start_time")
+    if error:
+        return {
+            "status": "error",
+            "error": error,
+        }
+    normalized_end, end_dt, error = _parse_iso_timestamp(end_time, "end_time")
+    if error:
+        return {
+            "status": "error",
+            "error": error,
+        }
+    if start_dt and end_dt and start_dt > end_dt:
+        return {
+            "status": "error",
+            "error": "start_time must be before or equal to end_time",
+        }
+
+    audit_path = Path(".yolo/audit/decisions.json")
+    resolved_path = audit_path.resolve()
+    if not audit_path.exists():
+        return {
+            "status": "error",
+            "error": f"Audit store not found: {resolved_path}",
+        }
+    if not audit_path.is_file():
+        return {
+            "status": "error",
+            "error": f"Audit store path is not a file: {resolved_path}",
+        }
+
+    try:
+        decision_store = JsonDecisionStore(audit_path)
+        traceability_store = InMemoryTraceabilityStore()
+        filter_service = get_audit_filter_service(
+            decision_store=decision_store,
+            traceability_store=traceability_store,
+            cost_store=None,
+        )
+
+        filters = AuditFilters(
+            agent_name=agent,
+            decision_type=decision_type,
+            artifact_type=artifact_type,
+            start_time=normalized_start,
+            end_time=normalized_end,
+        )
+
+        results = await filter_service.filter_all(filters)
+        decisions = results.get("decisions", [])
+        if artifact_type is not None:
+            decisions = [
+                decision
+                for decision in decisions
+                if decision.metadata.get("artifact_type") == artifact_type
+            ]
+
+        total = len(decisions)
+        if limit == 0:
+            paginated = []
+        else:
+            paginated = decisions[offset : offset + limit]
+
+        entries = [
+            {
+                "entry_id": decision.id,
+                "timestamp": decision.timestamp,
+                "agent": decision.agent.agent_name,
+                "decision_type": decision.decision_type,
+                "content": decision.content,
+                "rationale": decision.rationale,
+                "metadata": decision.metadata,
+            }
+            for decision in paginated
+        ]
+
+        return {
+            "status": "ok",
+            "entries": entries,
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+        }
+    except Exception as exc:
+        logger.exception("mcp_audit_failed", error=str(exc))
+        return {
+            "status": "error",
+            "error": f"Failed to retrieve audit entries: {exc}",
+        }
+
+
 __all__ = [
     "StoredSeed",
     "StoredSprint",
@@ -488,6 +637,7 @@ __all__ = [
     "get_sprint",
     "store_seed",
     "store_sprint",
+    "yolo_audit",
     "yolo_run",
     "yolo_seed",
     "yolo_status",

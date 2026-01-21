@@ -581,10 +581,9 @@ async def generate_commit_message_with_llm(
 
     for attempt in range(max_retries + 1):
         try:
-            # Use "routine" tier per ADR-003
-            response = await router.call(
+            response = await router.call_task(
                 messages=[{"role": "user", "content": prompt}],
-                tier="routine",
+                task_type="documentation",
                 temperature=0.3,  # Lower for consistency
                 max_tokens=512,
             )

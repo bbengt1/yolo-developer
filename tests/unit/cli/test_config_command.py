@@ -158,11 +158,8 @@ class TestConfigShowCommand:
         assert result.exit_code == 0
         output = strip_ansi(result.output)
         # API keys should show as masked or "not set", never actual values
-        assert (
-            "openai_api_key" not in output.lower()
-            or "****" in output
-            or "not set" in output.lower()
-        )
+        assert "sk-" not in output.lower()
+        assert "****" in output or "not set" in output.lower()
 
     def test_show_config_json_output(self, temp_config_dir: Path) -> None:
         """Test that --json flag outputs valid JSON."""
@@ -188,6 +185,8 @@ class TestConfigShowCommand:
         # API keys should be masked in JSON output
         if output["llm"].get("openai_api_key"):
             assert output["llm"]["openai_api_key"] == "****"
+        if output["llm"].get("openai", {}).get("api_key"):
+            assert output["llm"]["openai"]["api_key"] == "****"
 
 
 class TestConfigSetCommand:
@@ -240,6 +239,11 @@ class TestConfigSetCommand:
         assert result.exit_code != 0
         output = strip_ansi(result.output)
         assert "environment" in output.lower() or "protected" in output.lower()
+
+        nested_result = runner.invoke(app, ["config", "set", "llm.openai.api_key", "sk-secret"])
+        assert nested_result.exit_code != 0
+        nested_output = strip_ansi(nested_result.output)
+        assert "environment" in nested_output.lower() or "protected" in nested_output.lower()
 
     def test_set_shows_before_after(self, temp_config_dir: Path) -> None:
         """Test that set command shows before/after values."""
@@ -296,6 +300,7 @@ class TestConfigExportCommand:
             content = f.read()
         # API keys should not be in exported file
         assert "openai_api_key" not in content or "null" in content.lower()
+        assert "openai:\n  api_key:" not in content
 
     def test_export_json_output(self, temp_config_dir: Path) -> None:
         """Test export command JSON output."""

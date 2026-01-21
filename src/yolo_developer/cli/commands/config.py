@@ -48,6 +48,7 @@ logger = structlog.get_logger(__name__)
 PROTECTED_KEYS = frozenset(
     {
         "llm.openai_api_key",
+        "llm.openai.api_key",
         "llm.anthropic_api_key",
     }
 )
@@ -56,9 +57,21 @@ PROTECTED_KEYS = frozenset(
 VALID_CONFIG_KEYS = frozenset(
     {
         "project_name",
+        "llm.provider",
         "llm.cheap_model",
         "llm.premium_model",
         "llm.best_model",
+        "llm.openai.cheap_model",
+        "llm.openai.premium_model",
+        "llm.openai.code_model",
+        "llm.openai.reasoning_model",
+        "llm.hybrid.enabled",
+        "llm.hybrid.routing.code_generation",
+        "llm.hybrid.routing.code_review",
+        "llm.hybrid.routing.architecture",
+        "llm.hybrid.routing.analysis",
+        "llm.hybrid.routing.documentation",
+        "llm.hybrid.routing.testing",
         "quality.test_coverage_threshold",
         "quality.confidence_threshold",
         "quality.seed_thresholds.overall",
@@ -103,6 +116,8 @@ def _mask_api_keys(config_dict: dict[str, Any]) -> dict[str, Any]:
         llm = dict(result["llm"])
         if llm.get("openai_api_key"):
             llm["openai_api_key"] = MASKED_VALUE
+        if isinstance(llm.get("openai"), dict) and llm["openai"].get("api_key"):
+            llm["openai"]["api_key"] = MASKED_VALUE
         if llm.get("anthropic_api_key"):
             llm["anthropic_api_key"] = MASKED_VALUE
         result["llm"] = llm
@@ -139,6 +154,7 @@ def _display_config_tree(config: YoloConfig, mask_secrets: bool = True) -> None:
 
     # LLM section
     llm_branch = tree.add("[cyan]llm:[/cyan]")
+    llm_branch.add(f"provider: {config.llm.provider}")
     llm_branch.add(f"cheap_model: {config.llm.cheap_model}")
     llm_branch.add(f"premium_model: {config.llm.premium_model}")
     llm_branch.add(f"best_model: {config.llm.best_model}")
@@ -157,6 +173,24 @@ def _display_config_tree(config: YoloConfig, mask_secrets: bool = True) -> None:
 
     llm_branch.add(f"openai_api_key: {openai_display}")
     llm_branch.add(f"anthropic_api_key: {anthropic_display}")
+
+    openai_branch = llm_branch.add("openai:")
+    openai_branch.add(f"cheap_model: {config.llm.openai.cheap_model}")
+    openai_branch.add(f"premium_model: {config.llm.openai.premium_model}")
+    openai_branch.add(f"code_model: {config.llm.openai.code_model}")
+    openai_branch.add(
+        f"reasoning_model: {config.llm.openai.reasoning_model or '[dim]not set[/dim]'}"
+    )
+
+    hybrid_branch = llm_branch.add("hybrid:")
+    hybrid_branch.add(f"enabled: {config.llm.hybrid.enabled}")
+    routing_branch = hybrid_branch.add("routing:")
+    routing_branch.add(f"code_generation: {config.llm.hybrid.routing.code_generation}")
+    routing_branch.add(f"code_review: {config.llm.hybrid.routing.code_review}")
+    routing_branch.add(f"architecture: {config.llm.hybrid.routing.architecture}")
+    routing_branch.add(f"analysis: {config.llm.hybrid.routing.analysis}")
+    routing_branch.add(f"documentation: {config.llm.hybrid.routing.documentation}")
+    routing_branch.add(f"testing: {config.llm.hybrid.routing.testing}")
 
     # Quality section
     quality_branch = tree.add("[cyan]quality:[/cyan]")
@@ -283,7 +317,10 @@ def _validate_key(key: str) -> str | None:
         Error message if invalid, None if valid.
     """
     if key in PROTECTED_KEYS:
-        return f"Cannot set '{key}' via CLI. Use environment variables instead:\n  YOLO_LLM__OPENAI_API_KEY or YOLO_LLM__ANTHROPIC_API_KEY"
+        return (
+            f"Cannot set '{key}' via CLI. Use environment variables instead:\n"
+            "  YOLO_LLM__OPENAI__API_KEY or YOLO_LLM__ANTHROPIC_API_KEY"
+        )
 
     if key not in VALID_CONFIG_KEYS:
         # Check if it might be a partial match (for better error messages)

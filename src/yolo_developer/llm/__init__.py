@@ -22,6 +22,8 @@ from yolo_developer.llm.router import (
     LLMRouter,
     LLMRouterError,
     ModelTier,
+    TaskRouting,
+    TaskType,
 )
 
 __all__ = [
@@ -30,4 +32,6 @@ __all__ = [
     "LLMRouter",
     "LLMRouterError",
     "ModelTier",
+    "TaskRouting",
+    "TaskType",
 ]

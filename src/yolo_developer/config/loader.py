@@ -156,31 +156,18 @@ def _merge_with_env_vars(yaml_data: dict[str, Any]) -> dict[str, Any]:
         config_key = key[len(env_prefix) :]
         parts = config_key.lower().split(nested_delimiter)
 
-        if len(parts) == 1:
-            # Top-level key (e.g., YOLO_PROJECT_NAME -> project_name)
-            result[parts[0]] = value
-        elif len(parts) == 2:
-            # Nested key (e.g., YOLO_LLM__CHEAP_MODEL -> llm.cheap_model)
-            parent, child = parts
-            if parent not in result:
-                result[parent] = {}
-            elif not isinstance(result[parent], dict):
-                # Convert to dict if it was a different type
-                result[parent] = {}
-            result[parent][child] = _convert_value(value, parent, child)
-        else:
-            # Deeper nesting not supported - warn the user
-            logger.warning(
-                "Environment variable %s has %d levels of nesting (max 2 supported). "
-                "This variable will be ignored. Use YOLO_SECTION__KEY format.",
-                key,
-                len(parts),
-            )
+        current: dict[str, Any] = result
+        for part in parts[:-1]:
+            if part not in current or not isinstance(current.get(part), dict):
+                current[part] = {}
+            current = current[part]
+
+        current[parts[-1]] = _convert_value(value, tuple(parts))
 
     return result
 
 
-def _convert_value(value: str, parent: str, child: str) -> Any:
+def _convert_value(value: str, path: tuple[str, ...]) -> Any:
     """Convert string environment variable to appropriate type.
 
     Attempts automatic type inference: tries float conversion first
@@ -189,8 +176,7 @@ def _convert_value(value: str, parent: str, child: str) -> Any:
 
     Args:
         value: String value from environment variable.
-        parent: Parent config section (e.g., 'quality').
-        child: Child config key (e.g., 'test_coverage_threshold').
+        path: Full config path parts (e.g., ("quality", "test_coverage_threshold")).
 
     Returns:
         Converted value (float for numeric values, string otherwise).
@@ -199,10 +185,13 @@ def _convert_value(value: str, parent: str, child: str) -> Any:
     float_fields = {
         ("quality", "test_coverage_threshold"),
         ("quality", "confidence_threshold"),
+        ("quality", "seed_thresholds", "overall"),
+        ("quality", "seed_thresholds", "ambiguity"),
+        ("quality", "seed_thresholds", "sop"),
     }
 
     # Always convert known float fields
-    if (parent, child) in float_fields:
+    if path in float_fields:
         try:
             return float(value)
         except ValueError:

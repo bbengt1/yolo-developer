@@ -86,7 +86,7 @@ PYTEST_INTEGRATION_CONVENTIONS = """
 def mock_llm_router() -> MagicMock:
     \"\"\"Mock LLM router for integration tests.\"\"\"
     router = MagicMock(spec=LLMRouter)
-    router.call = AsyncMock(return_value="response")
+    router.call_task = AsyncMock(return_value="response")
     return router
 
 @pytest.fixture(autouse=True)
@@ -101,8 +101,8 @@ def cleanup_state() -> Generator[None, None, None]:
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Mock LLM calls
-mock_router.call.return_value = "generated response"
-mock_router.call.side_effect = [response1, response2]  # Multiple calls
+mock_router.call_task.return_value = "generated response"
+mock_router.call_task.side_effect = [response1, response2]  # Multiple calls
 
 # Mock filesystem
 with patch("pathlib.Path.read_text", return_value="content"):

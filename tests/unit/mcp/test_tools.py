@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from yolo_developer.audit.types import Decision
+
 
 @pytest.fixture(autouse=True)
 def clear_seed_storage() -> None:
@@ -49,6 +51,46 @@ async def call_yolo_status(**kwargs: str | None) -> dict:
     if hasattr(yolo_status, "fn"):
         return await yolo_status.fn(**kwargs)
     return await yolo_status(**kwargs)
+
+
+async def call_yolo_audit(**kwargs: str | None) -> dict:
+    """Call yolo_audit tool's underlying function directly for testing."""
+    from yolo_developer.mcp.tools import yolo_audit
+
+    if hasattr(yolo_audit, "fn"):
+        return await yolo_audit.fn(**kwargs)
+    return await yolo_audit(**kwargs)
+
+
+def _create_audit_decision(
+    *,
+    decision_id: str,
+    agent_name: str,
+    decision_type: str,
+    timestamp: str,
+    metadata: dict[str, str],
+) -> Decision:
+    """Create a Decision object for audit tests."""
+    from yolo_developer.audit.types import AgentIdentity, Decision, DecisionContext
+
+    return Decision(
+        id=decision_id,
+        decision_type=decision_type,  # type: ignore[arg-type]
+        content=f"Decision {decision_id}",
+        rationale="Testing audit trail",
+        agent=AgentIdentity(
+            agent_name=agent_name,
+            agent_type=agent_name,
+            session_id="session-1",
+        ),
+        context=DecisionContext(
+            sprint_id="sprint-1",
+            story_id="story-1",
+        ),
+        timestamp=timestamp,
+        metadata=metadata,
+        severity="info",  # type: ignore[arg-type]
+    )
 
 
 class TestYoloSeedTool:
@@ -385,6 +427,94 @@ class TestYoloStatusTool:
         assert "sprint_id" in result["error"].lower()
 
 
+class TestYoloAuditTool:
+    """Tests for the yolo_audit MCP tool."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_empty_store_returns_empty(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test yolo_audit returns empty results for missing audit data."""
+        monkeypatch.chdir(tmp_path)
+        audit_path = Path(".yolo/audit/decisions.json")
+        audit_path.parent.mkdir(parents=True, exist_ok=True)
+        audit_path.write_text("", encoding="utf-8")
+
+        result = await call_yolo_audit()
+
+        assert result["status"] == "ok"
+        assert result["entries"] == []
+        assert result["total"] == 0
+        assert result["limit"] == 100
+        assert result["offset"] == 0
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_missing_store_returns_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test yolo_audit returns error when audit store is missing."""
+        monkeypatch.chdir(tmp_path)
+
+        result = await call_yolo_audit()
+
+        assert result["status"] == "error"
+        assert "audit store not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_filters_and_pagination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test yolo_audit supports filtering and pagination."""
+        from yolo_developer.audit import JsonDecisionStore
+
+        monkeypatch.chdir(tmp_path)
+
+        store = JsonDecisionStore(Path(".yolo/audit/decisions.json"))
+        await store.log_decision(
+            _create_audit_decision(
+                decision_id="dec-1",
+                agent_name="analyst",
+                decision_type="requirement_analysis",
+                timestamp="2026-01-18T10:00:00+00:00",
+                metadata={"artifact_type": "requirement"},
+            )
+        )
+        await store.log_decision(
+            _create_audit_decision(
+                decision_id="dec-2",
+                agent_name="pm",
+                decision_type="story_creation",
+                timestamp="2026-01-18T11:00:00+00:00",
+                metadata={"artifact_type": "story"},
+            )
+        )
+        await store.log_decision(
+            _create_audit_decision(
+                decision_id="dec-3",
+                agent_name="analyst",
+                decision_type="requirement_analysis",
+                timestamp="2026-01-18T12:00:00+00:00",
+                metadata={"artifact_type": "story"},
+            )
+        )
+
+        filtered = await call_yolo_audit(agent="analyst", decision_type="requirement_analysis")
+        assert filtered["status"] == "ok"
+        assert filtered["total"] == 2
+        assert [entry["entry_id"] for entry in filtered["entries"]] == ["dec-1", "dec-3"]
+
+        artifact_filtered = await call_yolo_audit(artifact_type="story")
+        assert artifact_filtered["status"] == "ok"
+        assert artifact_filtered["total"] == 2
+        assert [entry["entry_id"] for entry in artifact_filtered["entries"]] == ["dec-2", "dec-3"]
+
+        paginated = await call_yolo_audit(limit=1, offset=1)
+        assert paginated["status"] == "ok"
+        assert paginated["total"] == 3
+        assert len(paginated["entries"]) == 1
+        assert paginated["entries"][0]["entry_id"] == "dec-2"
+
+
 class TestToolRegistration:
     """Tests for MCP tool registration."""
 
@@ -448,6 +578,22 @@ class TestToolRegistration:
         assert "yolo_status" in tool_names
 
     @pytest.mark.asyncio
+    async def test_mcp_server_lists_yolo_audit_tool(self) -> None:
+        """Test MCP server includes yolo_audit in list_tools."""
+        from yolo_developer.mcp import mcp
+
+        tools = await mcp.get_tools()
+
+        if isinstance(tools, dict):
+            tool_names = list(tools.keys())
+        elif isinstance(tools, list):
+            tool_names = [t.name if hasattr(t, "name") else str(t) for t in tools]
+        else:
+            tool_names = [str(t) for t in tools]
+
+        assert "yolo_audit" in tool_names
+
+    @pytest.mark.asyncio
     async def test_yolo_seed_tool_has_description(self) -> None:
         """Test yolo_seed tool has a description for LLM understanding."""
         from yolo_developer.mcp.tools import yolo_seed
@@ -501,3 +647,21 @@ class TestToolRegistration:
         assert description is not None
         assert len(description) > 0
         assert "status" in description.lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_tool_has_description(self) -> None:
+        """Test yolo_audit tool has a description for LLM understanding."""
+        from yolo_developer.mcp.tools import yolo_audit
+
+        if hasattr(yolo_audit, "description"):
+            description = yolo_audit.description
+        elif hasattr(yolo_audit, "fn") and yolo_audit.fn.__doc__:
+            description = yolo_audit.fn.__doc__
+        elif hasattr(yolo_audit, "__doc__"):
+            description = yolo_audit.__doc__
+        else:
+            description = None
+
+        assert description is not None
+        assert len(description) > 0
+        assert "audit" in description.lower()

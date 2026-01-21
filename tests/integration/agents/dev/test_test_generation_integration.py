@@ -239,7 +239,7 @@ class TestCalculator:
         result = add(0, 5)
         assert result == 5
 ```'''
-        mock_router.call = AsyncMock(return_value=valid_test_code)
+        mock_router.call_task = AsyncMock(return_value=valid_test_code)
 
         implementation = '''
 def add(a: int, b: int) -> int:
@@ -260,7 +260,7 @@ def add(a: int, b: int) -> int:
         assert "assert" in test_code
 
         # Verify router was called
-        mock_router.call.assert_called()
+        mock_router.call_task.assert_called()
 
     @pytest.mark.asyncio
     async def test_multiple_source_files_generate_multiple_tests(self) -> None:

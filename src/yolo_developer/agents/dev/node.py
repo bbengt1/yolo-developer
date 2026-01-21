@@ -40,6 +40,7 @@ Architecture Note:
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 import structlog
@@ -88,7 +89,7 @@ from yolo_developer.agents.dev.types import (
     ImplementationArtifact,
     TestFile,
 )
-from yolo_developer.config import load_config
+from yolo_developer.config import ConfigurationError, load_config
 from yolo_developer.config.schema import LLMConfig
 from yolo_developer.gates import quality_gate
 from yolo_developer.llm.router import LLMProviderError, LLMRouter
@@ -120,8 +121,13 @@ def _get_llm_router() -> LLMRouter | None:
     global _llm_router
     if _llm_router is None:
         try:
-            config = LLMConfig()
-            _llm_router = LLMRouter(config)
+            try:
+                config = load_config()
+                llm_config = config.llm
+            except ConfigurationError as e:
+                logger.warning("llm_router_load_config_failed", error=str(e))
+                llm_config = LLMConfig()
+            _llm_router = LLMRouter(llm_config)
         except Exception as e:
             logger.warning("llm_router_init_failed", error=str(e))
             return None
@@ -472,10 +478,9 @@ async def _generate_code_with_llm(
     )
 
     try:
-        # Use "complex" tier per ADR-003 for code generation
-        response = await router.call(
+        response = await router.call_task(
             messages=[{"role": "user", "content": prompt}],
-            tier="complex",
+            task_type="code_generation",
             temperature=0.7,
             max_tokens=4096,
         )
@@ -532,9 +537,9 @@ async def _generate_code_with_llm(
             )
 
             retry_prompt = build_retry_prompt(prompt, error or "Unknown error", code)
-            retry_response = await router.call(
+            retry_response = await router.call_task(
                 messages=[{"role": "user", "content": retry_prompt}],
-                tier="complex",
+                task_type="code_generation",
                 temperature=0.5,  # Lower temp for fixing
             )
 
@@ -1343,6 +1348,10 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
 
     # Get LLM router (may be None if not configured)
     router = _get_llm_router()
+    if router is not None:
+        clear_usage_log = getattr(router, "clear_usage_log", None)
+        if callable(clear_usage_log):
+            clear_usage_log()
 
     # Extract project context for code generation (Task 6)
     context = _extract_project_context(state)
@@ -1404,12 +1413,20 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
     )
 
     # Create output message with dev attribution (AC6)
+    llm_usage = []
+    if router is not None:
+        get_usage_log = getattr(router, "get_usage_log", None)
+        if callable(get_usage_log):
+            usage_log = get_usage_log()
+            if isinstance(usage_log, (list, tuple)):
+                llm_usage = [asdict(entry) for entry in usage_log]
+
     message = create_agent_message(
         content=f"Dev processing complete: {total_code_files} code files, "
         f"{total_test_files} test files generated for {len(stories)} stories "
         f"({generation_method}).",
         agent="dev",
-        metadata={"output": output.to_dict()},
+        metadata={"output": output.to_dict(), "llm_usage": llm_usage},
     )
 
     logger.info(
@@ -1419,6 +1436,7 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         code_file_count=total_code_files,
         test_file_count=total_test_files,
         generation_method=generation_method,
+        llm_usage_count=len(llm_usage),
     )
 
     # Return ONLY the updates, not full state (AC6)

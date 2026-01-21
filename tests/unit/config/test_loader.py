@@ -439,6 +439,23 @@ class TestAPIKeyLoading:
 
         assert config.llm.openai_api_key is not None
         assert config.llm.openai_api_key.get_secret_value() == "sk-test-key-12345"
+        assert config.llm.openai.api_key is not None
+        assert config.llm.openai.api_key.get_secret_value() == "sk-test-key-12345"
+
+    def test_api_key_loaded_from_nested_env_openai(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nested OpenAI API key is loaded from environment variable."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text("project_name: test-project\n")
+
+        monkeypatch.setenv("YOLO_LLM__OPENAI__API_KEY", "sk-nested-key")
+        config = load_config(yaml_file)
+
+        assert config.llm.openai.api_key is not None
+        assert config.llm.openai.api_key.get_secret_value() == "sk-nested-key"
+        assert config.llm.openai_api_key is not None
+        assert config.llm.openai_api_key.get_secret_value() == "sk-nested-key"
 
     def test_api_key_loaded_from_env_anthropic(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -505,6 +522,7 @@ class TestAPIKeyLoading:
 
         assert config.llm.openai_api_key is None
         assert config.llm.anthropic_api_key is None
+        assert config.llm.openai.api_key is None
 
     def test_missing_api_key_logs_warning_on_load(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
@@ -525,6 +543,20 @@ class TestAPIKeyLoading:
         assert any(
             "openai" in msg.lower() or "anthropic" in msg.lower() for msg in warning_messages
         )
+
+    def test_missing_openai_key_raises_when_provider_openai(
+        self, tmp_path: Path
+    ) -> None:
+        """OpenAI provider requires OpenAI API key."""
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text(
+            "project_name: test-project\nllm:\n  provider: openai\n"
+        )
+
+        with pytest.raises(ConfigurationError) as exc_info:
+            load_config(yaml_file)
+
+        assert "llm.openai.api_key" in str(exc_info.value)
 
     def test_no_warning_logged_when_api_key_set(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture

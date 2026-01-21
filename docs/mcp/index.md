@@ -419,7 +419,7 @@ mcp:
       "command": "uv",
       "args": ["run", "--directory", "/path/to/yolo-developer", "yolo", "mcp"],
       "env": {
-        "YOLO_LLM__OPENAI_API_KEY": "sk-proj-..."
+        "YOLO_LLM__OPENAI__API_KEY": "sk-proj-..."
       }
     }
   }
@@ -602,7 +602,7 @@ curl http://localhost:8080/health
 **Solution:**
 Ensure API keys are set before starting MCP server:
 ```bash
-export YOLO_LLM__OPENAI_API_KEY=sk-...
+export YOLO_LLM__OPENAI__API_KEY=sk-...
 yolo mcp
 ```
 
@@ -614,7 +614,7 @@ Or in Claude Desktop config:
       "command": "uv",
       "args": ["..."],
       "env": {
-        "YOLO_LLM__OPENAI_API_KEY": "sk-..."
+        "YOLO_LLM__OPENAI__API_KEY": "sk-..."
       }
     }
   }
@@ -636,22 +636,34 @@ yolo mcp  # defaults to stdio
 
 Don't hardcode API keys in config files:
 ```bash
-export YOLO_LLM__OPENAI_API_KEY=sk-...
+export YOLO_LLM__OPENAI__API_KEY=sk-...
 ```
 
-### 3. Monitor Token Usage
+### 3. Codex/Hybrid Routing (Optional)
+
+To route code tasks to OpenAI/Codex while keeping reasoning on Anthropic:
+```bash
+export YOLO_LLM__PROVIDER=hybrid
+export YOLO_LLM__HYBRID__ENABLED=true
+export YOLO_LLM__HYBRID__ROUTING__CODE_GENERATION=openai
+export YOLO_LLM__HYBRID__ROUTING__CODE_REVIEW=openai
+export YOLO_LLM__HYBRID__ROUTING__ARCHITECTURE=anthropic
+export YOLO_LLM__HYBRID__ROUTING__ANALYSIS=anthropic
+```
+
+### 4. Monitor Token Usage
 
 YOLO Developer tracks token usage. Check periodically:
 ```bash
 yolo status --format json | jq '.tokens'
 ```
 
-### 4. Use Specific Seed IDs
+### 5. Use Specific Seed IDs
 
 When resuming work, reference specific seeds:
 > "Run the sprint for seed_abc123"
 
-### 5. Review Before Deploying
+### 6. Review Before Deploying
 
 Always review generated code before deploying:
 > "Show me the authentication implementation from the last sprint"

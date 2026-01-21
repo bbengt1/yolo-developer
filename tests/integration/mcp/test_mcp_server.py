@@ -69,6 +69,15 @@ async def test_server_lists_yolo_status_tool() -> None:
 
 
 @pytest.mark.asyncio
+async def test_server_lists_yolo_audit_tool() -> None:
+    """Test server includes yolo_audit in available tools."""
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        tool_names = [t.name for t in tools]
+        assert "yolo_audit" in tool_names
+
+
+@pytest.mark.asyncio
 async def test_client_can_ping_server() -> None:
     """Test client can establish connection with server."""
     async with Client(mcp) as client:
@@ -240,6 +249,53 @@ class TestYoloStatusIntegration:
             result = await client.call_tool("yolo_status", {"sprint_id": "missing-sprint"})
 
         assert_result_error(result)
+
+
+class TestYoloAuditIntegration:
+    """Integration tests for yolo_audit MCP tool via FastMCP Client."""
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_via_client_returns_entries(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test yolo_audit returns audit entries via MCP client."""
+        from yolo_developer.audit import JsonDecisionStore
+        from yolo_developer.audit.types import AgentIdentity, Decision, DecisionContext
+
+        monkeypatch.chdir(tmp_path)
+
+        store = JsonDecisionStore(Path(".yolo/audit/decisions.json"))
+        await store.log_decision(
+            Decision(
+                id="dec-100",
+                decision_type="requirement_analysis",  # type: ignore[arg-type]
+                content="Requirement noted",
+                rationale="Needed for test",
+                agent=AgentIdentity(
+                    agent_name="analyst",
+                    agent_type="analyst",
+                    session_id="session-99",
+                ),
+                context=DecisionContext(
+                    sprint_id="sprint-1",
+                    story_id="story-1",
+                ),
+                timestamp="2026-01-18T10:00:00+00:00",
+                metadata={"artifact_type": "requirement"},
+                severity="info",  # type: ignore[arg-type]
+            )
+        )
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("yolo_audit", {"agent": "analyst"})
+
+        data = extract_result_data(result)
+        assert data.get("status") == "ok"
+        assert data.get("total") == 1
+        assert isinstance(data.get("entries"), list)
+        assert data["entries"][0]["entry_id"] == "dec-100"
 
 
 def assert_result_accepted(result: Any, source: str = "text") -> None:

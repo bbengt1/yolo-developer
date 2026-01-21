@@ -11,10 +11,12 @@ import pytest
 
 from yolo_developer.config.schema import LLMConfig
 from yolo_developer.llm.router import (
-    LLMConfigurationError,
     LLMProviderError,
+    LLMConfigurationError,
     LLMRouter,
     ModelTier,
+    TaskRouting,
+    TaskType,
 )
 
 
@@ -261,6 +263,47 @@ class TestLLMRouterCallWithFallback:
             assert result == "Fallback response"
             # Should have tried complex model (with retries) then routine
             assert any("gpt-4o-mini" in m for m in models_used)
+
+
+class TestLLMRouterTaskRouting:
+    """Tests for task-based routing behavior."""
+
+    def test_task_routing_uses_openai_code_model_in_hybrid(self) -> None:
+        """Code tasks should use OpenAI code_model when hybrid routing is enabled."""
+        config = LLMConfig(
+            provider="hybrid",
+            hybrid={"enabled": True},
+            openai={"code_model": "gpt-4o"},
+        )
+        router = LLMRouter(config)
+
+        task_type: TaskType = "code_generation"
+        routing = router.get_task_routing(task_type)
+
+        assert isinstance(routing, TaskRouting)
+        assert routing.provider == "openai"
+        assert routing.model == "gpt-4o"
+        assert routing.task_type == "code_generation"
+
+    def test_task_routing_uses_anthropic_for_architecture_in_hybrid(self) -> None:
+        """Architecture tasks should route to Anthropic by default in hybrid."""
+        config = LLMConfig(provider="hybrid", hybrid={"enabled": True})
+        router = LLMRouter(config)
+
+        routing = router.get_task_routing("architecture")
+
+        assert routing.provider == "anthropic"
+        assert routing.task_type == "architecture"
+
+    def test_task_routing_defaults_to_tier_mapping_when_auto(self) -> None:
+        """Auto provider should follow legacy tier mapping for tasks."""
+        config = LLMConfig()
+        router = LLMRouter(config)
+
+        routing = router.get_task_routing("documentation")
+
+        assert routing.tier == "routine"
+        assert routing.model == config.cheap_model
 
 
 class TestModelTierType:

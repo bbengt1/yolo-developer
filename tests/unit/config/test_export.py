@@ -158,8 +158,10 @@ class TestExportExcludesSecrets:
         yaml_file.write_text("project_name: test-project\n")
 
         env_backup = os.environ.get("YOLO_LLM__OPENAI_API_KEY")
+        nested_backup = os.environ.get("YOLO_LLM__OPENAI__API_KEY")
         try:
             os.environ["YOLO_LLM__OPENAI_API_KEY"] = "sk-test-secret-key"
+            os.environ["YOLO_LLM__OPENAI__API_KEY"] = "sk-nested-secret-key"
             config = load_config(yaml_file)
 
             output = tmp_path / "exported.yaml"
@@ -167,12 +169,18 @@ class TestExportExcludesSecrets:
 
             content = output.read_text()
             assert "openai_api_key" not in content
+            assert "openai:\n  api_key:" not in content
             assert "sk-test-secret-key" not in content
+            assert "sk-nested-secret-key" not in content
         finally:
             if env_backup is not None:
                 os.environ["YOLO_LLM__OPENAI_API_KEY"] = env_backup
             else:
                 os.environ.pop("YOLO_LLM__OPENAI_API_KEY", None)
+            if nested_backup is not None:
+                os.environ["YOLO_LLM__OPENAI__API_KEY"] = nested_backup
+            else:
+                os.environ.pop("YOLO_LLM__OPENAI__API_KEY", None)
 
     def test_export_excludes_anthropic_api_key(self, tmp_path: Path) -> None:
         """Anthropic API key should not appear in exported file."""
@@ -213,6 +221,7 @@ class TestExportExcludesSecrets:
         export_config(config, output)
 
         content = output.read_text()
+        assert "YOLO_LLM__OPENAI__API_KEY" in content
         assert "YOLO_LLM__OPENAI_API_KEY" in content
         assert "YOLO_LLM__ANTHROPIC_API_KEY" in content
         # Should be in comments
@@ -315,6 +324,7 @@ class TestImportDirectoryCreation:
         import_config(source, target)
 
         content = target.read_text()
+        assert "YOLO_LLM__OPENAI__API_KEY" in content
         assert "YOLO_LLM__OPENAI_API_KEY" in content
         assert "YOLO_LLM__ANTHROPIC_API_KEY" in content
 

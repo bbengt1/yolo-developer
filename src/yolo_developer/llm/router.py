@@ -26,6 +26,7 @@ Architecture Note:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import structlog
@@ -42,6 +43,24 @@ logger = structlog.get_logger(__name__)
 
 # Model tier type alias
 ModelTier = Literal["routine", "complex", "critical"]
+TaskType = Literal[
+    "code_generation",
+    "code_review",
+    "architecture",
+    "analysis",
+    "documentation",
+    "testing",
+]
+
+
+@dataclass(frozen=True)
+class TaskRouting:
+    """Routing decision for a task-based LLM call."""
+
+    task_type: TaskType
+    provider: Literal["openai", "anthropic", "auto"]
+    model: str
+    tier: ModelTier
 
 
 class LLMRouterError(Exception):
@@ -97,6 +116,7 @@ class LLMRouter:
             "complex": config.premium_model,
             "critical": config.best_model,
         }
+        self._usage_log: list[TaskRouting] = []
 
         logger.debug(
             "llm_router_initialized",
@@ -120,6 +140,26 @@ class LLMRouter:
             'claude-sonnet-4-20250514'
         """
         return self.model_map[tier]
+
+    def get_task_routing(self, task_type: TaskType) -> TaskRouting:
+        """Resolve provider/model selection for a task type."""
+        tier = _task_tier(task_type)
+        provider = self._provider_for_task(task_type)
+
+        if provider == "openai":
+            model = _openai_model_for_task(self.config, task_type, tier)
+        elif provider == "anthropic":
+            model = self.get_model_for_tier(tier)
+        else:
+            model = self.get_model_for_tier(tier)
+            provider = _provider_from_model(model)
+
+        return TaskRouting(
+            task_type=task_type,
+            provider=provider,
+            model=model,
+            tier=tier,
+        )
 
     @retry(
         stop=stop_after_attempt(3),
@@ -161,11 +201,14 @@ class LLMRouter:
             ... )
         """
         model = self.get_model_for_tier(tier)
+        provider = _provider_from_model(model)
+        api_key = self._api_key_for_provider(provider, allow_missing=True)
 
         logger.info(
             "llm_call_start",
             model=model,
             tier=tier,
+            provider=provider,
             message_count=len(messages),
             max_tokens=max_tokens,
         )
@@ -179,6 +222,7 @@ class LLMRouter:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                api_key=api_key,
                 **kwargs,
             )
 
@@ -188,6 +232,7 @@ class LLMRouter:
                 "llm_call_complete",
                 model=model,
                 tier=tier,
+                provider=provider,
                 response_length=len(content),
             )
 
@@ -246,3 +291,143 @@ class LLMRouter:
                 fallback_tier=fallback_tier,
             )
             return await self.call(messages, tier=fallback_tier, **kwargs)
+
+    async def call_task(
+        self,
+        messages: list[dict[str, str]],
+        task_type: TaskType,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        **kwargs: Any,
+    ) -> str:
+        """Call LLM using task-based routing."""
+        routing = self.get_task_routing(task_type)
+        resolved_provider = (
+            _provider_from_model(routing.model)
+            if routing.provider == "auto"
+            else routing.provider
+        )
+        api_key = self._api_key_for_provider(resolved_provider, allow_missing=False)
+
+        logger.info(
+            "llm_task_call_start",
+            task_type=task_type,
+            provider=resolved_provider,
+            model=routing.model,
+            tier=routing.tier,
+        )
+
+        try:
+            from litellm import acompletion
+
+            response = await acompletion(
+                model=routing.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                api_key=api_key,
+                **kwargs,
+            )
+
+            content = response.choices[0].message.content or ""
+
+            logger.info(
+                "llm_task_call_complete",
+                task_type=task_type,
+                provider=resolved_provider,
+                model=routing.model,
+                response_length=len(content),
+            )
+
+            self._usage_log.append(
+                TaskRouting(
+                    task_type=routing.task_type,
+                    provider=resolved_provider,
+                    model=routing.model,
+                    tier=routing.tier,
+                )
+            )
+
+            return content
+
+        except ImportError as e:
+            logger.error("litellm_not_installed", error=str(e))
+            raise LLMConfigurationError("LiteLLM is not installed. Run: uv add litellm") from e
+
+        except Exception as e:
+            logger.error(
+                "llm_task_call_failed",
+                task_type=task_type,
+                provider=resolved_provider,
+                model=routing.model,
+                error=str(e),
+            )
+            raise LLMProviderError(f"LLM call failed: {e}") from e
+
+    def get_usage_log(self) -> tuple[TaskRouting, ...]:
+        """Return a snapshot of task routing usage."""
+        return tuple(self._usage_log)
+
+    def clear_usage_log(self) -> None:
+        """Clear stored task routing usage."""
+        self._usage_log.clear()
+
+    def _provider_for_task(self, task_type: TaskType) -> Literal["openai", "anthropic", "auto"]:
+        if self.config.provider == "hybrid" or self.config.hybrid.enabled:
+            routing = self.config.hybrid.routing
+            return getattr(routing, task_type)
+        if self.config.provider in ("openai", "anthropic"):
+            return self.config.provider
+        return "auto"
+
+    def _api_key_for_provider(
+        self,
+        provider: Literal["openai", "anthropic", "auto"],
+        *,
+        allow_missing: bool,
+    ) -> str | None:
+        if provider == "openai":
+            api_key = self.config.openai.api_key
+            if api_key is None:
+                api_key = self.config.openai_api_key
+            if api_key is None and not allow_missing:
+                raise LLMConfigurationError("Missing OpenAI API key (llm.openai.api_key)")
+            return api_key.get_secret_value() if api_key else None
+        if provider == "anthropic":
+            api_key = self.config.anthropic_api_key
+            if api_key is None and not allow_missing:
+                raise LLMConfigurationError(
+                    "Missing Anthropic API key (llm.anthropic_api_key)"
+                )
+            return api_key.get_secret_value() if api_key else None
+        return None
+
+
+def _task_tier(task_type: TaskType) -> ModelTier:
+    tier_map: dict[TaskType, ModelTier] = {
+        "code_generation": "complex",
+        "code_review": "complex",
+        "architecture": "complex",
+        "analysis": "complex",
+        "documentation": "routine",
+        "testing": "complex",
+    }
+    return tier_map[task_type]
+
+
+def _openai_model_for_task(config: LLMConfig, task_type: TaskType, tier: ModelTier) -> str:
+    if task_type in ("code_generation", "code_review", "testing"):
+        return config.openai.code_model
+    if task_type == "documentation":
+        return config.openai.cheap_model
+    if task_type in ("analysis", "architecture"):
+        return config.openai.reasoning_model or config.openai.premium_model
+    return config.openai.premium_model
+
+
+def _provider_from_model(model: str) -> Literal["openai", "anthropic", "auto"]:
+    if model.startswith("claude-"):
+        return "anthropic"
+    if model.startswith(("gpt-", "o1-", "o3-")):
+        return "openai"
+    return "auto"

@@ -764,9 +764,9 @@ async def _call_llm_with_retry(
     Raises:
         Exception: If all retries fail.
     """
-    return await router.call(
+    return await router.call_task(
         messages=[{"role": "user", "content": prompt}],
-        tier="complex",
+        task_type="testing",
     )
 
 

@@ -324,7 +324,7 @@ class TestGenerateUnitTestsWithLLM:
     def mock_router(self) -> MagicMock:
         """Create mock LLM router."""
         router = MagicMock()
-        router.call = AsyncMock()
+        router.call_task = AsyncMock()
         return router
 
     @pytest.fixture
@@ -368,7 +368,7 @@ def multiply(x: int, y: int) -> int:
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that function returns tuple of (code, is_valid)."""
-        mock_router.call.return_value = """```python
+        mock_router.call_task.return_value = """```python
 def test_add():
     assert add(1, 2) == 3
 ```"""
@@ -385,24 +385,24 @@ def test_add():
         assert isinstance(is_valid, bool)
 
     @pytest.mark.asyncio
-    async def test_calls_router_with_complex_tier(
+    async def test_calls_router_with_testing_task_type(
         self,
         mock_router: MagicMock,
         sample_code: str,
         sample_functions: list[FunctionInfo],
     ) -> None:
-        """Test that router is called with 'complex' tier per ADR-003."""
-        mock_router.call.return_value = "```python\ndef test_x(): pass\n```"
+        """Test that router is called with testing task type."""
+        mock_router.call_task.return_value = "```python\ndef test_x(): pass\n```"
         await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
             module_name="math_utils",
             router=mock_router,
         )
-        # Verify call was made with complex tier
-        mock_router.call.assert_called()
-        call_kwargs = mock_router.call.call_args.kwargs
-        assert call_kwargs.get("tier") == "complex"
+        # Verify call was made with testing task type
+        mock_router.call_task.assert_called()
+        call_kwargs = mock_router.call_task.call_args.kwargs
+        assert call_kwargs.get("task_type") == "testing"
 
     @pytest.mark.asyncio
     async def test_validates_generated_test_syntax(
@@ -413,7 +413,7 @@ def test_add():
     ) -> None:
         """Test that generated tests are validated for syntax."""
         # Return valid Python test code
-        mock_router.call.return_value = '''```python
+        mock_router.call_task.return_value = '''```python
 def test_add_positive_numbers():
     """Test adding positive numbers."""
     assert add(1, 2) == 3
@@ -436,7 +436,7 @@ def test_add_positive_numbers():
     ) -> None:
         """Test that syntax errors return is_valid=False."""
         # Return invalid Python code
-        mock_router.call.return_value = "```python\ndef test_broken(\n```"
+        mock_router.call_task.return_value = "```python\ndef test_broken(\n```"
         _code, is_valid = await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
@@ -454,7 +454,7 @@ def test_add_positive_numbers():
     ) -> None:
         """Test that syntax errors trigger retry with corrected prompt."""
         # First call returns invalid, second returns valid
-        mock_router.call.side_effect = [
+        mock_router.call_task.side_effect = [
             "```python\ndef test_broken(\n```",
             "```python\ndef test_fixed(): pass\n```",
         ]
@@ -465,7 +465,7 @@ def test_add_positive_numbers():
             router=mock_router,
         )
         # Should have retried
-        assert mock_router.call.call_count >= 2
+        assert mock_router.call_task.call_count >= 2
         # Final result should be valid
         assert is_valid is True
 
@@ -477,7 +477,7 @@ def test_add_positive_numbers():
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that prompt includes the implementation code."""
-        mock_router.call.return_value = "```python\ndef test_x(): pass\n```"
+        mock_router.call_task.return_value = "```python\ndef test_x(): pass\n```"
         await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
@@ -485,7 +485,7 @@ def test_add_positive_numbers():
             router=mock_router,
         )
         # Check the prompt content
-        call_kwargs = mock_router.call.call_args.kwargs
+        call_kwargs = mock_router.call_task.call_args.kwargs
         messages = call_kwargs.get("messages", [])
         prompt_content = messages[0]["content"] if messages else ""
         assert "add" in prompt_content
@@ -498,7 +498,7 @@ def test_add_positive_numbers():
         sample_code: str,
     ) -> None:
         """Test handling of empty function list."""
-        mock_router.call.return_value = "```python\n# No tests\n```"
+        mock_router.call_task.return_value = "```python\n# No tests\n```"
         code, _is_valid = await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=[],
@@ -515,7 +515,7 @@ def test_add_positive_numbers():
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that router exceptions return empty code and is_valid=False."""
-        mock_router.call.side_effect = Exception("API Error")
+        mock_router.call_task.side_effect = Exception("API Error")
         code, is_valid = await generate_unit_tests_with_llm(
             implementation_code=sample_code,
             functions=sample_functions,
@@ -533,7 +533,7 @@ def test_add_positive_numbers():
         sample_functions: list[FunctionInfo],
     ) -> None:
         """Test that code is properly extracted from markdown blocks."""
-        mock_router.call.return_value = """Here are the tests:
+        mock_router.call_task.return_value = """Here are the tests:
 
 ```python
 def test_add():

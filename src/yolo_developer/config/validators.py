@@ -95,6 +95,7 @@ def validate_config(config: YoloConfig) -> ValidationResult:
     # Run each validator and collect issues
     # Path validation produces warnings since directories may be created at runtime
     result.warnings.extend(_validate_paths(config))
+    result.errors.extend(_validate_provider_api_keys(config))
     result.warnings.extend(_validate_api_keys_for_models(config))
 
     return result
@@ -177,6 +178,9 @@ def _validate_api_keys_for_models(config: YoloConfig) -> list[ValidationIssue]:
     """
     warnings: list[ValidationIssue] = []
 
+    if config.llm.provider != "auto" or config.llm.hybrid.enabled:
+        return warnings
+
     models = [
         config.llm.cheap_model,
         config.llm.premium_model,
@@ -192,7 +196,7 @@ def _validate_api_keys_for_models(config: YoloConfig) -> list[ValidationIssue]:
                 field="llm.openai_api_key",
                 message=(
                     f"OpenAI models configured ({', '.join(openai_models)}) "
-                    "but YOLO_LLM__OPENAI_API_KEY not set"
+                    "but YOLO_LLM__OPENAI__API_KEY not set"
                 ),
             )
         )
@@ -211,3 +215,56 @@ def _validate_api_keys_for_models(config: YoloConfig) -> list[ValidationIssue]:
         )
 
     return warnings
+
+
+def _validate_provider_api_keys(config: YoloConfig) -> list[ValidationIssue]:
+    """Validate API keys based on provider selection.
+
+    When provider or hybrid routing explicitly uses a provider, missing
+    API keys become fatal errors.
+    """
+    errors: list[ValidationIssue] = []
+
+    openai_required = False
+    anthropic_required = False
+
+    if config.llm.provider == "openai":
+        openai_required = True
+    elif config.llm.provider == "anthropic":
+        anthropic_required = True
+    elif config.llm.provider == "hybrid" or config.llm.hybrid.enabled:
+        routing = config.llm.hybrid.routing
+        openai_required = "openai" in {
+            routing.code_generation,
+            routing.code_review,
+            routing.documentation,
+            routing.testing,
+            routing.analysis,
+            routing.architecture,
+        }
+        anthropic_required = "anthropic" in {
+            routing.code_generation,
+            routing.code_review,
+            routing.documentation,
+            routing.testing,
+            routing.analysis,
+            routing.architecture,
+        }
+
+    if openai_required and config.llm.openai.api_key is None:
+        errors.append(
+            ValidationIssue(
+                field="llm.openai.api_key",
+                message="OpenAI provider selected but no API key configured",
+            )
+        )
+
+    if anthropic_required and config.llm.anthropic_api_key is None:
+        errors.append(
+            ValidationIssue(
+                field="llm.anthropic_api_key",
+                message="Anthropic provider selected but no API key configured",
+            )
+        )
+
+    return errors

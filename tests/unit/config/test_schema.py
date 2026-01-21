@@ -461,6 +461,8 @@ class TestLLMConfigAPIKeys:
         config = LLMConfig(openai_api_key="sk-test-key-12345")
         assert config.openai_api_key is not None
         assert isinstance(config.openai_api_key, SecretStr)
+        assert config.openai.api_key is not None
+        assert isinstance(config.openai.api_key, SecretStr)
 
     def test_anthropic_api_key_is_secret_str_type(self) -> None:
         """Verify anthropic_api_key uses SecretStr for masking."""
@@ -479,6 +481,18 @@ class TestLLMConfigAPIKeys:
         config = LLMConfig(openai_api_key="sk-test-key-12345")
         assert config.openai_api_key is not None
         assert config.openai_api_key.get_secret_value() == "sk-test-key-12345"
+        assert config.openai.api_key is not None
+        assert config.openai.api_key.get_secret_value() == "sk-test-key-12345"
+
+    def test_openai_nested_api_key_sets_legacy_field(self) -> None:
+        """Verify openai.api_key syncs to legacy openai_api_key."""
+        from yolo_developer.config.schema import LLMConfig
+
+        config = LLMConfig(openai={"api_key": "sk-nested"})
+        assert config.openai.api_key is not None
+        assert config.openai_api_key is not None
+        assert config.openai.api_key.get_secret_value() == "sk-nested"
+        assert config.openai_api_key.get_secret_value() == "sk-nested"
 
     def test_anthropic_api_key_get_secret_value(self) -> None:
         """Verify anthropic_api_key value is accessible via get_secret_value()."""
@@ -514,6 +528,7 @@ class TestLLMConfigAPIKeys:
         assert LLMConfig.model_fields["anthropic_api_key"].description is not None
         assert "env" in LLMConfig.model_fields["openai_api_key"].description.lower()
         assert "env" in LLMConfig.model_fields["anthropic_api_key"].description.lower()
+        assert LLMConfig.model_fields["openai"].description is not None
 
 
 class TestYoloConfigAPIKeyValidation:

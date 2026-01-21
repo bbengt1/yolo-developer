@@ -472,7 +472,7 @@ class TestGenerateDocumentationWithLLM:
         from yolo_developer.agents.dev.doc_utils import generate_documentation_with_llm
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value='''```python
 """Module docstring."""
 
@@ -489,7 +489,7 @@ def hello():
             router=mock_router,
         )
 
-        mock_router.call.assert_called_once()
+        mock_router.call_task.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_enhanced_code(self) -> None:
@@ -497,7 +497,7 @@ def hello():
         from yolo_developer.agents.dev.doc_utils import generate_documentation_with_llm
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value='''```python
 """Module docstring."""
 
@@ -523,7 +523,7 @@ def hello():
         from yolo_developer.agents.dev.doc_utils import generate_documentation_with_llm
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value="""```python
 def broken(
 ```"""
@@ -544,7 +544,7 @@ def broken(
         from yolo_developer.agents.dev.doc_utils import generate_documentation_with_llm
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value='''```python
 """Module."""
 
@@ -561,11 +561,11 @@ def hello():
         )
 
         # Verify tier was passed
-        call_kwargs = mock_router.call.call_args
+        call_kwargs = mock_router.call_task.call_args
         assert call_kwargs is not None
-        # Tier should be "complex"
+        # Task type should be "documentation"
         if call_kwargs.kwargs:
-            assert call_kwargs.kwargs.get("tier") == "complex"
+            assert call_kwargs.kwargs.get("task_type") == "documentation"
 
     @pytest.mark.asyncio
     async def test_returns_original_code_on_llm_error(self) -> None:
@@ -573,7 +573,7 @@ def hello():
         from yolo_developer.agents.dev.doc_utils import generate_documentation_with_llm
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(side_effect=Exception("LLM unavailable"))
+        mock_router.call_task = AsyncMock(side_effect=Exception("LLM unavailable"))
 
         original_code = "def hello(): pass"
         result, is_valid = await generate_documentation_with_llm(

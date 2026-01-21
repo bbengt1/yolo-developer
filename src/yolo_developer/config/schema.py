@@ -8,11 +8,16 @@ Environment Variable Pattern
 Environment variables use the ``YOLO_`` prefix with ``__`` as the nested delimiter:
 
 - ``YOLO_PROJECT_NAME``: Project name (required)
+- ``YOLO_LLM__PROVIDER``: LLM provider selection (auto/openai/anthropic/hybrid)
 - ``YOLO_LLM__CHEAP_MODEL``: LLM model for routine tasks
 - ``YOLO_LLM__PREMIUM_MODEL``: LLM model for complex reasoning
 - ``YOLO_LLM__BEST_MODEL``: LLM model for critical decisions
-- ``YOLO_LLM__OPENAI_API_KEY``: OpenAI API key (secrets only via env vars)
+- ``YOLO_LLM__OPENAI__API_KEY``: OpenAI API key (nested, preferred)
+- ``YOLO_LLM__OPENAI_API_KEY``: OpenAI API key (legacy)
+- ``YOLO_LLM__OPENAI__CODE_MODEL``: OpenAI model for code tasks
 - ``YOLO_LLM__ANTHROPIC_API_KEY``: Anthropic API key (secrets only via env vars)
+- ``YOLO_LLM__HYBRID__ENABLED``: Enable hybrid routing
+- ``YOLO_LLM__HYBRID__ROUTING__CODE_GENERATION``: Provider for code generation
 - ``YOLO_QUALITY__TEST_COVERAGE_THRESHOLD``: Test coverage threshold (0.0-1.0)
 - ``YOLO_QUALITY__CONFIDENCE_THRESHOLD``: Confidence threshold (0.0-1.0)
 - ``YOLO_QUALITY__SEED_THRESHOLDS__OVERALL``: Seed overall quality threshold (0.0-1.0, default 0.70)
@@ -32,7 +37,7 @@ Configuration values are resolved in the following order (later overrides earlie
 
 API Key Security
 ----------------
-API keys (openai_api_key, anthropic_api_key) are:
+API keys (openai_api_key, openai.api_key, anthropic_api_key) are:
 
 - Set via environment variables ONLY (never in YAML files)
 - Stored as SecretStr for automatic masking in logs/repr
@@ -53,7 +58,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -86,6 +91,76 @@ class GateThreshold(BaseModel):
     )
 
 
+LLMProvider = Literal["auto", "openai", "anthropic", "hybrid"]
+
+
+class OpenAIConfig(BaseModel):
+    """OpenAI/Codex configuration for code-optimized models."""
+
+    api_key: SecretStr | None = Field(
+        default=None,
+        description="OpenAI API key (set via YOLO_LLM__OPENAI__API_KEY env var)",
+    )
+    cheap_model: str = Field(
+        default="gpt-4o-mini",
+        description="OpenAI model for routine tasks",
+    )
+    premium_model: str = Field(
+        default="gpt-4o",
+        description="OpenAI model for complex reasoning tasks",
+    )
+    code_model: str = Field(
+        default="gpt-4o",
+        description="OpenAI model optimized for code generation and review",
+    )
+    reasoning_model: str | None = Field(
+        default=None,
+        description="OpenAI model for deep reasoning tasks (optional)",
+    )
+
+
+class HybridRoutingConfig(BaseModel):
+    """Task-based routing configuration for hybrid provider mode."""
+
+    code_generation: Literal["openai", "anthropic"] = Field(
+        default="openai",
+        description="Provider for code generation tasks",
+    )
+    code_review: Literal["openai", "anthropic"] = Field(
+        default="openai",
+        description="Provider for code review tasks",
+    )
+    architecture: Literal["openai", "anthropic"] = Field(
+        default="anthropic",
+        description="Provider for architecture tasks",
+    )
+    analysis: Literal["openai", "anthropic"] = Field(
+        default="anthropic",
+        description="Provider for analysis tasks",
+    )
+    documentation: Literal["openai", "anthropic"] = Field(
+        default="openai",
+        description="Provider for documentation tasks",
+    )
+    testing: Literal["openai", "anthropic"] = Field(
+        default="openai",
+        description="Provider for testing tasks",
+    )
+
+
+class HybridConfig(BaseModel):
+    """Hybrid routing configuration."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable hybrid routing across providers",
+    )
+    routing: HybridRoutingConfig = Field(
+        default_factory=HybridRoutingConfig,
+        description="Task routing configuration for hybrid mode",
+    )
+
+
 class LLMConfig(BaseModel):
     """Configuration for LLM provider settings.
 
@@ -108,15 +183,37 @@ class LLMConfig(BaseModel):
         description="LLM model for critical decisions requiring highest quality",
     )
 
+    provider: LLMProvider = Field(
+        default="auto",
+        description="Primary LLM provider selection (auto/openai/anthropic/hybrid)",
+    )
+    openai: OpenAIConfig = Field(
+        default_factory=OpenAIConfig,
+        description="OpenAI/Codex provider configuration",
+    )
+    hybrid: HybridConfig = Field(
+        default_factory=HybridConfig,
+        description="Hybrid routing configuration",
+    )
+
     # API keys - read from env only, masked in output (Story 1.6)
     openai_api_key: SecretStr | None = Field(
         default=None,
-        description="OpenAI API key (set via YOLO_LLM__OPENAI_API_KEY env var)",
+        description="OpenAI API key (set via YOLO_LLM__OPENAI_API_KEY env var, legacy)",
     )
     anthropic_api_key: SecretStr | None = Field(
         default=None,
         description="Anthropic API key (set via YOLO_LLM__ANTHROPIC_API_KEY env var)",
     )
+
+    @model_validator(mode="after")
+    def _sync_api_keys(self) -> "LLMConfig":
+        """Keep legacy API key fields in sync with nested OpenAI config."""
+        if self.openai.api_key is None and self.openai_api_key is not None:
+            self.openai.api_key = self.openai_api_key
+        if self.openai_api_key is None and self.openai.api_key is not None:
+            self.openai_api_key = self.openai.api_key
+        return self
 
 
 class SeedThresholdConfig(BaseModel):
@@ -264,7 +361,8 @@ class YoloConfig(BaseSettings):
         - YOLO_LLM__CHEAP_MODEL: Override cheap_model
         - YOLO_LLM__PREMIUM_MODEL: Override premium_model
         - YOLO_LLM__BEST_MODEL: Override best_model
-        - YOLO_LLM__OPENAI_API_KEY: OpenAI API key (secrets via env only)
+        - YOLO_LLM__OPENAI__API_KEY: OpenAI API key (secrets via env only)
+        - YOLO_LLM__OPENAI_API_KEY: OpenAI API key (legacy)
         - YOLO_LLM__ANTHROPIC_API_KEY: Anthropic API key (secrets via env only)
         - YOLO_QUALITY__TEST_COVERAGE_THRESHOLD: Override test coverage threshold
         - YOLO_QUALITY__CONFIDENCE_THRESHOLD: Override confidence threshold
@@ -325,9 +423,9 @@ class YoloConfig(BaseSettings):
         """
         warnings: list[str] = []
 
-        if self.llm.openai_api_key is None and self.llm.anthropic_api_key is None:
+        if self.llm.openai.api_key is None and self.llm.anthropic_api_key is None:
             warnings.append(
-                "No API keys configured. Set YOLO_LLM__OPENAI_API_KEY or "
+                "No API keys configured. Set YOLO_LLM__OPENAI__API_KEY or "
                 "YOLO_LLM__ANTHROPIC_API_KEY environment variable for LLM operations."
             )
 

@@ -24,7 +24,7 @@ Tools available:
     - yolo_seed: Provide seed requirements for development (Story 14.2)
     - yolo_run: Execute autonomous sprint (Story 14.3)
     - yolo_status: Query sprint status (Story 14.4)
-    - yolo_audit: Access audit trail (coming in Story 14.5)
+    - yolo_audit: Access audit trail (Story 14.5)
 """
 
 from __future__ import annotations
@@ -44,6 +44,7 @@ from yolo_developer.mcp.tools import (
     get_sprint,
     store_seed,
     store_sprint,
+    yolo_audit,
     yolo_run,
     yolo_seed,
     yolo_status,
@@ -70,6 +71,7 @@ __all__ = [
     "run_server",
     "store_seed",
     "store_sprint",
+    "yolo_audit",
     "yolo_run",
     "yolo_seed",
     "yolo_status",

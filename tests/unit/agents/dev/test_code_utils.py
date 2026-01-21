@@ -606,7 +606,7 @@ class TestGenerateCodeWithValidation:
         from unittest.mock import AsyncMock, MagicMock
 
         router = MagicMock()
-        router.call = AsyncMock()
+        router.call_task = AsyncMock()
         return router
 
     @pytest.mark.asyncio
@@ -614,7 +614,7 @@ class TestGenerateCodeWithValidation:
         """Test that valid code is returned on first success."""
         from yolo_developer.agents.dev.code_utils import generate_code_with_validation
 
-        mock_router.call.return_value = """```python
+        mock_router.call_task.return_value = """```python
 def hello():
     return "world"
 ```"""
@@ -626,7 +626,7 @@ def hello():
 
         assert is_valid is True
         assert "def hello()" in code
-        assert mock_router.call.call_count == 1
+        assert mock_router.call_task.call_count == 1
 
     @pytest.mark.asyncio
     async def test_retries_on_syntax_error(self, mock_router: MagicMock) -> None:
@@ -634,7 +634,7 @@ def hello():
         from yolo_developer.agents.dev.code_utils import generate_code_with_validation
 
         # First call returns invalid, second returns valid
-        mock_router.call.side_effect = [
+        mock_router.call_task.side_effect = [
             "```python\ndef broken(\n```",  # Invalid
             "```python\ndef fixed(): pass\n```",  # Valid
         ]
@@ -647,7 +647,7 @@ def hello():
 
         assert is_valid is True
         assert "def fixed()" in code
-        assert mock_router.call.call_count == 2
+        assert mock_router.call_task.call_count == 2
 
     @pytest.mark.asyncio
     async def test_returns_invalid_after_max_retries(self, mock_router: MagicMock) -> None:
@@ -655,7 +655,7 @@ def hello():
         from yolo_developer.agents.dev.code_utils import generate_code_with_validation
 
         # All calls return invalid code
-        mock_router.call.return_value = "```python\ndef broken(\n```"
+        mock_router.call_task.return_value = "```python\ndef broken(\n```"
 
         _code, is_valid = await generate_code_with_validation(
             router=mock_router,
@@ -665,14 +665,14 @@ def hello():
 
         assert is_valid is False
         # Original + 2 retries = 3 calls
-        assert mock_router.call.call_count == 3
+        assert mock_router.call_task.call_count == 3
 
     @pytest.mark.asyncio
     async def test_uses_correct_tier(self, mock_router: MagicMock) -> None:
         """Test that specified tier is passed to router."""
         from yolo_developer.agents.dev.code_utils import generate_code_with_validation
 
-        mock_router.call.return_value = "```python\ndef test(): pass\n```"
+        mock_router.call_task.return_value = "```python\ndef test(): pass\n```"
 
         await generate_code_with_validation(
             router=mock_router,
@@ -680,5 +680,5 @@ def hello():
             tier="critical",
         )
 
-        call_kwargs = mock_router.call.call_args
-        assert call_kwargs.kwargs["tier"] == "critical"
+        call_kwargs = mock_router.call_task.call_args
+        assert call_kwargs.kwargs["task_type"] == "code_generation"

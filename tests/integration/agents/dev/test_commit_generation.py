@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from yolo_developer.agents.dev.types import CodeFile, ImplementationArtifact
+from yolo_developer.llm.router import TaskRouting
 
 
 class TestDevNodeCommitMessageIntegration:
@@ -57,7 +58,7 @@ class TestDevNodeCommitMessageIntegration:
         # Mock the LLM router to avoid actual API calls
         with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
+            mock_router.call_task = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -77,7 +78,7 @@ class TestDevNodeCommitMessageIntegration:
 
         with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
+            mock_router.call_task = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -88,6 +89,31 @@ class TestDevNodeCommitMessageIntegration:
             assert "8-8" in commit_message or "Story" in commit_message
 
     @pytest.mark.asyncio
+    async def test_dev_node_records_llm_usage_metadata(self, mock_state: dict) -> None:
+        """Test that dev_node includes LLM usage metadata in messages."""
+        from yolo_developer.agents.dev.node import dev_node
+
+        with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
+            mock_router = MagicMock()
+            mock_router.call_task = AsyncMock(return_value='def implement(): return {"status": "ok"}')
+            mock_router.get_usage_log.return_value = [
+                TaskRouting(
+                    task_type="code_generation",
+                    provider="openai",
+                    model="gpt-4o",
+                    tier="complex",
+                )
+            ]
+            mock_get_router.return_value = mock_router
+
+            result = await dev_node(mock_state)
+
+            message = result["messages"][0]
+            metadata = message.additional_kwargs
+            assert "llm_usage" in metadata
+            assert metadata["llm_usage"][0]["model"] == "gpt-4o"
+
+    @pytest.mark.asyncio
     async def test_commit_message_uses_conventional_format(self, mock_state: dict) -> None:
         """Test that generated commit message uses conventional commit format."""
         from yolo_developer.agents.dev.commit_utils import validate_commit_message
@@ -95,7 +121,7 @@ class TestDevNodeCommitMessageIntegration:
 
         with patch("yolo_developer.agents.dev.node._get_llm_router") as mock_get_router:
             mock_router = MagicMock()
-            mock_router.call = AsyncMock(return_value='def implement(): return {"status": "ok"}')
+            mock_router.call_task = AsyncMock(return_value='def implement(): return {"status": "ok"}')
             mock_get_router.return_value = mock_router
 
             result = await dev_node(mock_state)
@@ -265,7 +291,7 @@ class TestGenerateCommitMessageForImplementations:
         ]
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value="""feat(dev): add test implementation
 
 This implements the test story functionality.
@@ -280,7 +306,7 @@ Story: 8-8"""
         )
 
         # Should have used LLM
-        mock_router.call.assert_called_once()
+        mock_router.call_task.assert_called_once()
         assert "feat(dev):" in result
 
     @pytest.mark.asyncio
@@ -301,7 +327,7 @@ Story: 8-8"""
         ]
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(side_effect=Exception("LLM error"))
+        mock_router.call_task = AsyncMock(side_effect=Exception("LLM error"))
 
         result = await _generate_commit_message_for_implementations(
             stories=stories,

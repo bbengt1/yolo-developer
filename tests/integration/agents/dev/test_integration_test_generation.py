@@ -68,7 +68,7 @@ async def load_data(item_id: str) -> dict:
     def mock_router(self) -> MagicMock:
         """Mock LLM router for testing."""
         router = MagicMock()
-        router.call = AsyncMock(
+        router.call_task = AsyncMock(
             return_value='''```python
 from __future__ import annotations
 

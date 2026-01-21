@@ -437,8 +437,10 @@ async def generate_code_with_validation(
     """
     from yolo_developer.agents.dev.prompts.code_generation import build_retry_prompt
 
+    _ = tier  # Retained for backwards compatibility with older call sites.
+
     messages = [{"role": "user", "content": prompt}]
-    response = await router.call(messages=messages, tier=tier)
+    response = await router.call_task(messages=messages, task_type="code_generation")
 
     code = extract_code_from_response(response)
     is_valid, error = validate_python_syntax(code)
@@ -457,7 +459,7 @@ async def generate_code_with_validation(
 
         retry_prompt = build_retry_prompt(prompt, error or "Unknown error", code)
         messages = [{"role": "user", "content": retry_prompt}]
-        response = await router.call(messages=messages, tier=tier)
+        response = await router.call_task(messages=messages, task_type="code_generation")
 
         code = extract_code_from_response(response)
         is_valid, error = validate_python_syntax(code)

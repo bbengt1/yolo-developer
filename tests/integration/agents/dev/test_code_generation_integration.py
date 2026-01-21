@@ -167,7 +167,7 @@ class TestLLMCodeGeneration:
     def mock_router(self) -> MagicMock:
         """Create mock LLM router."""
         router = MagicMock(spec=LLMRouter)
-        router.call = AsyncMock()
+        router.call_task = AsyncMock()
         return router
 
     @pytest.mark.asyncio
@@ -182,7 +182,7 @@ def process_data(items: list[str]) -> dict[str, int]:
     """Process items and count them."""
     return {"count": len(items)}
 ```'''
-        mock_router.call.return_value = valid_response
+        mock_router.call_task.return_value = valid_response
 
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
@@ -205,7 +205,7 @@ def broken(
 def fixed() -> None:
     pass
 ```"""
-        mock_router.call.side_effect = [invalid_response, valid_response]
+        mock_router.call_task.side_effect = [invalid_response, valid_response]
 
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
@@ -213,7 +213,7 @@ def fixed() -> None:
         code, is_valid, _pattern_result = await _generate_code_with_llm(story, context, mock_router)
 
         # Should have called LLM twice (original + retry)
-        assert mock_router.call.call_count == 2
+        assert mock_router.call_task.call_count == 2
         # Should return valid code from retry
         assert is_valid is True
         assert "def fixed" in code
@@ -248,7 +248,7 @@ def implement_test_001() -> dict[str, str]:
     """Implementation for test story."""
     return {"status": "implemented", "story_id": "test-001"}
 ```'''
-        mock_router.call = AsyncMock(return_value=valid_response)
+        mock_router.call_task = AsyncMock(return_value=valid_response)
 
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}
@@ -264,7 +264,7 @@ def implement_test_001() -> dict[str, str]:
         """Test fallback to stub when LLM fails."""
         mock_router = MagicMock(spec=LLMRouter)
         # Always return invalid code to trigger fallback
-        mock_router.call = AsyncMock(return_value="not valid python {{{")
+        mock_router.call_task = AsyncMock(return_value="not valid python {{{")
 
         story = {"id": "test-001", "title": "Test Story"}
         context = {"patterns": [], "constraints": [], "conventions": {}}

@@ -106,7 +106,7 @@ yolo init --name my-project
 
 ```bash
 # Set your LLM API keys (never stored in config files)
-export YOLO_LLM__OPENAI_API_KEY=sk-...
+export YOLO_LLM__OPENAI__API_KEY=sk-...
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
 ```
 
@@ -336,24 +336,41 @@ Create `yolo.yaml` in your project root:
 project_name: my-project
 
 llm:
-  smart_model: gpt-4o           # For complex reasoning
-  routine_model: gpt-4o-mini    # For routine tasks
+  provider: auto
+  cheap_model: gpt-4o-mini      # Routine tasks
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
   # API keys must be set via environment variables
 
 quality:
   test_coverage_threshold: 0.8
-  gate_pass_threshold: 0.7
-  blocking_gates:
-    - testability
-    - architecture_validation
+  confidence_threshold: 0.9
 
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
+  persist_path: .yolo/memory
+  vector_store_type: chromadb
+  graph_store_type: json
+```
 
-agents:
-  max_iterations: 10
-  timeout_seconds: 300
+### Codex/Hybrid Routing Example
+
+```yaml
+llm:
+  provider: hybrid
+  openai:
+    cheap_model: gpt-4o-mini
+    premium_model: gpt-4o
+    code_model: gpt-4o
+    reasoning_model: null
+  hybrid:
+    enabled: true
+    routing:
+      code_generation: openai
+      code_review: openai
+      architecture: anthropic
+      analysis: anthropic
+      documentation: openai
+      testing: openai
 ```
 
 ### Environment Variables
@@ -362,13 +379,15 @@ Environment variables use `YOLO_` prefix with `__` as nested delimiter:
 
 ```bash
 # API Keys (required)
-export YOLO_LLM__OPENAI_API_KEY=sk-...
+export YOLO_LLM__OPENAI__API_KEY=sk-...
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
 
 # Override configuration values
 export YOLO_PROJECT_NAME=my-project
 export YOLO_QUALITY__TEST_COVERAGE_THRESHOLD=0.9
-export YOLO_MEMORY__PERSIST_DIRECTORY=/custom/path
+export YOLO_MEMORY__PERSIST_PATH=/custom/path
+export YOLO_LLM__HYBRID__ENABLED=true
+export YOLO_LLM__HYBRID__ROUTING__CODE_GENERATION=openai
 ```
 
 ### Configuration Priority

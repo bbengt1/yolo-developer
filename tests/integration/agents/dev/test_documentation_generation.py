@@ -51,7 +51,7 @@ def process_order(order):
     def mock_router(self) -> MagicMock:
         """Mock LLM router for testing."""
         router = MagicMock()
-        router.call = AsyncMock(
+        router.call_task = AsyncMock(
             return_value='''```python
 """Order processing and calculation utilities.
 

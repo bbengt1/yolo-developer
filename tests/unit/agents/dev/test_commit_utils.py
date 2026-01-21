@@ -545,7 +545,7 @@ class TestGenerateCommitMessageWithLLM:
 
         # Mock router
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value="""feat(dev): add commit message utilities
 
 Implement communicative commit messages for Dev agent.
@@ -564,7 +564,7 @@ Story: 8-8"""
 
         assert is_valid is True
         assert message.startswith("feat(dev):")
-        mock_router.call.assert_called_once()
+        mock_router.call_task.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_llm_generation_uses_routine_tier(self) -> None:
@@ -575,15 +575,15 @@ Story: 8-8"""
         )
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(return_value="feat: add feature")
+        mock_router.call_task = AsyncMock(return_value="feat: add feature")
 
         context = CommitMessageContext(story_ids=("8-8",))
 
         await generate_commit_message_with_llm(context, mock_router)
 
         # Verify "routine" tier was used
-        call_kwargs = mock_router.call.call_args[1]
-        assert call_kwargs["tier"] == "routine"
+        call_kwargs = mock_router.call_task.call_args[1]
+        assert call_kwargs["task_type"] == "documentation"
 
     @pytest.mark.asyncio
     async def test_llm_generation_retry_on_invalid_format(self) -> None:
@@ -595,7 +595,7 @@ Story: 8-8"""
 
         mock_router = MagicMock()
         # First call returns invalid, second returns valid
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             side_effect=[
                 "Invalid commit message without format",
                 "feat: valid message after retry",
@@ -610,7 +610,7 @@ Story: 8-8"""
 
         assert is_valid is True
         assert message.startswith("feat:")
-        assert mock_router.call.call_count == 2
+        assert mock_router.call_task.call_count == 2
 
     @pytest.mark.asyncio
     async def test_llm_generation_fallback_to_template(self) -> None:
@@ -622,7 +622,7 @@ Story: 8-8"""
 
         mock_router = MagicMock()
         # All calls fail
-        mock_router.call = AsyncMock(side_effect=Exception("LLM error"))
+        mock_router.call_task = AsyncMock(side_effect=Exception("LLM error"))
 
         context = CommitMessageContext(
             story_ids=("8-8",),
@@ -647,7 +647,7 @@ Story: 8-8"""
         )
 
         mock_router = MagicMock()
-        mock_router.call = AsyncMock(
+        mock_router.call_task = AsyncMock(
             return_value="""Here's the commit message:
 
 ```
@@ -678,7 +678,7 @@ This follows conventional commit format."""
 
         mock_router = MagicMock()
         # All calls return invalid format
-        mock_router.call = AsyncMock(return_value="Invalid message")
+        mock_router.call_task = AsyncMock(return_value="Invalid message")
 
         context = CommitMessageContext(story_ids=("8-8",))
 
@@ -689,7 +689,7 @@ This follows conventional commit format."""
         # Should fall back to template
         assert is_valid is False
         # 3 calls total: initial + 2 retries
-        assert mock_router.call.call_count == 3
+        assert mock_router.call_task.call_count == 3
 
 
 # =============================================================================
