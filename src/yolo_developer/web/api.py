@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from yolo_developer.config import load_config
+from yolo_developer.config import ConfigurationError, YoloConfig, load_config
 from yolo_developer.sdk import YoloClient
 
 api_router = APIRouter()
@@ -89,7 +89,7 @@ def get_audit() -> dict[str, Any]:
 
 @api_router.post("/uploads")
 async def upload_file(file: UploadFile = File(...)) -> dict[str, Any]:
-    config = load_config()
+    config = _load_config_or_default()
     upload_config = config.web.uploads
     if not upload_config.enabled:
         raise HTTPException(status_code=403, detail="Uploads are disabled.")
@@ -106,3 +106,10 @@ async def upload_file(file: UploadFile = File(...)) -> dict[str, Any]:
     path = upload_dir / f"{timestamp}_{file.filename}"
     path.write_bytes(content)
     return {"filename": file.filename, "stored_as": str(path)}
+
+
+def _load_config_or_default() -> YoloConfig:
+    try:
+        return load_config()
+    except ConfigurationError:
+        return YoloConfig(project_name="web")
