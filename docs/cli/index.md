@@ -59,6 +59,7 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo issue`](#yolo-issue) | Issue operations |
 | [`yolo release`](#yolo-release) | Release operations |
 | [`yolo workflow`](#yolo-workflow) | GitHub workflow automation |
+| [`yolo import`](#yolo-import) | Import GitHub issues |
 
 ---
 
@@ -887,6 +888,25 @@ Automate story workflows.
 yolo workflow start US-001 --title "Add endpoint" --description "..."
 yolo workflow complete US-001 --title "Add endpoint" --description "..." --commit "feat: add endpoint"
 ```
+
+---
+
+## yolo import
+
+Import GitHub issues and convert them into user stories.
+
+```bash
+yolo import issue 42
+yolo import preview 42
+yolo import issues --label "ready" --auto-seed
+```
+
+Common options:
+
+- `--repo owner/repo`: override repository
+- `--auto-seed`: write seed file to `.yolo/imported-issues/`
+- `--preview`: preview only
+- `--output`: export story to file
 
 ---
 

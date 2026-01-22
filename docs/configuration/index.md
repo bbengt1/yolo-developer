@@ -326,7 +326,35 @@ github:
     generate_notes: true
   commits:
     conventional: true
+  import_config:
+    enabled: true
+    update_issues: true
+    add_label: yolo-imported
+    story:
+      id_prefix: US
+      include_technical_notes: true
+      estimate_points: true
 ```
+
+#### github.import_config
+
+GitHub issue import configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `enabled` | bool | true | `YOLO_GITHUB__IMPORT_CONFIG__ENABLED` | Enable issue import |
+| `default_repo` | string | None | `YOLO_GITHUB__IMPORT_CONFIG__DEFAULT_REPO` | Default repo for imports |
+| `update_issues` | bool | true | `YOLO_GITHUB__IMPORT_CONFIG__UPDATE_ISSUES` | Post back to issues |
+| `add_label` | string | yolo-imported | `YOLO_GITHUB__IMPORT_CONFIG__ADD_LABEL` | Label to apply |
+| `add_comment` | bool | true | `YOLO_GITHUB__IMPORT_CONFIG__ADD_COMMENT` | Comment with story summary |
+
+#### github.import_config.story
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `id_prefix` | string | US | `YOLO_GITHUB__IMPORT_CONFIG__STORY__ID_PREFIX` | Story ID prefix |
+| `include_technical_notes` | bool | true | `YOLO_GITHUB__IMPORT_CONFIG__STORY__INCLUDE_TECHNICAL_NOTES` | Include technical notes |
+| `estimate_points` | bool | true | `YOLO_GITHUB__IMPORT_CONFIG__STORY__ESTIMATE_POINTS` | Estimate points |
 
 ---
 

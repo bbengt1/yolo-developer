@@ -68,6 +68,7 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Git Operations**: Branch, commit, push, and status workflows
 - **PR Lifecycle**: Create, update, review, and merge PRs
 - **Issues & Releases**: Issue management and release creation
+- **Issue Import**: Convert GitHub issues into user stories
 
 ---
 
@@ -177,6 +178,7 @@ yolo logs
 | `yolo issue` | GitHub issue operations |
 | `yolo release` | GitHub release operations |
 | `yolo workflow` | GitHub workflow automation |
+| `yolo import` | Import GitHub issues as user stories |
 
 Run `yolo <command> --help` for detailed usage.
 
@@ -270,6 +272,9 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 | `yolo_pr_respond` | Respond to PR review comments |
 | `yolo_issue_create` | Create a GitHub issue |
 | `yolo_release_create` | Create a GitHub release |
+| `yolo_import_issue` | Import a GitHub issue as a story |
+| `yolo_import_issues` | Import multiple GitHub issues |
+| `yolo_preview_import` | Preview issue import output |
 
 ### yolo_status Walkthrough
 

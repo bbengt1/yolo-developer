@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 
@@ -65,6 +66,88 @@ class Release:
     url: str
     assets: list[str]
     created_at: datetime | None
+
+
+class IssueType(str, Enum):
+    FEATURE = "feature"
+    BUG = "bug"
+    ENHANCEMENT = "enhancement"
+    TASK = "task"
+    EPIC = "epic"
+    UNKNOWN = "unknown"
+
+
+class StoryPriority(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+@dataclass(frozen=True)
+class GitHubIssueInput:
+    number: int
+    title: str
+    body: str
+    labels: list[str]
+    state: str
+    author: str
+    created_at: datetime
+    comments: list[dict[str, Any]]
+    linked_issues: list[int]
+    milestone: str | None
+    assignees: list[str]
+    url: str
+
+
+@dataclass(frozen=True)
+class ParsedIssue:
+    issue: GitHubIssueInput
+    issue_type: IssueType
+    objective: str
+    requirements: list[str]
+    acceptance_criteria: list[str]
+    technical_notes: str
+    dependencies: list[str]
+    priority: StoryPriority
+
+
+@dataclass(frozen=True)
+class ExtractedRequirement:
+    id: str
+    description: str
+    type: str
+    priority: StoryPriority
+    source: str
+    acceptance_criteria: list[str]
+    assumptions: list[str]
+    dependencies: list[str]
+    confidence: float
+
+
+@dataclass(frozen=True)
+class GeneratedStory:
+    id: str
+    title: str
+    description: str
+    type: IssueType
+    priority: StoryPriority
+    acceptance_criteria: list[str]
+    technical_notes: str
+    estimation_points: int | None
+    github_issue: int
+    dependencies: list[str]
+    tags: list[str]
+
+
+@dataclass(frozen=True)
+class ImportResult:
+    issues_processed: int
+    stories_generated: list[GeneratedStory]
+    requirements_extracted: list[ExtractedRequirement]
+    warnings: list[str]
+    errors: list[str]
+    ready_for_sprint: bool
 
 
 def parse_datetime(value: str | None) -> datetime | None:

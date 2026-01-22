@@ -503,6 +503,82 @@ Create a GitHub release and auto-generate notes.
 }
 ```
 
+---
+
+### yolo_import_issue
+
+Import a GitHub issue and convert it into a user story.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `issue_number` | integer | Yes | Issue number to import |
+| `repo` | string | No | Repo override (owner/repo) |
+| `auto_seed` | boolean | No | Write seed file |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "story": {
+    "id": "US-0042",
+    "title": "Add user profile avatars"
+  },
+  "warnings": []
+}
+```
+
+---
+
+### yolo_import_issues
+
+Import multiple GitHub issues into user stories.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `issue_numbers` | array | No | List of issue numbers |
+| `labels` | array | No | Filter by labels |
+| `milestone` | string | No | Filter by milestone |
+| `query` | string | No | GitHub search query |
+| `auto_seed` | boolean | No | Write seed file |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "stories": [
+    { "id": "US-0042", "title": "Add user profile avatars" }
+  ]
+}
+```
+
+---
+
+### yolo_preview_import
+
+Preview issue import output without updating the issue.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `issue_number` | integer | Yes | Issue number to preview |
+| `repo` | string | No | Repo override (owner/repo) |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "seed_markdown": "# Imported GitHub Issues\\n..."
+}
+```
+
 {: .note }
 > GitHub tools require the `gh` CLI to be installed and authenticated, plus `YOLO_GITHUB__TOKEN` and `YOLO_GITHUB__REPOSITORY` if auto-detection is unavailable.
 

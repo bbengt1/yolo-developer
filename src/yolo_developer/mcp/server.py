@@ -130,6 +130,15 @@ Create a GitHub issue.
 ## yolo_release_create
 Create a GitHub release with generated notes.
 
+## yolo_import_issue
+Import a GitHub issue and convert it into a user story.
+
+## yolo_import_issues
+Import multiple GitHub issues into user stories.
+
+## yolo_preview_import
+Preview the issue import output without updating the issue.
+
 Use these tools to integrate YOLO Developer into your AI workflow.
 """
 

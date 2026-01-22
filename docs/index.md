@@ -47,6 +47,9 @@ Scan existing projects to detect language, frameworks, structure, and testing se
 ### GitHub Automation
 Manage branches, commits, PRs, issues, and releases directly from YOLO Developer.
 
+### Issue Import
+Convert GitHub issues into structured user stories for sprint planning.
+
 ### Full Observability
 Complete audit trail with decision logging, token cost tracking, and requirement traceability from seed to implementation.
 
@@ -117,6 +120,9 @@ Scan and integrate existing projects with generated context.
 
 ### [GitHub Automation](/yolo-developer/guides/github)
 Manage GitHub workflow automation from YOLO Developer.
+
+### [Issue Import](/yolo-developer/guides/issue-import)
+Import GitHub issues and generate user stories.
 
 </div>
 

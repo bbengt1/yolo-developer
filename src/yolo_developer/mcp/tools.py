@@ -43,6 +43,7 @@ from yolo_developer.audit.traceability_types import VALID_ARTIFACT_TYPES
 from yolo_developer.config import load_config
 from yolo_developer.github.client import GitHubClient
 from yolo_developer.github.git import GitManager
+from yolo_developer.github.issue_import import IssueImporter
 from yolo_developer.github.issues import IssueManager
 from yolo_developer.github.pr import PRManager
 from yolo_developer.github.releases import ReleaseManager
@@ -740,6 +741,96 @@ async def yolo_release_create(
         return {"status": "error", "error": str(exc)}
 
 
+@mcp.tool
+async def yolo_import_issue(
+    issue_number: int,
+    repo: str | None = None,
+    auto_seed: bool = False,
+) -> dict[str, Any]:
+    """Import a GitHub issue and convert it into a user story."""
+    try:
+        importer = IssueImporter.from_config()
+        result = await importer.import_issue(
+            issue_number=issue_number,
+            repo=repo,
+            auto_seed=auto_seed,
+        )
+        story = result.stories_generated[0]
+        return {
+            "status": "ok",
+            "story": {
+                "id": story.id,
+                "title": story.title,
+                "description": story.description,
+                "priority": story.priority.value,
+                "acceptance_criteria": story.acceptance_criteria,
+                "technical_notes": story.technical_notes,
+                "github_issue": story.github_issue,
+                "tags": story.tags,
+            },
+            "warnings": result.warnings,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_import_issues(
+    issue_numbers: list[int] | None = None,
+    labels: list[str] | None = None,
+    milestone: str | None = None,
+    query: str | None = None,
+    auto_seed: bool = False,
+) -> dict[str, Any]:
+    """Import multiple GitHub issues into user stories."""
+    try:
+        importer = IssueImporter.from_config()
+        result = await importer.import_multiple(
+            issue_numbers=issue_numbers,
+            labels=labels,
+            milestone=milestone,
+            query=query,
+            auto_seed=auto_seed,
+        )
+        return {
+            "status": "ok",
+            "stories": [
+                {
+                    "id": story.id,
+                    "title": story.title,
+                    "priority": story.priority.value,
+                    "github_issue": story.github_issue,
+                }
+                for story in result.stories_generated
+            ],
+            "warnings": result.warnings,
+            "errors": result.errors,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_preview_import(
+    issue_number: int,
+    repo: str | None = None,
+) -> dict[str, Any]:
+    """Preview a GitHub issue import without updating the issue."""
+    try:
+        importer = IssueImporter.from_config()
+        preview = importer.preview(issue_number=issue_number, repo=repo)
+        return {
+            "status": "ok",
+            "issue": {
+                "number": preview.issue.number,
+                "title": preview.issue.title,
+                "url": preview.issue.url,
+            },
+            "seed_markdown": preview.seed_markdown,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
 __all__ = [
     "StoredSeed",
     "StoredSprint",
@@ -758,4 +849,7 @@ __all__ = [
     "yolo_run",
     "yolo_seed",
     "yolo_status",
+    "yolo_import_issue",
+    "yolo_import_issues",
+    "yolo_preview_import",
 ]

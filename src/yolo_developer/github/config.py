@@ -40,6 +40,47 @@ class GitHubCommitConfig(BaseModel):
     conventional: bool = Field(default=True, description="Use conventional commits")
 
 
+class GitHubImportStoryConfig(BaseModel):
+    id_prefix: str = Field(default="US", description="Story ID prefix")
+    include_technical_notes: bool = Field(
+        default=True, description="Include technical notes in story output"
+    )
+    estimate_points: bool = Field(default=True, description="Estimate story points")
+    default_priority: str = Field(default="medium", description="Default story priority")
+
+
+class GitHubImportRequirementConfig(BaseModel):
+    extract_nfr: bool = Field(default=True, description="Extract non-functional requirements")
+    min_confidence: float = Field(default=0.7, description="Minimum confidence threshold")
+
+
+class GitHubImportTemplateConfig(BaseModel):
+    feature: list[str] = Field(default_factory=list, description="Feature template markers")
+    bug: list[str] = Field(default_factory=list, description="Bug template markers")
+    enhancement: list[str] = Field(default_factory=list, description="Enhancement template markers")
+    custom: list[str] = Field(default_factory=list, description="Custom template markers")
+
+
+class GitHubImportBatchConfig(BaseModel):
+    max_issues: int = Field(default=20, description="Maximum issues to import per batch")
+    detect_dependencies: bool = Field(default=True, description="Detect dependencies")
+    group_by_epic: bool = Field(default=False, description="Group by epic labels")
+
+
+class GitHubImportConfig(BaseModel):
+    enabled: bool = Field(default=True, description="Enable issue import")
+    default_repo: str | None = Field(default=None, description="Default repo for imports")
+    update_issues: bool = Field(default=True, description="Update issues with story info")
+    add_label: str | None = Field(default="yolo-imported", description="Label to add after import")
+    add_comment: bool = Field(default=True, description="Add comment with story summary")
+    story: GitHubImportStoryConfig = Field(default_factory=GitHubImportStoryConfig)
+    requirements: GitHubImportRequirementConfig = Field(
+        default_factory=GitHubImportRequirementConfig
+    )
+    templates: GitHubImportTemplateConfig = Field(default_factory=GitHubImportTemplateConfig)
+    batch: GitHubImportBatchConfig = Field(default_factory=GitHubImportBatchConfig)
+
+
 class GitHubConfig(BaseModel):
     enabled: bool = Field(default=False, description="Enable GitHub automation")
     token: SecretStr | None = Field(default=None, description="GitHub token (env only)")
@@ -51,3 +92,4 @@ class GitHubConfig(BaseModel):
     issues: GitHubIssueConfig = Field(default_factory=GitHubIssueConfig)
     releases: GitHubReleaseConfig = Field(default_factory=GitHubReleaseConfig)
     commits: GitHubCommitConfig = Field(default_factory=GitHubCommitConfig)
+    import_config: GitHubImportConfig = Field(default_factory=GitHubImportConfig)
