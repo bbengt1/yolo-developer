@@ -39,10 +39,12 @@ project_name: my-awesome-api
 
 # LLM configuration
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  temperature: 0.7
-  max_tokens: 4096
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+  openai:
+    code_model: gpt-4o
   # API keys should be set via environment variables
 
 # Quality thresholds
@@ -56,9 +58,9 @@ quality:
 
 # Memory and storage
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
-  embedding_model: text-embedding-3-small
+  vector_store_type: chromadb
+  graph_store_type: json
+  persist_path: .yolo/memory
 
 # Agent configuration
 agents:
@@ -111,40 +113,81 @@ LLM (Large Language Model) configuration for agent reasoning.
 
 | Option | Type | Default | Env Var | Description |
 |:-------|:-----|:--------|:--------|:------------|
-| `smart_model` | string | gpt-4o | `YOLO_LLM__SMART_MODEL` | Model for complex reasoning |
-| `routine_model` | string | gpt-4o-mini | `YOLO_LLM__ROUTINE_MODEL` | Model for routine tasks |
-| `temperature` | float | 0.7 | `YOLO_LLM__TEMPERATURE` | Sampling temperature (0.0-2.0) |
-| `max_tokens` | int | 4096 | `YOLO_LLM__MAX_TOKENS` | Maximum response tokens |
-| `openai_api_key` | string | None | `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key |
+| `provider` | string | auto | `YOLO_LLM__PROVIDER` | Primary provider (auto/openai/anthropic/hybrid) |
+| `cheap_model` | string | gpt-4o-mini | `YOLO_LLM__CHEAP_MODEL` | Model for routine tasks |
+| `premium_model` | string | claude-sonnet-4-20250514 | `YOLO_LLM__PREMIUM_MODEL` | Model for complex reasoning |
+| `best_model` | string | claude-opus-4-5-20251101 | `YOLO_LLM__BEST_MODEL` | Model for critical decisions |
+| `openai_api_key` | string | None | `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key (legacy) |
 | `anthropic_api_key` | string | None | `YOLO_LLM__ANTHROPIC_API_KEY` | Anthropic API key |
-| `request_timeout` | int | 60 | `YOLO_LLM__REQUEST_TIMEOUT` | API request timeout |
 
 {: .warning }
 > Never put API keys in `yolo.yaml`. Always use environment variables.
 
 ```yaml
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  temperature: 0.7
-  max_tokens: 4096
-  request_timeout: 60
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+  openai:
+    cheap_model: gpt-4o-mini
+    premium_model: gpt-4o
+    code_model: gpt-4o
+    reasoning_model: null
+  hybrid:
+    enabled: false
+    routing:
+      code_generation: openai
+      code_review: openai
+      architecture: anthropic
+      analysis: anthropic
+      documentation: openai
+      testing: openai
 ```
 
 **Environment Variables:**
 ```bash
-export YOLO_LLM__OPENAI_API_KEY=sk-proj-...
+export YOLO_LLM__OPENAI__API_KEY=sk-proj-...
+export YOLO_LLM__OPENAI_API_KEY=sk-proj-...  # Legacy
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
-export YOLO_LLM__SMART_MODEL=claude-3-opus
+export YOLO_LLM__PREMIUM_MODEL=claude-sonnet-4-20250514
 ```
+
+#### llm.openai
+
+OpenAI/Codex configuration for code-optimized models.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `api_key` | string | None | `YOLO_LLM__OPENAI__API_KEY` | OpenAI API key (preferred) |
+| `cheap_model` | string | gpt-4o-mini | `YOLO_LLM__OPENAI__CHEAP_MODEL` | OpenAI model for routine tasks |
+| `premium_model` | string | gpt-4o | `YOLO_LLM__OPENAI__PREMIUM_MODEL` | OpenAI model for complex reasoning |
+| `code_model` | string | gpt-4o | `YOLO_LLM__OPENAI__CODE_MODEL` | OpenAI model for code tasks |
+| `reasoning_model` | string | None | `YOLO_LLM__OPENAI__REASONING_MODEL` | OpenAI model for deep reasoning |
+
+#### llm.hybrid
+
+Hybrid routing configuration for task-based provider selection.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `enabled` | bool | false | `YOLO_LLM__HYBRID__ENABLED` | Enable hybrid routing |
+| `routing.code_generation` | string | openai | `YOLO_LLM__HYBRID__ROUTING__CODE_GENERATION` | Provider for code generation |
+| `routing.code_review` | string | openai | `YOLO_LLM__HYBRID__ROUTING__CODE_REVIEW` | Provider for code review |
+| `routing.architecture` | string | anthropic | `YOLO_LLM__HYBRID__ROUTING__ARCHITECTURE` | Provider for architecture |
+| `routing.analysis` | string | anthropic | `YOLO_LLM__HYBRID__ROUTING__ANALYSIS` | Provider for analysis |
+| `routing.documentation` | string | openai | `YOLO_LLM__HYBRID__ROUTING__DOCUMENTATION` | Provider for documentation |
+| `routing.testing` | string | openai | `YOLO_LLM__HYBRID__ROUTING__TESTING` | Provider for testing |
 
 #### Supported Models
 
 **OpenAI:**
-- `gpt-4o` (recommended for smart)
-- `gpt-4o-mini` (recommended for routine)
+- `gpt-4o` (recommended for premium/code)
+- `gpt-4o-mini` (recommended for cheap)
 - `gpt-4-turbo`
 - `gpt-3.5-turbo`
+ - `o1-preview` (deep reasoning)
+ - `o1-mini`
 
 **Anthropic:**
 - `claude-3-opus-20240229`
@@ -196,27 +239,29 @@ Memory and vector storage configuration.
 
 | Option | Type | Default | Env Var | Description |
 |:-------|:-----|:--------|:--------|:------------|
-| `vector_store` | string | chromadb | `YOLO_MEMORY__VECTOR_STORE` | Vector store backend |
-| `persist_directory` | string | .yolo/memory | `YOLO_MEMORY__PERSIST_DIRECTORY` | Storage location |
-| `embedding_model` | string | text-embedding-3-small | `YOLO_MEMORY__EMBEDDING_MODEL` | Embedding model |
-| `collection_name` | string | yolo_decisions | `YOLO_MEMORY__COLLECTION_NAME` | ChromaDB collection |
-| `similarity_threshold` | float | 0.7 | `YOLO_MEMORY__SIMILARITY_THRESHOLD` | Semantic search threshold |
+| `persist_path` | string | .yolo/memory | `YOLO_MEMORY__PERSIST_PATH` | Storage location |
+| `vector_store_type` | string | chromadb | `YOLO_MEMORY__VECTOR_STORE_TYPE` | Vector store backend |
+| `graph_store_type` | string | json | `YOLO_MEMORY__GRAPH_STORE_TYPE` | Graph store backend |
 
 ```yaml
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
-  embedding_model: text-embedding-3-small
-  collection_name: yolo_decisions
-  similarity_threshold: 0.7
+  persist_path: .yolo/memory
+  vector_store_type: chromadb
+  graph_store_type: json
 ```
 
-#### Vector Store Options
+#### Vector Store Types
 
 | Backend | Description |
 |:--------|:------------|
 | `chromadb` | Default, local ChromaDB instance |
-| `ephemeral` | In-memory, not persisted (testing) |
+
+#### Graph Store Types
+
+| Backend | Description |
+|:--------|:------------|
+| `json` | Default, local JSON graph store |
+| `neo4j` | Optional Neo4j backend |
 
 ---
 
@@ -349,16 +394,19 @@ YOLO_<SECTION>__<KEY>=<VALUE>
 export YOLO_PROJECT_NAME=my-api
 
 # LLM settings
-export YOLO_LLM__SMART_MODEL=gpt-4o
-export YOLO_LLM__OPENAI_API_KEY=sk-proj-...
-export YOLO_LLM__TEMPERATURE=0.5
+export YOLO_LLM__PROVIDER=hybrid
+export YOLO_LLM__CHEAP_MODEL=gpt-4o-mini
+export YOLO_LLM__PREMIUM_MODEL=claude-sonnet-4-20250514
+export YOLO_LLM__BEST_MODEL=claude-opus-4-5-20251101
+export YOLO_LLM__OPENAI__API_KEY=sk-proj-...
+export YOLO_LLM__HYBRID__ENABLED=true
 
 # Quality thresholds
 export YOLO_QUALITY__TEST_COVERAGE_THRESHOLD=0.9
 export YOLO_QUALITY__GATE_PASS_THRESHOLD=0.8
 
 # Memory
-export YOLO_MEMORY__PERSIST_DIRECTORY=/custom/path
+export YOLO_MEMORY__PERSIST_PATH=/custom/path
 
 # Agent settings
 export YOLO_AGENTS__MAX_ITERATIONS=15
@@ -440,7 +488,7 @@ Error: quality.test_coverage_threshold must be between 0.0 and 1.0
 ```
 Error: No LLM API key configured
   Set one of:
-    - YOLO_LLM__OPENAI_API_KEY
+    - YOLO_LLM__OPENAI__API_KEY
     - YOLO_LLM__ANTHROPIC_API_KEY
 ```
 
@@ -462,8 +510,9 @@ Error: Unknown model: gpt-5-turbo
 project_name: my-api-dev
 
 llm:
-  smart_model: gpt-4o-mini  # Cheaper for dev
-  routine_model: gpt-4o-mini
+  cheap_model: gpt-4o-mini  # Cheaper for dev
+  premium_model: gpt-4o-mini
+  best_model: gpt-4o
 
 quality:
   test_coverage_threshold: 0.6  # Relaxed for iteration
@@ -484,9 +533,9 @@ audit:
 project_name: my-api-prod
 
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  temperature: 0.3  # More deterministic
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
 
 quality:
   test_coverage_threshold: 0.95  # Strict
@@ -524,12 +573,25 @@ project_name: user-management-api
 
 # LLM configuration
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  temperature: 0.7
-  max_tokens: 4096
-  request_timeout: 60
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
   # API keys via environment variables
+  openai:
+    cheap_model: gpt-4o-mini
+    premium_model: gpt-4o
+    code_model: gpt-4o
+    reasoning_model: null
+  hybrid:
+    enabled: false
+    routing:
+      code_generation: openai
+      code_review: openai
+      architecture: anthropic
+      analysis: anthropic
+      documentation: openai
+      testing: openai
 
 # Quality gates
 quality:
@@ -545,10 +607,9 @@ quality:
 
 # Memory configuration
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
-  embedding_model: text-embedding-3-small
-  similarity_threshold: 0.7
+  persist_path: .yolo/memory
+  vector_store_type: chromadb
+  graph_store_type: json
 
 # Agent configuration
 agents:

@@ -469,3 +469,329 @@ def extract_sprint_id(result: Any) -> str | None:
         return None
 
     return data.get("sprint_id")
+
+
+class TestMcpToolDiscovery:
+    """Tests for MCP tool discovery and parameter validation (Story 14.6 AC1)."""
+
+    @pytest.mark.asyncio
+    async def test_all_tools_discoverable_via_list_tools(self) -> None:
+        """Test all YOLO tools are discoverable via MCP protocol."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            tool_names = [t.name for t in tools]
+
+            # All expected tools should be present
+            expected_tools = ["yolo_seed", "yolo_run", "yolo_status", "yolo_audit"]
+            for tool_name in expected_tools:
+                assert tool_name in tool_names, f"Tool {tool_name} not discoverable"
+
+    @pytest.mark.asyncio
+    async def test_yolo_seed_has_valid_input_schema(self) -> None:
+        """Test yolo_seed tool has properly typed parameters per MCP spec."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            tool = next((t for t in tools if t.name == "yolo_seed"), None)
+
+            assert tool is not None
+            assert tool.inputSchema is not None
+
+            schema = tool.inputSchema
+            # Should have properties defined
+            assert "properties" in schema or schema.get("type") == "object"
+
+            if "properties" in schema:
+                props = schema["properties"]
+                # content should be string or null
+                if "content" in props:
+                    assert props["content"].get("type") in ["string", None] or (
+                        "anyOf" in props["content"]
+                    )
+                # file_path should be string or null
+                if "file_path" in props:
+                    assert props["file_path"].get("type") in ["string", None] or (
+                        "anyOf" in props["file_path"]
+                    )
+
+    @pytest.mark.asyncio
+    async def test_yolo_run_has_valid_input_schema(self) -> None:
+        """Test yolo_run tool has properly typed parameters per MCP spec."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            tool = next((t for t in tools if t.name == "yolo_run"), None)
+
+            assert tool is not None
+            assert tool.inputSchema is not None
+
+            schema = tool.inputSchema
+            assert "properties" in schema or schema.get("type") == "object"
+
+            if "properties" in schema:
+                props = schema["properties"]
+                # seed_id and seed_content should be string types
+                for param in ["seed_id", "seed_content"]:
+                    if param in props:
+                        assert props[param].get("type") in ["string", None] or (
+                            "anyOf" in props[param]
+                        )
+
+    @pytest.mark.asyncio
+    async def test_yolo_status_has_valid_input_schema(self) -> None:
+        """Test yolo_status tool has properly typed parameters per MCP spec."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            tool = next((t for t in tools if t.name == "yolo_status"), None)
+
+            assert tool is not None
+            assert tool.inputSchema is not None
+
+            schema = tool.inputSchema
+            assert "properties" in schema or schema.get("type") == "object"
+
+            if "properties" in schema:
+                props = schema["properties"]
+                # sprint_id is required string
+                assert "sprint_id" in props
+                assert props["sprint_id"].get("type") == "string"
+
+    @pytest.mark.asyncio
+    async def test_yolo_audit_has_valid_input_schema(self) -> None:
+        """Test yolo_audit tool has properly typed parameters per MCP spec."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+            tool = next((t for t in tools if t.name == "yolo_audit"), None)
+
+            assert tool is not None
+            assert tool.inputSchema is not None
+
+            schema = tool.inputSchema
+            assert "properties" in schema or schema.get("type") == "object"
+
+            if "properties" in schema:
+                props = schema["properties"]
+                # Check expected optional parameters
+                optional_params = [
+                    "agent",
+                    "decision_type",
+                    "artifact_type",
+                    "start_time",
+                    "end_time",
+                ]
+                for param in optional_params:
+                    if param in props:
+                        assert props[param].get("type") in ["string", None] or (
+                            "anyOf" in props[param]
+                        )
+                # Check numeric parameters
+                for param in ["limit", "offset"]:
+                    if param in props:
+                        assert props[param].get("type") == "integer"
+
+    @pytest.mark.asyncio
+    async def test_all_tools_have_descriptions(self) -> None:
+        """Test all tools have non-empty descriptions for LLM understanding."""
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+
+            for tool in tools:
+                if tool.name.startswith("yolo_"):
+                    assert tool.description is not None, (
+                        f"Tool {tool.name} has no description"
+                    )
+                    assert len(tool.description) > 10, (
+                        f"Tool {tool.name} description too short"
+                    )
+
+
+class TestMcpFullWorkflow:
+    """End-to-end integration tests for MCP workflow (Story 14.6 AC all)."""
+
+    @pytest.mark.asyncio
+    async def test_full_workflow_seed_run_status(self) -> None:
+        """Test complete workflow: seed -> run -> status."""
+        async with Client(mcp) as client:
+            # Step 1: Seed requirements
+            seed_result = await client.call_tool(
+                "yolo_seed", {"content": "Build a complete user authentication system"}
+            )
+            seed_data = extract_result_data(seed_result)
+            assert seed_data["status"] == "accepted"
+            seed_id = seed_data["seed_id"]
+
+            # Step 2: Run sprint with seed_id
+            with patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock):
+                run_result = await client.call_tool("yolo_run", {"seed_id": seed_id})
+            run_data = extract_result_data(run_result)
+            assert run_data["status"] == "started"
+            sprint_id = run_data["sprint_id"]
+            assert run_data["seed_id"] == seed_id
+
+            # Step 3: Check status
+            status_result = await client.call_tool(
+                "yolo_status", {"sprint_id": sprint_id}
+            )
+            status_data = extract_result_data(status_result)
+            assert status_data["status"] == "running"
+            assert status_data["sprint_id"] == sprint_id
+            assert status_data["seed_id"] == seed_id
+
+    @pytest.mark.asyncio
+    async def test_concurrent_seed_requests(self) -> None:
+        """Test concurrent MCP requests for thread safety."""
+        import asyncio
+
+        async with Client(mcp) as client:
+            # Create multiple concurrent seed requests
+            tasks = [
+                client.call_tool("yolo_seed", {"content": f"Requirement {i}"})
+                for i in range(5)
+            ]
+
+            # Execute all concurrently
+            results = await asyncio.gather(*tasks)
+
+            # All should succeed with unique seed_ids
+            seed_ids = set()
+            for result in results:
+                data = extract_result_data(result)
+                assert data["status"] == "accepted"
+                seed_ids.add(data["seed_id"])
+
+            # All seed_ids should be unique
+            assert len(seed_ids) == 5
+
+    @pytest.mark.asyncio
+    async def test_concurrent_status_requests(self) -> None:
+        """Test concurrent status queries for thread safety."""
+        import asyncio
+
+        # Create a sprint first
+        seed = store_seed(content="Test seed", source="text")
+        sprint = store_sprint(seed_id=seed.seed_id, thread_id="thread-concurrent")
+
+        async with Client(mcp) as client:
+            # Query status multiple times concurrently
+            tasks = [
+                client.call_tool("yolo_status", {"sprint_id": sprint.sprint_id})
+                for _ in range(10)
+            ]
+
+            results = await asyncio.gather(*tasks)
+
+            # All should return consistent data
+            for result in results:
+                data = extract_result_data(result)
+                assert data["status"] == "running"
+                assert data["sprint_id"] == sprint.sprint_id
+                assert data["seed_id"] == seed.seed_id
+
+    @pytest.mark.asyncio
+    async def test_workflow_with_inline_seed_content(self) -> None:
+        """Test workflow using inline seed_content instead of seed_id."""
+        async with Client(mcp) as client:
+            # Use seed_content directly with yolo_run
+            with (
+                patch("yolo_developer.mcp.tools.parse_seed", new_callable=AsyncMock),
+                patch("yolo_developer.mcp.tools.generate_validation_report") as mock_report,
+                patch("yolo_developer.mcp.tools.validate_quality_thresholds") as mock_validate,
+                patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock),
+            ):
+                # Setup mocks to pass validation
+                mock_report.return_value = type("Report", (), {"quality_metrics": {}})()
+                mock_validate.return_value = type("Result", (), {"passed": True})()
+
+                run_result = await client.call_tool(
+                    "yolo_run", {"seed_content": "Build a REST API"}
+                )
+
+            run_data = extract_result_data(run_result)
+            assert run_data["status"] == "started"
+            assert "sprint_id" in run_data
+            assert "seed_id" in run_data
+
+
+class TestMcpProviderCompatibility:
+    """Integration tests for multi-provider compatibility (Story 14.6)."""
+
+    @pytest.mark.asyncio
+    async def test_tool_names_follow_mcp_convention(self) -> None:
+        """Test tool names follow MCP naming conventions (snake_case)."""
+        import re
+
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+
+            for tool in tools:
+                if tool.name.startswith("yolo_"):
+                    # MCP tool names should be snake_case
+                    assert re.match(r"^[a-z][a-z0-9_]*$", tool.name), (
+                        f"Tool name '{tool.name}' doesn't follow snake_case convention"
+                    )
+
+    @pytest.mark.asyncio
+    async def test_all_tool_descriptions_are_provider_agnostic(self) -> None:
+        """Test tool descriptions don't contain provider-specific terms."""
+        provider_terms = ["claude", "anthropic", "openai", "gpt", "codex"]
+
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+
+            for tool in tools:
+                if tool.name.startswith("yolo_") and tool.description:
+                    desc_lower = tool.description.lower()
+                    for term in provider_terms:
+                        assert term not in desc_lower, (
+                            f"Tool '{tool.name}' description contains "
+                            f"provider-specific term '{term}'"
+                        )
+
+    @pytest.mark.asyncio
+    async def test_tool_responses_are_json_serializable(self) -> None:
+        """Test all tool responses can be serialized to JSON."""
+        import json
+
+        async with Client(mcp) as client:
+            # Test yolo_seed
+            result = await client.call_tool(
+                "yolo_seed", {"content": "Test requirements"}
+            )
+            data = extract_result_data(result)
+            json.dumps(data)  # Should not raise
+
+            # Test yolo_run with seed_id
+            seed_id = data["seed_id"]
+            with patch("yolo_developer.mcp.tools._run_sprint", new_callable=AsyncMock):
+                result = await client.call_tool("yolo_run", {"seed_id": seed_id})
+            data = extract_result_data(result)
+            json.dumps(data)
+
+            # Test yolo_status
+            sprint_id = data["sprint_id"]
+            result = await client.call_tool("yolo_status", {"sprint_id": sprint_id})
+            data = extract_result_data(result)
+            json.dumps(data)
+
+    @pytest.mark.asyncio
+    async def test_error_responses_are_mcp_compliant(self) -> None:
+        """Test error responses follow MCP error format."""
+        async with Client(mcp) as client:
+            # Trigger various errors
+            error_tests = [
+                ("yolo_seed", {}),  # Missing required parameter
+                ("yolo_seed", {"content": ""}),  # Empty content
+                ("yolo_run", {}),  # Missing parameter
+                ("yolo_run", {"seed_id": "nonexistent"}),  # Not found
+                ("yolo_status", {"sprint_id": "nonexistent"}),  # Not found
+            ]
+
+            for tool_name, args in error_tests:
+                result = await client.call_tool(tool_name, args)
+                data = extract_result_data(result)
+
+                # All errors should have status and error fields
+                assert "status" in data, f"Missing status for {tool_name}"
+                assert data["status"] == "error", f"Expected error for {tool_name}"
+                assert "error" in data, f"Missing error message for {tool_name}"
+                assert isinstance(data["error"], str), (
+                    f"Error message not string for {tool_name}"
+                )

@@ -128,7 +128,12 @@ Deep dive into agents, orchestration, memory, and quality gates.
 | Epic | Status | Description |
 |:-----|:-------|:------------|
 | 1-13 | ✅ Complete | Core infrastructure, all agents, CLI, SDK |
-| 14 | 🚧 In Progress | MCP Integration |
+| 14 | ✅ Complete | MCP integration + Codex compatibility |
+
+### Recently Completed
+
+- [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
+- MCP integration tools, walkthroughs, and audit access
 
 ### Planned Features
 
@@ -137,7 +142,6 @@ Deep dive into agents, orchestration, memory, and quality gates.
 | Issue | Feature | Description |
 |:------|:--------|:------------|
 | [#1](https://github.com/bbengt1/yolo-developer/issues/1) | **Local LLM Support** | Ollama, LM Studio, vLLM integration with hybrid routing |
-| [#8](https://github.com/bbengt1/yolo-developer/issues/8) | **ChatGPT Codex Support** | OpenAI models as LLM provider with Azure support |
 
 #### IDE Integrations
 

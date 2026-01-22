@@ -1,8 +1,7 @@
 """MCP (Model Context Protocol) server for YOLO Developer.
 
-This module exposes YOLO Developer functionality to external tools
-via the MCP protocol, enabling integration with Claude Code and
-other MCP-compatible clients.
+This module exposes YOLO Developer functionality to MCP-compatible
+AI assistants and tools via the standard MCP protocol.
 
 Example:
     >>> from yolo_developer.mcp import mcp, run_server, TransportType

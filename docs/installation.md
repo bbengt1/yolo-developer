@@ -142,7 +142,7 @@ uv run ruff --version
 docker pull ghcr.io/bbengt1/yolo-developer:latest
 
 # Run with mounted project
-docker run -v $(pwd):/project -e YOLO_LLM__OPENAI_API_KEY=$OPENAI_API_KEY \
+docker run -v $(pwd):/project -e YOLO_LLM__OPENAI__API_KEY=$OPENAI_API_KEY \
   ghcr.io/bbengt1/yolo-developer yolo init
 ```
 
@@ -187,7 +187,7 @@ Add to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 # YOLO Developer API Keys
-export YOLO_LLM__OPENAI_API_KEY="sk-proj-..."
+export YOLO_LLM__OPENAI__API_KEY="sk-proj-..."
 export YOLO_LLM__ANTHROPIC_API_KEY="sk-ant-..."
 
 # Optional: Add yolo to PATH if using pip install
@@ -238,7 +238,7 @@ Add to your `~/.bashrc`:
 
 ```bash
 # YOLO Developer API Keys
-export YOLO_LLM__OPENAI_API_KEY="sk-proj-..."
+export YOLO_LLM__OPENAI__API_KEY="sk-proj-..."
 export YOLO_LLM__ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
@@ -307,14 +307,14 @@ Your WSL2 files are accessible at:
 **Option A: Environment Variables (Recommended)**
 
 ```bash
-export YOLO_LLM__OPENAI_API_KEY="sk-proj-..."
+export YOLO_LLM__OPENAI__API_KEY="sk-proj-..."
 ```
 
 **Option B: .env File (Local Development)**
 
 Create `.env` in your project root:
 ```bash
-YOLO_LLM__OPENAI_API_KEY=sk-proj-...
+YOLO_LLM__OPENAI__API_KEY=sk-proj-...
 YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
 ```
 
@@ -336,15 +336,23 @@ YOLO Developer v0.1.0
 
 project_name: null
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  openai_api_key: sk-proj-**** (configured)
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+  openai_api_key: "**********" (configured)
+  anthropic_api_key: "**********" (configured)
+  openai:
+    code_model: gpt-4o
+  hybrid:
+    enabled: false
 quality:
   test_coverage_threshold: 0.8
   gate_pass_threshold: 0.7
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
+  persist_path: .yolo/memory
+  vector_store_type: chromadb
+  graph_store_type: json
 ```
 
 ### 3. Initialize Your First Project

@@ -563,8 +563,9 @@ from yolo_developer.config import YoloConfig, LLMConfig, QualityConfig
 config = YoloConfig(
     project_name="my-api",
     llm=LLMConfig(
-        smart_model="gpt-4o",
-        routine_model="gpt-4o-mini",
+        cheap_model="gpt-4o-mini",
+        premium_model="claude-sonnet-4-20250514",
+        best_model="claude-opus-4-5-20251101",
     ),
     quality=QualityConfig(
         test_coverage_threshold=0.9,

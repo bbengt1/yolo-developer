@@ -627,15 +627,23 @@ yolo config show
 ```yaml
 project_name: my-api
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  openai_api_key: sk-**** (configured)
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+  openai_api_key: "**********" (configured)
+  anthropic_api_key: "**********" (configured)
+  openai:
+    code_model: gpt-4o
+  hybrid:
+    enabled: false
 quality:
   test_coverage_threshold: 0.8
   gate_pass_threshold: 0.7
 memory:
-  vector_store: chromadb
-  persist_directory: .yolo/memory
+  persist_path: .yolo/memory
+  vector_store_type: chromadb
+  graph_store_type: json
 agents:
   max_iterations: 10
   timeout_seconds: 300
@@ -648,12 +656,12 @@ yolo config set quality.test_coverage_threshold 0.9
 
 **Get a specific value:**
 ```bash
-yolo config get llm.smart_model
+yolo config get llm.premium_model
 ```
 
 **Output:**
 ```
-gpt-4o
+claude-sonnet-4-20250514
 ```
 
 **Validate configuration:**
@@ -779,9 +787,9 @@ Starting YOLO Developer MCP Server...
 
 Available tools:
   - yolo_seed: Provide seed requirements
-  - yolo_run: Execute sprint (coming soon)
-  - yolo_status: Get status (coming soon)
-  - yolo_audit: Access audit (coming soon)
+  - yolo_run: Execute sprint
+  - yolo_status: Get status
+  - yolo_audit: Access audit
 
 Server ready. Press Ctrl+C to stop.
 ```
@@ -811,13 +819,20 @@ All configuration can be overridden via environment variables using the `YOLO_` 
 | Variable | Description |
 |:---------|:------------|
 | `YOLO_PROJECT_NAME` | Project name |
-| `YOLO_LLM__SMART_MODEL` | Model for complex tasks |
-| `YOLO_LLM__ROUTINE_MODEL` | Model for routine tasks |
-| `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key |
+| `YOLO_LLM__PROVIDER` | Primary LLM provider (auto/openai/anthropic/hybrid) |
+| `YOLO_LLM__CHEAP_MODEL` | Model for routine tasks |
+| `YOLO_LLM__PREMIUM_MODEL` | Model for complex tasks |
+| `YOLO_LLM__BEST_MODEL` | Model for critical tasks |
+| `YOLO_LLM__OPENAI__API_KEY` | OpenAI API key (preferred) |
+| `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key (legacy) |
 | `YOLO_LLM__ANTHROPIC_API_KEY` | Anthropic API key |
+| `YOLO_LLM__OPENAI__CODE_MODEL` | OpenAI model for code tasks |
+| `YOLO_LLM__HYBRID__ENABLED` | Enable hybrid routing |
 | `YOLO_QUALITY__TEST_COVERAGE_THRESHOLD` | Coverage threshold |
 | `YOLO_QUALITY__GATE_PASS_THRESHOLD` | Gate pass threshold |
-| `YOLO_MEMORY__PERSIST_DIRECTORY` | Memory storage path |
+| `YOLO_MEMORY__PERSIST_PATH` | Memory storage path |
+| `YOLO_MEMORY__VECTOR_STORE_TYPE` | Vector store backend |
+| `YOLO_MEMORY__GRAPH_STORE_TYPE` | Graph store backend |
 
 ---
 

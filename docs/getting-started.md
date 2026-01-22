@@ -75,7 +75,7 @@ YOLO Developer requires an LLM API key. Set it via environment variable:
 ### OpenAI
 
 ```bash
-export YOLO_LLM__OPENAI_API_KEY=sk-proj-...
+export YOLO_LLM__OPENAI__API_KEY=sk-proj-...
 ```
 
 ### Anthropic
@@ -90,13 +90,20 @@ export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-api03-...
 uv run yolo config show
 ```
 
-**Expected output:**
+**Expected output (abbreviated):**
 ```yaml
 project_name: my-project
 llm:
-  smart_model: gpt-4o
-  routine_model: gpt-4o-mini
-  openai_api_key: sk-proj-****  # Masked
+  provider: auto
+  cheap_model: gpt-4o-mini
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+  openai_api_key: "**********"
+  anthropic_api_key: "**********"
+  openai:
+    code_model: gpt-4o
+  hybrid:
+    enabled: false
 quality:
   test_coverage_threshold: 0.8
   gate_pass_threshold: 0.7
@@ -320,7 +327,7 @@ Now that you have YOLO Developer running:
 
 Ensure your API key is set correctly:
 ```bash
-echo $YOLO_LLM__OPENAI_API_KEY
+echo $YOLO_LLM__OPENAI__API_KEY
 ```
 
 ### "ChromaDB initialization failed"

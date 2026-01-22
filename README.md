@@ -237,7 +237,7 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 | `yolo_seed` | Provide seed requirements (text or file) |
 | `yolo_run` | Execute autonomous sprint |
 | `yolo_status` | Query sprint status |
-| `yolo_audit` | Access audit trail (coming soon) |
+| `yolo_audit` | Access audit trail |
 
 ### yolo_status Walkthrough
 
@@ -448,7 +448,12 @@ tests/
 | Epic | Status | Description |
 |------|--------|-------------|
 | 1-13 | ✅ **Complete** | Core infrastructure, all agents, CLI, SDK |
-| 14 | 🚧 **In Progress** | MCP Integration (2/6 stories done) |
+| 14 | ✅ **Complete** | MCP integration + Codex compatibility |
+
+### Recently Completed
+
+- [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
+- MCP integration tools, walkthroughs, and audit access
 
 ### Planned Features
 
@@ -456,7 +461,6 @@ tests/
 | Issue | Feature | Labels |
 |-------|---------|--------|
 | [#1](https://github.com/bbengt1/yolo-developer/issues/1) | Local LLM Support (Ollama, LM Studio, vLLM) | `enhancement` `epic` |
-| [#8](https://github.com/bbengt1/yolo-developer/issues/8) | ChatGPT Codex Support | `enhancement` `epic` |
 
 #### IDE Integrations
 | Issue | Feature | Labels |

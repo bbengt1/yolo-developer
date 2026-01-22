@@ -8,7 +8,7 @@ has_children: true
 # MCP Integration
 {: .no_toc }
 
-Use YOLO Developer with Claude Code and other MCP-compatible clients.
+Use YOLO Developer with MCP-compatible AI assistants and tools.
 {: .fs-6 .fw-300 }
 
 ## Table of contents
@@ -21,18 +21,24 @@ Use YOLO Developer with Claude Code and other MCP-compatible clients.
 
 ## Overview
 
-YOLO Developer exposes an MCP (Model Context Protocol) server that allows AI assistants like Claude to directly interact with the autonomous development system. This enables conversational development workflows where you can seed requirements, run sprints, and monitor progress through natural language.
+YOLO Developer exposes an MCP (Model Context Protocol) server that allows AI assistants to directly interact with the autonomous development system. This enables conversational development workflows where you can seed requirements, run sprints, and monitor progress through natural language.
 
 ### What is MCP?
 
-MCP (Model Context Protocol) is a standard protocol for AI assistants to interact with external tools and services. When integrated with Claude Code or Claude Desktop, YOLO Developer becomes an extension of the AI assistant's capabilities.
+MCP (Model Context Protocol) is a standard protocol for AI assistants to interact with external tools and services. When integrated with MCP-compatible clients like Claude Code, Codex CLI, or other AI assistants, YOLO Developer becomes an extension of the AI's capabilities.
+
+### Supported Clients
+
+- **Claude Code** (Anthropic) - Full MCP support via STDIO transport
+- **Codex CLI** (OpenAI) - Full MCP support via STDIO transport
+- **Other MCP clients** - Any client implementing the MCP protocol
 
 ### Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Claude Code    │────▶│   MCP Server    │────▶│ YOLO Developer  │
-│  (MCP Client)   │◀────│  (FastMCP 2.x)  │◀────│    (Backend)    │
+│   MCP Client    │────▶│   MCP Server    │────▶│ YOLO Developer  │
+│ (Claude/Codex)  │◀────│  (FastMCP 2.x)  │◀────│    (Backend)    │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         │                       │                       │
         │    Tool Calls         │    Function Calls     │
@@ -47,8 +53,14 @@ MCP (Model Context Protocol) is a standard protocol for AI assistants to interac
 ### 1. Start the MCP Server
 
 ```bash
-# STDIO transport (for Claude Desktop)
+# STDIO transport (for local AI assistants)
 yolo mcp
+
+# Alternative: use entry point directly
+yolo-mcp
+
+# Or run as Python module
+python -m yolo_developer.mcp
 
 # HTTP transport (for remote access)
 yolo mcp --transport http --port 8080
@@ -56,7 +68,7 @@ yolo mcp --transport http --port 8080
 
 ### 1a. Quick MCP Tool Verification (CLI)
 
-This uses an in-process FastMCP client to list tool names. Use this for local sanity checks; for real clients (Claude Desktop or HTTP) you still need a running MCP server.
+This uses an in-process FastMCP client to list tool names. Use this for local sanity checks; for real clients you still need a running MCP server.
 
 ```bash
 uv run python - <<'PY'
@@ -73,11 +85,15 @@ asyncio.run(main())
 PY
 ```
 
-### 2. Configure Claude Desktop
+---
 
-Add to your Claude Desktop configuration file:
+## Client Configuration
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+### Claude Code / Claude Desktop
+
+Add to your configuration file:
+
+**macOS:** `~/.claude/claude_desktop_config.json`
 
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
@@ -88,19 +104,62 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "yolo-developer": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo", "mcp"]
+      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo-mcp"]
     }
   }
 }
 ```
 
-### 3. Restart Claude Desktop
+### Codex CLI (OpenAI)
 
-Close and reopen Claude Desktop. You should see YOLO Developer tools available.
+Add to your Codex CLI configuration:
 
-### 4. Start Using
+```json
+{
+  "mcpServers": {
+    "yolo-developer": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo-mcp"]
+    }
+  }
+}
+```
 
-In Claude Desktop, you can now say:
+### Generic MCP Client
+
+For any MCP-compatible client, configure STDIO transport:
+
+```json
+{
+  "mcpServers": {
+    "yolo-developer": {
+      "command": "python",
+      "args": ["-m", "yolo_developer.mcp"],
+      "cwd": "/path/to/yolo-developer"
+    }
+  }
+}
+```
+
+Or use the `yolo-mcp` entry point if installed:
+
+```json
+{
+  "mcpServers": {
+    "yolo-developer": {
+      "command": "yolo-mcp"
+    }
+  }
+}
+```
+
+### Restart Your AI Assistant
+
+After updating configuration, restart your AI assistant to load the YOLO Developer tools.
+
+### Start Using
+
+In your AI assistant, you can now say:
 
 > "Use yolo_seed to start a new project with requirements for a REST API with user authentication"
 
@@ -288,7 +347,7 @@ yolo seed requirements.md
 
 ---
 
-### yolo_audit (Coming Soon)
+### yolo_audit
 
 Access audit trail and decision history.
 
@@ -325,7 +384,7 @@ Access audit trail and decision history.
 
 ### STDIO Transport (Default)
 
-Used for local integration with Claude Desktop.
+Used for local integration with AI assistants.
 
 ```bash
 yolo mcp
@@ -338,7 +397,7 @@ yolo mcp --transport stdio
 - Secure (no open ports)
 - Automatic lifecycle management
 
-**Use case:** Claude Desktop on the same machine
+**Use case:** Local AI assistants (Claude Code, Codex CLI, etc.)
 
 ---
 
@@ -395,16 +454,18 @@ mcp:
 
 ---
 
-## Claude Desktop Configuration
+## MCP Client Configuration
 
 ### Basic Configuration
+
+For Claude Code, Codex CLI, or any MCP-compatible client:
 
 ```json
 {
   "mcpServers": {
     "yolo-developer": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo", "mcp"]
+      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo-mcp"]
     }
   }
 }
@@ -417,7 +478,7 @@ mcp:
   "mcpServers": {
     "yolo-developer": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo", "mcp"],
+      "args": ["run", "--directory", "/path/to/yolo-developer", "yolo-mcp"],
       "env": {
         "YOLO_LLM__OPENAI__API_KEY": "sk-proj-..."
       }
@@ -433,11 +494,11 @@ mcp:
   "mcpServers": {
     "yolo-project-a": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/project-a", "yolo", "mcp"]
+      "args": ["run", "--directory", "/path/to/project-a", "yolo-mcp"]
     },
     "yolo-project-b": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/project-b", "yolo", "mcp"]
+      "args": ["run", "--directory", "/path/to/project-b", "yolo-mcp"]
     }
   }
 }
@@ -564,20 +625,20 @@ lsof -i :8080
 yolo mcp --transport http --port 8081
 ```
 
-### Claude Desktop Doesn't Show Tools
+### AI Assistant Doesn't Show Tools
 
-**Problem:** Tools not appearing in Claude Desktop
+**Problem:** Tools not appearing in your AI assistant
 
 **Solutions:**
 1. Verify config file path is correct
 2. Ensure uv is in PATH
-3. Check Claude Desktop logs for errors
-4. Restart Claude Desktop completely
+3. Check AI assistant logs for errors
+4. Restart the AI assistant completely
 
 **Debug:**
 ```bash
 # Test server manually
-yolo mcp
+yolo-mcp
 
 # In another terminal, verify it starts without errors
 ```
@@ -603,16 +664,16 @@ curl http://localhost:8080/health
 Ensure API keys are set before starting MCP server:
 ```bash
 export YOLO_LLM__OPENAI__API_KEY=sk-...
-yolo mcp
+yolo-mcp
 ```
 
-Or in Claude Desktop config:
+Or in your MCP client config:
 ```json
 {
   "mcpServers": {
     "yolo-developer": {
       "command": "uv",
-      "args": ["..."],
+      "args": ["run", "yolo-mcp"],
       "env": {
         "YOLO_LLM__OPENAI__API_KEY": "sk-..."
       }

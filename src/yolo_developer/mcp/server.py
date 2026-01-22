@@ -1,7 +1,7 @@
 """FastMCP server implementation for YOLO Developer.
 
 This module provides the MCP (Model Context Protocol) server that exposes
-YOLO Developer functionality to external tools like Claude Code.
+YOLO Developer functionality to MCP-compatible AI assistants and tools.
 
 Example:
     >>> from yolo_developer.mcp import mcp
@@ -37,7 +37,7 @@ class TransportType(Enum):
     """Transport protocol types for the MCP server.
 
     Attributes:
-        STDIO: Standard input/output transport for Claude Desktop integration.
+        STDIO: Standard input/output transport for local AI assistant integration.
         HTTP: HTTP transport for remote MCP client access.
     """
 
@@ -130,7 +130,7 @@ def run_server(
     """Run the MCP server with the specified transport.
 
     Args:
-        transport: Transport protocol to use. Defaults to STDIO for Claude Desktop.
+        transport: Transport protocol to use. Defaults to STDIO for local AI assistants.
         port: Port number for HTTP transport. Defaults to 8000.
 
     Example:
