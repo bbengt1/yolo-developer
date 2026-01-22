@@ -32,7 +32,7 @@ def get_dashboard() -> dict[str, Any]:
     audit_entries = client.get_audit(limit=20)
     stories = [
         {"id": entry.artifact_id or "story", "status": entry.decision_type or "unknown"}
-        for entry in audit_entries.entries[:5]
+        for entry in audit_entries[:5]
     ]
     stories_total = max(len(stories), 1)
     stories_completed = max(min(2, stories_total), 0)
@@ -65,7 +65,7 @@ def get_dashboard() -> dict[str, Any]:
                 "agent": entry.agent,
                 "decision": entry.decision,
             }
-            for entry in audit_entries.entries[:8]
+            for entry in audit_entries[:8]
         ],
     }
 
@@ -82,7 +82,7 @@ def get_audit() -> dict[str, Any]:
                 "decision": entry.decision,
                 "artifact_id": entry.artifact_id,
             }
-            for entry in entries.entries
+            for entry in entries
         ]
     }
 
