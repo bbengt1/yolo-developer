@@ -75,6 +75,8 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Local UI**: Browser dashboard for sprint status and agent activity
 - **Real-time Updates**: WebSocket-driven status refresh
 
+![YOLO Developer Web Dashboard](docs/assets/images/dashboard.svg)
+
 ---
 
 ## Installation

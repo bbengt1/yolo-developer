@@ -59,6 +59,8 @@ Run guided Q&A sessions to crystallize requirements before seeding.
 ### Web Dashboard
 Use the local web UI to monitor sprint status and agent activity.
 
+![Web Dashboard Preview](/yolo-developer/assets/images/dashboard.svg)
+
 ---
 
 ## Quick Example

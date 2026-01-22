@@ -27,6 +27,8 @@ yolo web start
 
 The dashboard is available at `http://127.0.0.1:3000`.
 
+![Web Dashboard Preview](/yolo-developer/assets/images/dashboard.svg)
+
 ---
 
 ## Run API-Only
