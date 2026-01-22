@@ -40,6 +40,12 @@ from yolo_developer.audit import (
     get_audit_filter_service,
 )
 from yolo_developer.audit.traceability_types import VALID_ARTIFACT_TYPES
+from yolo_developer.config import load_config
+from yolo_developer.github.client import GitHubClient
+from yolo_developer.github.git import GitManager
+from yolo_developer.github.issues import IssueManager
+from yolo_developer.github.pr import PRManager
+from yolo_developer.github.releases import ReleaseManager
 from yolo_developer.audit.types import VALID_DECISION_TYPES
 from yolo_developer.mcp.server import mcp
 from yolo_developer.seed import parse_seed
@@ -628,6 +634,112 @@ async def yolo_audit(
         }
 
 
+def _github_managers() -> tuple[GitManager, PRManager, IssueManager, ReleaseManager]:
+    config = load_config()
+    repo_path = Path.cwd()
+    git = GitManager(repo_path)
+    repo_slug = config.github.repository or git.get_repo_slug()
+    if not repo_slug:
+        raise ValueError("GitHub repository not configured")
+    token = config.github.token.get_secret_value() if config.github.token else None
+    client = GitHubClient(repo=repo_slug, token=token, cwd=repo_path)
+    return git, PRManager(client), IssueManager(client), ReleaseManager(client)
+
+
+@mcp.tool
+async def yolo_git_commit(
+    message: str,
+    files: list[str] | None = None,
+    push: bool = False,
+) -> dict[str, Any]:
+    """Commit changes to Git repository."""
+    try:
+        git, _, _, _ = _github_managers()
+        git.stage_files(files or ".")
+        result = git.commit(message)
+        if push:
+            git.push(set_upstream=True)
+        return {
+            "status": "ok",
+            "commit": {
+                "sha": result.sha,
+                "message": result.message,
+                "files_changed": result.files_changed,
+                "insertions": result.insertions,
+                "deletions": result.deletions,
+            },
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_pr_create(
+    title: str,
+    body: str,
+    draft: bool = False,
+    reviewers: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a GitHub pull request from current branch."""
+    try:
+        git, prs, _, _ = _github_managers()
+        pr = prs.create(
+            title=title,
+            body=body,
+            head=git.get_current_branch().name,
+            draft=draft,
+            reviewers=reviewers,
+        )
+        return {"status": "ok", "number": pr.number, "url": pr.url}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_pr_respond(
+    pr_number: int,
+    comment_id: int,
+    response: str,
+) -> dict[str, Any]:
+    """Respond to a PR review comment."""
+    try:
+        _, prs, _, _ = _github_managers()
+        prs.respond_to_review(comment_id=comment_id, response=response)
+        return {"status": "ok", "comment_id": comment_id}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_issue_create(
+    title: str,
+    body: str,
+    labels: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a GitHub issue."""
+    try:
+        _, _, issues, _ = _github_managers()
+        issue = issues.create(title=title, body=body, labels=labels)
+        return {"status": "ok", "number": issue.number, "url": issue.url}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_release_create(
+    version: str,
+    name: str,
+    body: str = "",
+) -> dict[str, Any]:
+    """Create a GitHub release with auto-generated notes."""
+    try:
+        _, _, _, releases = _github_managers()
+        release = releases.create(tag=version, name=name, body=body, generate_notes=True)
+        return {"status": "ok", "tag": release.tag, "url": release.url}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
 __all__ = [
     "StoredSeed",
     "StoredSprint",
@@ -638,6 +750,11 @@ __all__ = [
     "store_seed",
     "store_sprint",
     "yolo_audit",
+    "yolo_git_commit",
+    "yolo_issue_create",
+    "yolo_pr_create",
+    "yolo_pr_respond",
+    "yolo_release_create",
     "yolo_run",
     "yolo_seed",
     "yolo_status",

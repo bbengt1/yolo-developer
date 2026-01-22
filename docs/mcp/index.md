@@ -380,6 +380,134 @@ Access audit trail and decision history.
 
 ---
 
+### yolo_git_commit
+
+Commit changes to the local Git repository.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `message` | string | Yes | Commit message |
+| `files` | array | No | Files to stage (defaults to all changes) |
+| `push` | boolean | No | Push after commit |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "commit": {
+    "sha": "abc1234",
+    "message": "feat: add github workflow support",
+    "files_changed": ["src/yolo_developer/github/git.py"],
+    "insertions": 12,
+    "deletions": 3
+  }
+}
+```
+
+---
+
+### yolo_pr_create
+
+Create a pull request for the current branch.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `title` | string | Yes | Pull request title |
+| `body` | string | Yes | Pull request body |
+| `draft` | boolean | No | Create as draft PR |
+| `reviewers` | array | No | GitHub usernames to request review |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "number": 42,
+  "url": "https://github.com/org/repo/pull/42"
+}
+```
+
+---
+
+### yolo_pr_respond
+
+Respond to a pull request review comment.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `pr_number` | integer | Yes | Pull request number |
+| `comment_id` | integer | Yes | Review comment ID |
+| `response` | string | Yes | Response text |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "comment_id": 123456789
+}
+```
+
+---
+
+### yolo_issue_create
+
+Create a GitHub issue.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `title` | string | Yes | Issue title |
+| `body` | string | Yes | Issue body |
+| `labels` | array | No | Labels to apply |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "number": 88,
+  "url": "https://github.com/org/repo/issues/88"
+}
+```
+
+---
+
+### yolo_release_create
+
+Create a GitHub release and auto-generate notes.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `version` | string | Yes | Tag name (for example `v1.2.0`) |
+| `name` | string | Yes | Release name |
+| `body` | string | No | Release body (additional notes) |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "tag": "v1.2.0",
+  "url": "https://github.com/org/repo/releases/tag/v1.2.0"
+}
+```
+
+{: .note }
+> GitHub tools require the `gh` CLI to be installed and authenticated, plus `YOLO_GITHUB__TOKEN` and `YOLO_GITHUB__REPOSITORY` if auto-detection is unavailable.
+
+---
+
 ## Transport Options
 
 ### STDIO Transport (Default)

@@ -16,6 +16,11 @@ The server exposes the following tools:
     - yolo_run: Execute autonomous sprint
     - yolo_status: Query sprint status
     - yolo_audit: Access audit trail
+    - yolo_git_commit: Commit changes to git
+    - yolo_pr_create: Create pull requests
+    - yolo_pr_respond: Respond to PR review comments
+    - yolo_issue_create: Create issues
+    - yolo_release_create: Create releases
 
 References:
     - ADR-004: FastMCP 2.x for MCP server implementation
@@ -109,6 +114,21 @@ Returns audit entries, pagination metadata, and total count.
 
 Example:
   yolo_audit(agent="analyst", limit=25, offset=0)
+
+## yolo_git_commit
+Commit staged changes and optionally push.
+
+## yolo_pr_create
+Create a pull request from the current branch.
+
+## yolo_pr_respond
+Reply to a pull request review comment.
+
+## yolo_issue_create
+Create a GitHub issue.
+
+## yolo_release_create
+Create a GitHub release with generated notes.
 
 Use these tools to integrate YOLO Developer into your AI workflow.
 """

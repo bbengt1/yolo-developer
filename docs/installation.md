@@ -40,6 +40,14 @@ Complete installation instructions for all platforms and environments.
 
 ---
 
+## Optional Tools
+
+These are only required if you plan to use GitHub automation commands.
+
+- **GitHub CLI (`gh`)**: Install from https://cli.github.com/ and run `gh auth login`.
+
+---
+
 ## Installation Methods
 
 ### Method 1: Using uv (Recommended)

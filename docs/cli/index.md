@@ -54,6 +54,11 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo tune`](#yolo-tune) | Adjust quality thresholds |
 | [`yolo mcp`](#yolo-mcp) | Start MCP server for Claude Code |
 | [`yolo scan`](#yolo-scan) | Scan existing project for brownfield context |
+| [`yolo git`](#yolo-git) | Local git operations |
+| [`yolo pr`](#yolo-pr) | Pull request operations |
+| [`yolo issue`](#yolo-issue) | Issue operations |
+| [`yolo release`](#yolo-release) | Release operations |
+| [`yolo workflow`](#yolo-workflow) | GitHub workflow automation |
 
 ---
 
@@ -830,6 +835,62 @@ yolo scan --max-files 200 --scan-depth 4
 
 ---
 
+## yolo git
+
+Manage local Git operations.
+
+```bash
+yolo git status
+yolo git commit -m "feat: update"
+yolo git push
+```
+
+---
+
+## yolo pr
+
+Manage pull requests.
+
+```bash
+yolo pr create --title "Title" --body "Body"
+yolo pr merge 123 --method squash
+```
+
+---
+
+## yolo issue
+
+Manage GitHub issues.
+
+```bash
+yolo issue create --title "Bug" --body "Details"
+yolo issue close 123 --comment "Fixed in PR #456"
+```
+
+---
+
+## yolo release
+
+Create GitHub releases.
+
+```bash
+yolo release create --tag v1.2.0 --name "Release 1.2.0" --body "Notes"
+```
+
+---
+
+## yolo workflow
+
+Automate story workflows.
+
+```bash
+yolo workflow start US-001 --title "Add endpoint" --description "..."
+yolo workflow complete US-001 --title "Add endpoint" --description "..." --commit "feat: add endpoint"
+```
+
+---
+
+## Exit Codes
 ## Exit Codes
 
 | Code | Description |
@@ -867,6 +928,8 @@ All configuration can be overridden via environment variables using the `YOLO_` 
 | `YOLO_MEMORY__GRAPH_STORE_TYPE` | Graph store backend |
 | `YOLO_BROWNFIELD__SCAN_DEPTH` | Brownfield scan depth |
 | `YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE` | Brownfield scan file limit |
+| `YOLO_GITHUB__TOKEN` | GitHub token |
+| `YOLO_GITHUB__REPOSITORY` | GitHub repo slug (owner/repo) |
 
 ---
 

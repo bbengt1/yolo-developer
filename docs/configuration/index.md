@@ -293,6 +293,43 @@ brownfield:
 
 ---
 
+### github
+
+GitHub automation configuration for repository management.
+
+Prerequisite: install the GitHub CLI (`gh`) and authenticate (`gh auth login`).
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `enabled` | bool | false | `YOLO_GITHUB__ENABLED` | Enable GitHub automation |
+| `token` | string | None | `YOLO_GITHUB__TOKEN` | GitHub token (env only) |
+| `repository` | string | None | `YOLO_GITHUB__REPOSITORY` | owner/repo override |
+| `default_branch` | string | main | `YOLO_GITHUB__DEFAULT_BRANCH` | Default branch |
+| `branch_prefix` | string | feature/ | `YOLO_GITHUB__BRANCH_PREFIX` | Branch prefix |
+
+```yaml
+github:
+  enabled: true
+  repository: bbengt1/yolo-developer
+  default_branch: main
+  branch_prefix: feature/
+  automation:
+    auto_commit: true
+    auto_push: true
+    auto_pr: true
+  pull_requests:
+    draft_by_default: false
+    merge_method: squash
+  issues:
+    create_from_stories: true
+  releases:
+    generate_notes: true
+  commits:
+    conventional: true
+```
+
+---
+
 ### agents
 
 Agent execution configuration.
@@ -450,6 +487,10 @@ export YOLO_MCP__HTTP__PORT=9000
 # Brownfield scanning
 export YOLO_BROWNFIELD__SCAN_DEPTH=4
 export YOLO_BROWNFIELD__INTERACTIVE=false
+
+# GitHub automation
+export YOLO_GITHUB__TOKEN=ghp_...
+export YOLO_GITHUB__REPOSITORY=bbengt1/yolo-developer
 ```
 
 ### List Values

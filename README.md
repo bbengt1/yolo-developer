@@ -64,6 +64,11 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Real-time Activity Display**: Live progress visualization
 - **Export Formats**: JSON, Markdown, and structured reports
 
+### GitHub Automation
+- **Git Operations**: Branch, commit, push, and status workflows
+- **PR Lifecycle**: Create, update, review, and merge PRs
+- **Issues & Releases**: Issue management and release creation
+
 ---
 
 ## Installation
@@ -72,6 +77,7 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 
 - Python 3.10 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
+- [GitHub CLI (`gh`)](https://cli.github.com/) for GitHub automation commands (run `gh auth login`)
 
 ### Install from Source
 
@@ -166,6 +172,11 @@ yolo logs
 | `yolo tune` | Adjust quality thresholds |
 | `yolo mcp` | Start MCP server for Claude Code |
 | `yolo scan` | Scan existing project for brownfield context |
+| `yolo git` | Local git operations |
+| `yolo pr` | Pull request operations |
+| `yolo issue` | GitHub issue operations |
+| `yolo release` | GitHub release operations |
+| `yolo workflow` | GitHub workflow automation |
 
 Run `yolo <command> --help` for detailed usage.
 
@@ -254,6 +265,11 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 | `yolo_run` | Execute autonomous sprint |
 | `yolo_status` | Query sprint status |
 | `yolo_audit` | Access audit trail |
+| `yolo_git_commit` | Commit changes and optionally push |
+| `yolo_pr_create` | Create a pull request for the current branch |
+| `yolo_pr_respond` | Respond to PR review comments |
+| `yolo_issue_create` | Create a GitHub issue |
+| `yolo_release_create` | Create a GitHub release |
 
 ### yolo_status Walkthrough
 
@@ -397,6 +413,8 @@ Environment variables use `YOLO_` prefix with `__` as nested delimiter:
 # API Keys (required)
 export YOLO_LLM__OPENAI__API_KEY=sk-...
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
+export YOLO_GITHUB__TOKEN=ghp_...
+export YOLO_GITHUB__REPOSITORY=owner/repo
 
 # Override configuration values
 export YOLO_PROJECT_NAME=my-project
@@ -466,6 +484,7 @@ tests/
 | 1-13 | ✅ **Complete** | Core infrastructure, all agents, CLI, SDK |
 | 14 | ✅ **Complete** | MCP integration + Codex compatibility |
 | 2 | ✅ **Complete** | Brownfield project support |
+| 12 | ✅ **Complete** | GitHub repository management |
 
 ### Recently Completed
 
@@ -496,7 +515,6 @@ tests/
 |-------|---------|--------|
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
-| [#12](https://github.com/bbengt1/yolo-developer/issues/12) | GitHub Repository Management | `enhancement` `epic` `github-integration` |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | GitHub Issue to User Story Conversion | `enhancement` `epic` `github-integration` |
 | [#14](https://github.com/bbengt1/yolo-developer/issues/14) | Interactive Requirements Gathering | `enhancement` `epic` |
 

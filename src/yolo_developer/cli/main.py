@@ -16,6 +16,11 @@ warnings.filterwarnings(
 
 from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.mcp import app as mcp_app
+from yolo_developer.cli.commands.git import app as git_app
+from yolo_developer.cli.commands.issue import app as issue_app
+from yolo_developer.cli.commands.pr import app as pr_app
+from yolo_developer.cli.commands.release import app as release_app
+from yolo_developer.cli.commands.workflow import app as workflow_app
 from yolo_developer.cli.commands.scan import scan_command
 
 app = typer.Typer(
@@ -24,6 +29,12 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+app.add_typer(git_app, name="git")
+app.add_typer(pr_app, name="pr")
+app.add_typer(issue_app, name="issue")
+app.add_typer(release_app, name="release")
+app.add_typer(workflow_app, name="workflow")
 
 
 @app.command("init")

@@ -44,6 +44,9 @@ ChromaDB-backed vector storage enables semantic search across decisions, while p
 ### Brownfield Support
 Scan existing projects to detect language, frameworks, structure, and testing setup, then generate `.yolo/project-context.yaml` for agent guidance.
 
+### GitHub Automation
+Manage branches, commits, PRs, issues, and releases directly from YOLO Developer.
+
 ### Full Observability
 Complete audit trail with decision logging, token cost tracking, and requirement traceability from seed to implementation.
 
@@ -112,6 +115,9 @@ Deep dive into agents, orchestration, memory, and quality gates.
 ### [Brownfield Guide](/yolo-developer/guides/brownfield)
 Scan and integrate existing projects with generated context.
 
+### [GitHub Automation](/yolo-developer/guides/github)
+Manage GitHub workflow automation from YOLO Developer.
+
 </div>
 
 ---
@@ -136,6 +142,7 @@ Scan and integrate existing projects with generated context.
 | 1-13 | ✅ Complete | Core infrastructure, all agents, CLI, SDK |
 | 14 | ✅ Complete | MCP integration + Codex compatibility |
 | 2 | ✅ Complete | Brownfield project support |
+| 12 | ✅ Complete | GitHub repository management |
 
 ### Recently Completed
 
@@ -170,7 +177,6 @@ Scan and integrate existing projects with generated context.
 |:------|:--------|:------------|
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | **Plugin System** | Create and integrate custom agents into the workflow |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | **Course Correction** | Mid-sprint requirement changes with impact analysis |
-| [#12](https://github.com/bbengt1/yolo-developer/issues/12) | **GitHub Management** | Full Git/GitHub workflow: commits, PRs, issues, releases |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | **Issue Import** | Convert GitHub issues to user stories for development |
 | [#14](https://github.com/bbengt1/yolo-developer/issues/14) | **Requirements Gathering** | Interactive session to elicit and crystallize requirements |
 

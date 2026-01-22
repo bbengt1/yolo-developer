@@ -61,6 +61,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from yolo_developer.github.config import GitHubConfig
+
 
 class GateThreshold(BaseModel):
     """Configuration for a single gate's threshold.
@@ -403,6 +405,8 @@ class YoloConfig(BaseSettings):
         - YOLO_BROWNFIELD__SCAN_DEPTH: Override brownfield scan depth
         - YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE: Override scan file limit
         - YOLO_BROWNFIELD__INTERACTIVE: Override brownfield interactive mode
+        - YOLO_GITHUB__TOKEN: GitHub token (env only)
+        - YOLO_GITHUB__REPOSITORY: GitHub repo slug (owner/repo)
 
     Example:
         >>> config = YoloConfig(project_name="my-project")
@@ -440,6 +444,10 @@ class YoloConfig(BaseSettings):
     brownfield: BrownfieldConfig = Field(
         default_factory=BrownfieldConfig,
         description="Brownfield scanning configuration",
+    )
+    github: GitHubConfig = Field(
+        default_factory=GitHubConfig,
+        description="GitHub automation configuration",
     )
 
     def validate_api_keys(self) -> list[str]:
