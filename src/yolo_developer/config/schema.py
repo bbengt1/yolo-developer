@@ -49,7 +49,7 @@ Example Usage
 >>> from yolo_developer.config import load_config
 >>> config = load_config()
 >>> config.llm.cheap_model
-'gpt-4o-mini'
+'gpt-5.2-instant'
 >>> if config.llm.openai_api_key:
 ...     api_key = config.llm.openai_api_key.get_secret_value()
 """
@@ -62,6 +62,15 @@ from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from yolo_developer.github.config import GitHubConfig
+
+OPENAI_CHEAP_MODEL_DEFAULT = "gpt-5.2-instant"
+OPENAI_PREMIUM_MODEL_DEFAULT = "gpt-5.2-thinking"
+OPENAI_CODE_MODEL_DEFAULT = "gpt-5.2-pro"
+OPENAI_REASONING_MODEL_DEFAULT = "gpt-5.2-pro"
+
+LLM_CHEAP_MODEL_DEFAULT = OPENAI_CHEAP_MODEL_DEFAULT
+LLM_PREMIUM_MODEL_DEFAULT = "claude-sonnet-4-20250514"
+LLM_BEST_MODEL_DEFAULT = "claude-opus-4-5-20251101"
 
 
 class GateThreshold(BaseModel):
@@ -104,19 +113,19 @@ class OpenAIConfig(BaseModel):
         description="OpenAI API key (set via YOLO_LLM__OPENAI__API_KEY env var)",
     )
     cheap_model: str = Field(
-        default="gpt-4o-mini",
+        default=OPENAI_CHEAP_MODEL_DEFAULT,
         description="OpenAI model for routine tasks",
     )
     premium_model: str = Field(
-        default="gpt-4o",
+        default=OPENAI_PREMIUM_MODEL_DEFAULT,
         description="OpenAI model for complex reasoning tasks",
     )
     code_model: str = Field(
-        default="gpt-4o",
+        default=OPENAI_CODE_MODEL_DEFAULT,
         description="OpenAI model optimized for code generation and review",
     )
     reasoning_model: str | None = Field(
-        default=None,
+        default=OPENAI_REASONING_MODEL_DEFAULT,
         description="OpenAI model for deep reasoning tasks (optional)",
     )
 
@@ -173,15 +182,15 @@ class LLMConfig(BaseModel):
     """
 
     cheap_model: str = Field(
-        default="gpt-4o-mini",
+        default=LLM_CHEAP_MODEL_DEFAULT,
         description="LLM model for routine, low-complexity tasks",
     )
     premium_model: str = Field(
-        default="claude-sonnet-4-20250514",
+        default=LLM_PREMIUM_MODEL_DEFAULT,
         description="LLM model for complex reasoning tasks",
     )
     best_model: str = Field(
-        default="claude-opus-4-5-20251101",
+        default=LLM_BEST_MODEL_DEFAULT,
         description="LLM model for critical decisions requiring highest quality",
     )
 
@@ -451,7 +460,7 @@ class YoloConfig(BaseSettings):
     Example:
         >>> config = YoloConfig(project_name="my-project")
         >>> config.llm.cheap_model
-        'gpt-4o-mini'
+        'gpt-5.2-instant'
         >>> warnings = config.validate_api_keys()
         >>> if warnings:
         ...     print("Warning: No API keys configured")

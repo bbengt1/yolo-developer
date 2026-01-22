@@ -648,7 +648,7 @@ def config_set(
 
     Examples:
         yolo config set project_name my-project
-        yolo config set llm.cheap_model gpt-4o
+        yolo config set llm.cheap_model gpt-5.2-instant
         yolo config set quality.test_coverage_threshold 0.85
         yolo config set quality.seed_thresholds.overall 0.75
     """

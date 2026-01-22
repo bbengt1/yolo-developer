@@ -6,7 +6,7 @@ Example:
     >>> from yolo_developer.config import load_config, YoloConfig
     >>> config = load_config()  # Loads from ./yolo.yaml if it exists
     >>> config.llm.cheap_model
-    'gpt-4o-mini'
+    'gpt-5.2-instant'
 
 Export/Import Example:
     >>> from yolo_developer.config import export_config, import_config
@@ -29,6 +29,13 @@ from yolo_developer.config.schema import (
     QualityConfig,
     SeedThresholdConfig,
     YoloConfig,
+    LLM_BEST_MODEL_DEFAULT,
+    LLM_CHEAP_MODEL_DEFAULT,
+    LLM_PREMIUM_MODEL_DEFAULT,
+    OPENAI_CHEAP_MODEL_DEFAULT,
+    OPENAI_CODE_MODEL_DEFAULT,
+    OPENAI_PREMIUM_MODEL_DEFAULT,
+    OPENAI_REASONING_MODEL_DEFAULT,
 )
 from yolo_developer.config.validators import (
     ValidationIssue,
@@ -41,10 +48,17 @@ __all__ = [
     "GateThreshold",
     "LLMConfig",
     "LLMProvider",
+    "LLM_BEST_MODEL_DEFAULT",
+    "LLM_CHEAP_MODEL_DEFAULT",
+    "LLM_PREMIUM_MODEL_DEFAULT",
     "HybridConfig",
     "HybridRoutingConfig",
     "MemoryConfig",
     "OpenAIConfig",
+    "OPENAI_CHEAP_MODEL_DEFAULT",
+    "OPENAI_CODE_MODEL_DEFAULT",
+    "OPENAI_PREMIUM_MODEL_DEFAULT",
+    "OPENAI_REASONING_MODEL_DEFAULT",
     "QualityConfig",
     "SeedThresholdConfig",
     "ValidationIssue",

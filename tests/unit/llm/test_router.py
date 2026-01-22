@@ -9,6 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from yolo_developer.config import (
+    LLM_CHEAP_MODEL_DEFAULT,
+    OPENAI_CODE_MODEL_DEFAULT,
+)
 from yolo_developer.config.schema import LLMConfig
 from yolo_developer.llm.router import (
     LLMProviderError,
@@ -262,7 +266,7 @@ class TestLLMRouterCallWithFallback:
             )
             assert result == "Fallback response"
             # Should have tried complex model (with retries) then routine
-            assert any("gpt-4o-mini" in m for m in models_used)
+            assert any(LLM_CHEAP_MODEL_DEFAULT in m for m in models_used)
 
 
 class TestLLMRouterTaskRouting:
@@ -273,7 +277,7 @@ class TestLLMRouterTaskRouting:
         config = LLMConfig(
             provider="hybrid",
             hybrid={"enabled": True},
-            openai={"code_model": "gpt-4o"},
+            openai={"code_model": OPENAI_CODE_MODEL_DEFAULT},
         )
         router = LLMRouter(config)
 
@@ -282,7 +286,7 @@ class TestLLMRouterTaskRouting:
 
         assert isinstance(routing, TaskRouting)
         assert routing.provider == "openai"
-        assert routing.model == "gpt-4o"
+        assert routing.model == OPENAI_CODE_MODEL_DEFAULT
         assert routing.task_type == "code_generation"
 
     def test_task_routing_uses_anthropic_for_architecture_in_hybrid(self) -> None:

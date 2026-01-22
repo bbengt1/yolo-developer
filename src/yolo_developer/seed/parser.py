@@ -40,6 +40,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.seed.types import (
     ConstraintCategory,
     SeedConstraint,
@@ -548,7 +549,7 @@ class LLMSeedParser:
     components (goals, features, constraints).
 
     Attributes:
-        model: The LLM model to use (default: gpt-4o-mini for cost efficiency).
+        model: The LLM model to use (default: routine-tier model for cost efficiency).
         temperature: Sampling temperature (default: 0.1 for consistency).
 
     Example:
@@ -562,13 +563,13 @@ class LLMSeedParser:
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = LLM_CHEAP_MODEL_DEFAULT,
         temperature: float = 0.1,
     ) -> None:
         """Initialize the LLM seed parser.
 
         Args:
-            model: LiteLLM model identifier (default: gpt-4o-mini).
+            model: LiteLLM model identifier (default: routine-tier model).
             temperature: Sampling temperature for LLM (default: 0.1).
         """
         self.model = model

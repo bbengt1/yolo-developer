@@ -51,7 +51,7 @@ def _make_mock_response(
         mock._hidden_params = {}
 
     # Mock model for cost calculation
-    mock.model = "gpt-4o-mini"
+    mock.model = "gpt-5.2-instant"
 
     return mock
 

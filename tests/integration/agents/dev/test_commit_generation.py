@@ -100,7 +100,7 @@ class TestDevNodeCommitMessageIntegration:
                 TaskRouting(
                     task_type="code_generation",
                     provider="openai",
-                    model="gpt-4o",
+                    model="gpt-5.2-pro",
                     tier="complex",
                 )
             ]
@@ -111,7 +111,7 @@ class TestDevNodeCommitMessageIntegration:
             message = result["messages"][0]
             metadata = message.additional_kwargs
             assert "llm_usage" in metadata
-            assert metadata["llm_usage"][0]["model"] == "gpt-4o"
+            assert metadata["llm_usage"][0]["model"] == "gpt-5.2-pro"
 
     @pytest.mark.asyncio
     async def test_commit_message_uses_conventional_format(self, mock_state: dict) -> None:

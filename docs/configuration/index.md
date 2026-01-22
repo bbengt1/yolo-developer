@@ -40,11 +40,11 @@ project_name: my-awesome-api
 # LLM configuration
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   openai:
-    code_model: gpt-4o
+    code_model: {{ site.openai_defaults.code_model }}
   # API keys should be set via environment variables
 
 # Quality thresholds
@@ -114,9 +114,9 @@ LLM (Large Language Model) configuration for agent reasoning.
 | Option | Type | Default | Env Var | Description |
 |:-------|:-----|:--------|:--------|:------------|
 | `provider` | string | auto | `YOLO_LLM__PROVIDER` | Primary provider (auto/openai/anthropic/hybrid) |
-| `cheap_model` | string | gpt-4o-mini | `YOLO_LLM__CHEAP_MODEL` | Model for routine tasks |
-| `premium_model` | string | claude-sonnet-4-20250514 | `YOLO_LLM__PREMIUM_MODEL` | Model for complex reasoning |
-| `best_model` | string | claude-opus-4-5-20251101 | `YOLO_LLM__BEST_MODEL` | Model for critical decisions |
+| `cheap_model` | string | {{ site.llm_defaults.cheap_model }} | `YOLO_LLM__CHEAP_MODEL` | Model for routine tasks |
+| `premium_model` | string | {{ site.llm_defaults.premium_model }} | `YOLO_LLM__PREMIUM_MODEL` | Model for complex reasoning |
+| `best_model` | string | {{ site.llm_defaults.best_model }} | `YOLO_LLM__BEST_MODEL` | Model for critical decisions |
 | `openai_api_key` | string | None | `YOLO_LLM__OPENAI_API_KEY` | OpenAI API key (legacy) |
 | `anthropic_api_key` | string | None | `YOLO_LLM__ANTHROPIC_API_KEY` | Anthropic API key |
 
@@ -126,14 +126,14 @@ LLM (Large Language Model) configuration for agent reasoning.
 ```yaml
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   openai:
-    cheap_model: gpt-4o-mini
-    premium_model: gpt-4o
-    code_model: gpt-4o
-    reasoning_model: null
+    cheap_model: {{ site.openai_defaults.cheap_model }}
+    premium_model: {{ site.openai_defaults.premium_model }}
+    code_model: {{ site.openai_defaults.code_model }}
+    reasoning_model: {{ site.openai_defaults.reasoning_model }}
   hybrid:
     enabled: false
     routing:
@@ -150,7 +150,7 @@ llm:
 export YOLO_LLM__OPENAI__API_KEY=sk-proj-...
 export YOLO_LLM__OPENAI_API_KEY=sk-proj-...  # Legacy
 export YOLO_LLM__ANTHROPIC_API_KEY=sk-ant-...
-export YOLO_LLM__PREMIUM_MODEL=claude-sonnet-4-20250514
+export YOLO_LLM__PREMIUM_MODEL={{ site.llm_defaults.premium_model }}
 ```
 
 #### llm.openai
@@ -160,10 +160,10 @@ OpenAI/Codex configuration for code-optimized models.
 | Option | Type | Default | Env Var | Description |
 |:-------|:-----|:--------|:--------|:------------|
 | `api_key` | string | None | `YOLO_LLM__OPENAI__API_KEY` | OpenAI API key (preferred) |
-| `cheap_model` | string | gpt-4o-mini | `YOLO_LLM__OPENAI__CHEAP_MODEL` | OpenAI model for routine tasks |
-| `premium_model` | string | gpt-4o | `YOLO_LLM__OPENAI__PREMIUM_MODEL` | OpenAI model for complex reasoning |
-| `code_model` | string | gpt-4o | `YOLO_LLM__OPENAI__CODE_MODEL` | OpenAI model for code tasks |
-| `reasoning_model` | string | None | `YOLO_LLM__OPENAI__REASONING_MODEL` | OpenAI model for deep reasoning |
+| `cheap_model` | string | {{ site.openai_defaults.cheap_model }} | `YOLO_LLM__OPENAI__CHEAP_MODEL` | OpenAI model for routine tasks |
+| `premium_model` | string | {{ site.openai_defaults.premium_model }} | `YOLO_LLM__OPENAI__PREMIUM_MODEL` | OpenAI model for complex reasoning |
+| `code_model` | string | {{ site.openai_defaults.code_model }} | `YOLO_LLM__OPENAI__CODE_MODEL` | OpenAI model for code tasks |
+| `reasoning_model` | string | {{ site.openai_defaults.reasoning_model }} | `YOLO_LLM__OPENAI__REASONING_MODEL` | OpenAI model for deep reasoning |
 
 #### llm.hybrid
 
@@ -182,12 +182,9 @@ Hybrid routing configuration for task-based provider selection.
 #### Supported Models
 
 **OpenAI:**
-- `gpt-4o` (recommended for premium/code)
-- `gpt-4o-mini` (recommended for cheap)
-- `gpt-4-turbo`
-- `gpt-3.5-turbo`
- - `o1-preview` (deep reasoning)
- - `o1-mini`
+- `{{ site.openai_defaults.code_model }}` (recommended for code + deep reasoning)
+- `{{ site.openai_defaults.premium_model }}` (recommended for premium reasoning)
+- `{{ site.openai_defaults.cheap_model }}` (recommended for cheap/fast)
 
 **Anthropic:**
 - `claude-3-opus-20240229`
@@ -536,9 +533,9 @@ export YOLO_PROJECT_NAME=my-api
 
 # LLM settings
 export YOLO_LLM__PROVIDER=hybrid
-export YOLO_LLM__CHEAP_MODEL=gpt-4o-mini
-export YOLO_LLM__PREMIUM_MODEL=claude-sonnet-4-20250514
-export YOLO_LLM__BEST_MODEL=claude-opus-4-5-20251101
+export YOLO_LLM__CHEAP_MODEL={{ site.llm_defaults.cheap_model }}
+export YOLO_LLM__PREMIUM_MODEL={{ site.llm_defaults.premium_model }}
+export YOLO_LLM__BEST_MODEL={{ site.llm_defaults.best_model }}
 export YOLO_LLM__OPENAI__API_KEY=sk-proj-...
 export YOLO_LLM__HYBRID__ENABLED=true
 
@@ -644,7 +641,7 @@ Error: No LLM API key configured
 **Invalid model:**
 ```
 Error: Unknown model: gpt-5-turbo
-  Valid OpenAI models: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
+  Valid OpenAI models: {{ site.openai_defaults.models | join: ", " }}
   Valid Anthropic models: claude-3-opus-*, claude-3-sonnet-*, claude-3-haiku-*
 ```
 
@@ -659,9 +656,9 @@ Error: Unknown model: gpt-5-turbo
 project_name: my-api-dev
 
 llm:
-  cheap_model: gpt-4o-mini  # Cheaper for dev
-  premium_model: gpt-4o-mini
-  best_model: gpt-4o
+  cheap_model: {{ site.openai_defaults.cheap_model }}  # Cheaper for dev
+  premium_model: {{ site.openai_defaults.premium_model }}
+  best_model: {{ site.openai_defaults.code_model }}
 
 quality:
   test_coverage_threshold: 0.6  # Relaxed for iteration
@@ -682,9 +679,9 @@ audit:
 project_name: my-api-prod
 
 llm:
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
 
 quality:
   test_coverage_threshold: 0.95  # Strict
@@ -723,15 +720,15 @@ project_name: user-management-api
 # LLM configuration
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   # API keys via environment variables
   openai:
-    cheap_model: gpt-4o-mini
-    premium_model: gpt-4o
-    code_model: gpt-4o
-    reasoning_model: null
+    cheap_model: {{ site.openai_defaults.cheap_model }}
+    premium_model: {{ site.openai_defaults.premium_model }}
+    code_model: {{ site.openai_defaults.code_model }}
+    reasoning_model: {{ site.openai_defaults.reasoning_model }}
   hybrid:
     enabled: false
     routing:

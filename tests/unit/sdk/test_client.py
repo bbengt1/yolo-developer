@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from yolo_developer.config import YoloConfig
+from yolo_developer.config import LLM_CHEAP_MODEL_DEFAULT, YoloConfig
 from yolo_developer.sdk.client import YoloClient
 from yolo_developer.sdk.exceptions import (
     ClientNotInitializedError,
@@ -181,7 +181,7 @@ class TestYoloClientInit:
         # Verify comprehensive config matching CLI format
         assert "project_name: new-project" in content
         assert "llm:" in content
-        assert "cheap_model: gpt-4o-mini" in content
+        assert f"cheap_model: {LLM_CHEAP_MODEL_DEFAULT}" in content
         assert "premium_model: claude-sonnet-4-20250514" in content
         assert "quality:" in content
         assert "test_coverage_threshold: 0.80" in content
@@ -734,7 +734,7 @@ class TestYoloClientConfigRead:
         client = YoloClient(config=config, project_path=tmp_path)
 
         # Access nested llm settings
-        assert client.config.llm.cheap_model == "gpt-4o-mini"
+        assert client.config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
         assert client.config.llm.premium_model == "claude-sonnet-4-20250514"
 
         # Access nested quality settings
@@ -780,11 +780,11 @@ class TestYoloClientConfigUpdate:
         client = YoloClient(config=config, project_path=tmp_path)
 
         result = client.update_config(
-            llm={"cheap_model": "gpt-4o"}, quality={"test_coverage_threshold": 0.90}
+            llm={"cheap_model": "gpt-5.2-thinking"}, quality={"test_coverage_threshold": 0.90}
         )
 
         assert result.success
-        assert client.config.llm.cheap_model == "gpt-4o"
+        assert client.config.llm.cheap_model == "gpt-5.2-thinking"
         assert client.config.quality.test_coverage_threshold == 0.90
 
     def test_update_config_project_name(self, tmp_path: Path) -> None:

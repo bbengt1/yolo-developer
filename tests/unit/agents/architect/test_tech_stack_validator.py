@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from yolo_developer.config import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.agents.architect import DesignDecision
 
 # RED phase: These imports will fail until we implement the module
@@ -39,7 +40,7 @@ class TestExtractTechStackFromConfig:
     def mock_config(self) -> MagicMock:
         """Create a mock YoloConfig."""
         config = MagicMock()
-        config.llm.cheap_model = "gpt-4o-mini"
+        config.llm.cheap_model = LLM_CHEAP_MODEL_DEFAULT
         config.llm.premium_model = "claude-sonnet-4-20250514"
         config.memory.vector_store_type = "chromadb"
         config.memory.graph_store_type = "json"
@@ -53,7 +54,7 @@ class TestExtractTechStackFromConfig:
         ):
             result = _extract_tech_stack_from_config()
             assert "llm_models" in result
-            assert "gpt-4o-mini" in result["llm_models"]
+            assert LLM_CHEAP_MODEL_DEFAULT in result["llm_models"]
 
     def test_extract_memory_store_types(self, mock_config: MagicMock) -> None:
         """Test extracting memory store type information."""
@@ -266,7 +267,7 @@ class TestValidateTechStackConstraints:
         """Create a mock YoloConfig with proper string values."""
         config = MagicMock()
         config.project_name = "test-project"
-        config.llm.cheap_model = "gpt-4o-mini"
+        config.llm.cheap_model = LLM_CHEAP_MODEL_DEFAULT
         config.llm.premium_model = "claude-sonnet-4"
         config.llm.best_model = "claude-opus-4"
         config.memory.vector_store_type = "chromadb"
@@ -498,7 +499,7 @@ class TestLLMIntegration:
         """Test fallback to rule-based validation when LLM fails."""
         mock_config = MagicMock()
         mock_config.project_name = "test-project"
-        mock_config.llm.cheap_model = "gpt-4o-mini"
+        mock_config.llm.cheap_model = LLM_CHEAP_MODEL_DEFAULT
         mock_config.llm.premium_model = "claude-sonnet-4"
         mock_config.llm.best_model = "claude-opus-4"
         mock_config.memory.vector_store_type = "chromadb"
@@ -535,7 +536,7 @@ class TestLLMIntegration:
         """Test validation with LLM explicitly disabled."""
         mock_config = MagicMock()
         mock_config.project_name = "test-project"
-        mock_config.llm.cheap_model = "gpt-4o-mini"
+        mock_config.llm.cheap_model = LLM_CHEAP_MODEL_DEFAULT
         mock_config.llm.premium_model = "claude-sonnet-4"
         mock_config.llm.best_model = "claude-opus-4"
         mock_config.memory.vector_store_type = "chromadb"

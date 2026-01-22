@@ -24,7 +24,7 @@ class TestCostTrackingServiceRecording:
         service = CostTrackingService(store)
 
         record = await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -33,7 +33,7 @@ class TestCostTrackingServiceRecording:
             session_id="session-123",
         )
 
-        assert record.model == "gpt-4o-mini"
+        assert record.model == "gpt-5.2-instant"
         assert record.tier == "routine"
         assert record.token_usage.prompt_tokens == 100
         assert record.token_usage.completion_tokens == 50
@@ -74,7 +74,7 @@ class TestCostTrackingServiceRecording:
         service = CostTrackingService(store)
 
         record = await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -95,7 +95,7 @@ class TestCostTrackingServiceRecording:
         service = CostTrackingService(store, enabled=False)
 
         record = await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -130,7 +130,7 @@ class TestCostTrackingServiceAgentCosts:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -139,7 +139,7 @@ class TestCostTrackingServiceAgentCosts:
             session_id="sess-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -148,7 +148,7 @@ class TestCostTrackingServiceAgentCosts:
             session_id="sess-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -187,7 +187,7 @@ class TestCostTrackingServiceStoryCosts:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -197,7 +197,7 @@ class TestCostTrackingServiceStoryCosts:
             story_id="1-2-auth",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -207,7 +207,7 @@ class TestCostTrackingServiceStoryCosts:
             story_id="1-3-profile",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -235,7 +235,7 @@ class TestCostTrackingServiceTotals:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -244,7 +244,7 @@ class TestCostTrackingServiceTotals:
             session_id="sess-a",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -253,7 +253,7 @@ class TestCostTrackingServiceTotals:
             session_id="sess-b",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -274,7 +274,7 @@ class TestCostTrackingServiceTotals:
         service = CostTrackingService(store)
 
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -284,7 +284,7 @@ class TestCostTrackingServiceTotals:
             sprint_id="sprint-1",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,
@@ -294,7 +294,7 @@ class TestCostTrackingServiceTotals:
             sprint_id="sprint-2",
         )
         await service.record_llm_call(
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             prompt_tokens=100,
             completion_tokens=50,

@@ -33,6 +33,7 @@ from typing import Any
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.agents.architect.types import (
     DesignDecision,
     MitigationEffort,
@@ -897,7 +898,7 @@ async def _call_quality_llm(prompt: str) -> str:
     """
     import litellm
 
-    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", "gpt-4o-mini")
+    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", LLM_CHEAP_MODEL_DEFAULT)
 
     logger.debug("calling_quality_llm", model=model, prompt_length=len(prompt))
 

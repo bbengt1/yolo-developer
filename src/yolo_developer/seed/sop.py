@@ -56,6 +56,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
+
 logger = structlog.get_logger(__name__)
 
 
@@ -609,7 +611,7 @@ def _build_conflict(
 async def validate_against_sop(
     seed_content: str,
     sop_store: SOPStore,
-    model: str = "gpt-4o-mini",
+    model: str = LLM_CHEAP_MODEL_DEFAULT,
 ) -> SOPValidationResult:
     """Validate seed content against SOP constraints.
 
@@ -619,7 +621,7 @@ async def validate_against_sop(
     Args:
         seed_content: The seed document content to validate
         sop_store: Store containing SOP constraints
-        model: LLM model to use for analysis (default: gpt-4o-mini)
+        model: LLM model to use for analysis (default: routine-tier model)
 
     Returns:
         SOPValidationResult with detected conflicts and status

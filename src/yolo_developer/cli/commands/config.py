@@ -11,7 +11,7 @@ Subcommands:
 Examples:
     yolo config                              # Show config
     yolo config --json                       # Show config as JSON
-    yolo config set llm.cheap_model gpt-4o   # Set nested value
+    yolo config set llm.cheap_model gpt-5.2-instant   # Set nested value
     yolo config export                       # Export to yolo-config-export.yaml
     yolo config export -o custom.yaml        # Export to custom path
     yolo config import backup.yaml           # Import from file

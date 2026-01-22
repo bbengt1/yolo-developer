@@ -102,13 +102,13 @@ uv run yolo config show
 project_name: my-project
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   openai_api_key: "**********"
   anthropic_api_key: "**********"
   openai:
-    code_model: gpt-4o
+    code_model: {{ site.openai_defaults.code_model }}
   hybrid:
     enabled: false
 quality:

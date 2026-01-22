@@ -11,6 +11,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from yolo_developer.config import (
+    LLM_BEST_MODEL_DEFAULT,
+    LLM_CHEAP_MODEL_DEFAULT,
+    LLM_PREMIUM_MODEL_DEFAULT,
+)
 from yolo_developer.config.schema import BrownfieldConfig
 from yolo_developer.scanner import ScannerManager
 
@@ -53,13 +58,13 @@ project_name: {project_name}
 # LLM Provider Configuration
 llm:
   # Model for routine, low-complexity tasks
-  cheap_model: gpt-4o-mini
+  cheap_model: {llm_cheap_model}
 
   # Model for complex reasoning tasks
-  premium_model: claude-sonnet-4-20250514
+  premium_model: {llm_premium_model}
 
   # Model for critical decisions requiring highest quality
-  best_model: claude-opus-4-5-20251101
+  best_model: {llm_best_model}
 
   # API keys should be set via environment variables:
   # - YOLO_LLM__OPENAI__API_KEY
@@ -388,7 +393,12 @@ def create_yolo_yaml(project_path: Path, project_name: str, overwrite: bool = Fa
         )
         return False
 
-    content = YOLO_YAML_TEMPLATE.format(project_name=project_name)
+    content = YOLO_YAML_TEMPLATE.format(
+        project_name=project_name,
+        llm_cheap_model=LLM_CHEAP_MODEL_DEFAULT,
+        llm_premium_model=LLM_PREMIUM_MODEL_DEFAULT,
+        llm_best_model=LLM_BEST_MODEL_DEFAULT,
+    )
     yolo_yaml_path.write_text(content)
     return True
 

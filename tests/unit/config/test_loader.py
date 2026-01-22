@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from yolo_developer.config import ConfigurationError, load_config
+from yolo_developer.config import (
+    ConfigurationError,
+    LLM_CHEAP_MODEL_DEFAULT,
+    load_config,
+)
 
 
 class TestLoadConfigWithValidYAML:
@@ -122,7 +126,7 @@ class TestLoadConfigMissingFile:
         config = load_config(yaml_file)
         assert config.project_name == "env-project"
         # All other defaults apply
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
         assert config.quality.test_coverage_threshold == 0.80
 
     def test_yaml_file_with_only_comments_uses_defaults(
@@ -134,7 +138,7 @@ class TestLoadConfigMissingFile:
         monkeypatch.setenv("YOLO_PROJECT_NAME", "env-project")
         config = load_config(yaml_file)
         assert config.project_name == "env-project"
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
 
     def test_missing_file_uses_defaults_with_env(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -144,7 +148,7 @@ class TestLoadConfigMissingFile:
         config = load_config(tmp_path / "nonexistent.yaml")
         assert config.project_name == "env-project"
         # All other defaults apply
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
         assert config.quality.test_coverage_threshold == 0.80
 
     def test_missing_file_requires_project_name(self, tmp_path: Path) -> None:
@@ -397,7 +401,7 @@ class TestLoadConfigFullExample:
 project_name: my-awesome-project
 
 llm:
-  cheap_model: gpt-4o-mini
+  cheap_model: {cheap_model}
   premium_model: claude-sonnet-4-20250514
   best_model: claude-opus-4-5-20251101
 
@@ -410,11 +414,12 @@ memory:
   vector_store_type: chromadb
   graph_store_type: json
 """
+            .format(cheap_model=LLM_CHEAP_MODEL_DEFAULT)
         )
         config = load_config(yaml_file)
 
         assert config.project_name == "my-awesome-project"
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
         assert config.llm.premium_model == "claude-sonnet-4-20250514"
         assert config.llm.best_model == "claude-opus-4-5-20251101"
         assert config.quality.test_coverage_threshold == 0.85

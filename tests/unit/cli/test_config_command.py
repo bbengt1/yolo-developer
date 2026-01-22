@@ -24,6 +24,7 @@ import yaml
 from typer.testing import CliRunner
 
 from yolo_developer.cli.main import app
+from yolo_developer.config import LLM_CHEAP_MODEL_DEFAULT
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -79,7 +80,7 @@ def temp_config_dir(tmp_path: Path) -> Generator[Path, None, None]:
     config_content = {
         "project_name": "test-project",
         "llm": {
-            "cheap_model": "gpt-4o-mini",
+            "cheap_model": LLM_CHEAP_MODEL_DEFAULT,
             "premium_model": "claude-sonnet-4-20250514",
             "best_model": "claude-opus-4-5-20251101",
         },
@@ -134,7 +135,7 @@ class TestConfigShowCommand:
         assert result.exit_code == 0
         output = strip_ansi(result.output)
         assert "llm" in output.lower()
-        assert "gpt-4o-mini" in output
+        assert LLM_CHEAP_MODEL_DEFAULT in output
 
     def test_show_config_displays_quality_section(self, temp_config_dir: Path) -> None:
         """Test that yolo config shows quality configuration."""
@@ -206,15 +207,15 @@ class TestConfigSetCommand:
 
     def test_set_nested_key(self, temp_config_dir: Path) -> None:
         """Test setting a nested key with dot notation."""
-        result = runner.invoke(app, ["config", "set", "llm.cheap_model", "gpt-4o"])
+        result = runner.invoke(app, ["config", "set", "llm.cheap_model", "gpt-5.2-thinking"])
         assert result.exit_code == 0
         output = strip_ansi(result.output)
-        assert "gpt-4o" in output
+        assert "gpt-5.2-thinking" in output
 
         # Verify the change was persisted
         with open(temp_config_dir / "yolo.yaml") as f:
             config = yaml.safe_load(f)
-        assert config["llm"]["cheap_model"] == "gpt-4o"
+        assert config["llm"]["cheap_model"] == "gpt-5.2-thinking"
 
     def test_set_numeric_value(self, temp_config_dir: Path) -> None:
         """Test setting a numeric value."""
@@ -247,11 +248,11 @@ class TestConfigSetCommand:
 
     def test_set_shows_before_after(self, temp_config_dir: Path) -> None:
         """Test that set command shows before/after values."""
-        result = runner.invoke(app, ["config", "set", "llm.cheap_model", "gpt-4o"])
+        result = runner.invoke(app, ["config", "set", "llm.cheap_model", "gpt-5.2-thinking"])
         assert result.exit_code == 0
         output = strip_ansi(result.output)
         # Should show old and new values
-        assert "gpt-4o-mini" in output or "gpt-4o" in output
+        assert LLM_CHEAP_MODEL_DEFAULT in output or "gpt-5.2-thinking" in output
 
     def test_set_json_output(self, temp_config_dir: Path) -> None:
         """Test set command JSON output."""

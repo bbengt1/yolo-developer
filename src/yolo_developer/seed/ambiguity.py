@@ -43,6 +43,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -653,7 +654,7 @@ Respond ONLY with the JSON object."""
 # =============================================================================
 
 # Default model for ambiguity detection
-_DEFAULT_MODEL = "gpt-4o-mini"
+_DEFAULT_MODEL = LLM_CHEAP_MODEL_DEFAULT
 _DEFAULT_TEMPERATURE = 0.1
 
 
@@ -859,7 +860,7 @@ async def detect_ambiguities(
 
     Args:
         content: The seed document content to analyze.
-        model: LiteLLM model identifier (default: gpt-4o-mini).
+            model: LiteLLM model identifier (default: routine-tier model).
         temperature: Sampling temperature (default: 0.1).
 
     Returns:

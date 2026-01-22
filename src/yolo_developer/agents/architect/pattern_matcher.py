@@ -49,6 +49,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.agents.architect.types import (
     DesignDecision,
     PatternCheckSeverity,
@@ -645,7 +646,7 @@ async def _analyze_patterns_with_llm(
     Returns:
         PatternMatchingResult if successful, None to trigger fallback.
     """
-    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", "gpt-4o-mini")
+    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", LLM_CHEAP_MODEL_DEFAULT)
 
     prompt = PATTERN_MATCHING_PROMPT.format(
         design_decisions=_format_decisions_for_llm(decisions),

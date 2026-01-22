@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from yolo_developer.config import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.seed.api import parse_seed
 from yolo_developer.seed.parser import LLMSeedParser
 from yolo_developer.seed.types import SeedSource
@@ -226,7 +227,7 @@ class TestLLMParserIntegration:
             assert result.feature_count == 2
             assert result.constraint_count == 1
             # Verify the parser was initialized with default settings
-            assert llm_parser.model == "gpt-4o-mini"
+            assert llm_parser.model == LLM_CHEAP_MODEL_DEFAULT
             assert llm_parser.temperature == 0.1
 
     @pytest.mark.asyncio

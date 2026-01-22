@@ -15,6 +15,22 @@ aux_links:
   "GitHub":
     - "https://github.com/bbengt1/yolo-developer"
 
+# Model defaults (shared across docs)
+llm_defaults:
+  cheap_model: gpt-5.2-instant
+  premium_model: claude-sonnet-4-20250514
+  best_model: claude-opus-4-5-20251101
+
+openai_defaults:
+  cheap_model: gpt-5.2-instant
+  premium_model: gpt-5.2-thinking
+  code_model: gpt-5.2-pro
+  reasoning_model: gpt-5.2-pro
+  models:
+    - gpt-5.2-pro
+    - gpt-5.2-thinking
+    - gpt-5.2-instant
+
 # Footer
 footer_content: "Copyright &copy; 2024-2026 YOLO Developer. Distributed under the MIT License."
 

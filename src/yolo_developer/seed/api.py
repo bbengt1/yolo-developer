@@ -36,6 +36,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
+
 from yolo_developer.seed.ambiguity import (
     detect_ambiguities as _detect_ambiguities,
 )
@@ -62,7 +64,7 @@ async def parse_seed(
     source: SeedSource | None = None,
     filename: str | None = None,
     *,
-    model: str = "gpt-4o-mini",
+    model: str = LLM_CHEAP_MODEL_DEFAULT,
     temperature: float = 0.1,
     preprocess: bool = True,
     detect_ambiguities: bool = False,
@@ -83,7 +85,7 @@ async def parse_seed(
         content: The raw seed document content.
         source: Optional source type override. If not provided, auto-detected.
         filename: Optional filename for format detection (e.g., "requirements.md").
-        model: LLM model to use (default: gpt-4o-mini).
+        model: LLM model to use (default: routine-tier model).
         temperature: LLM sampling temperature (default: 0.1).
         preprocess: Whether to apply format-specific preprocessing (default: True).
         detect_ambiguities: Whether to run ambiguity detection (default: False).

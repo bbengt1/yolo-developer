@@ -4,7 +4,7 @@ This module provides the LLMRouter class for routing LLM calls to the
 appropriate provider and model based on task tier.
 
 Model Tiers (per architecture):
-    - "routine": cheap_model (gpt-4o-mini) for routine tasks
+    - "routine": cheap_model (gpt-5.2-instant) for routine tasks
     - "complex": premium_model (claude-sonnet) for complex reasoning
     - "critical": best_model (claude-opus) for critical decisions
 
@@ -107,7 +107,7 @@ class LLMRouter:
             config: LLM configuration with model names and API keys.
 
         Example:
-            >>> config = LLMConfig(cheap_model="gpt-4o-mini")
+            >>> config = LLMConfig(cheap_model="gpt-5.2-instant")
             >>> router = LLMRouter(config)
         """
         self.config = config

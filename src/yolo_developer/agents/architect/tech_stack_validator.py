@@ -41,7 +41,7 @@ from yolo_developer.agents.architect.types import (
     StackPattern,
     TechStackValidation,
 )
-from yolo_developer.config import YoloConfig, load_config
+from yolo_developer.config import LLM_CHEAP_MODEL_DEFAULT, YoloConfig, load_config
 
 logger = structlog.get_logger(__name__)
 
@@ -576,8 +576,8 @@ async def _call_tech_stack_llm(prompt: str) -> str:
 
     # Note: Uses env var directly for model selection, consistent with other
     # architect modules (risk_identifier.py, adr_generator.py). This allows
-    # runtime override without config reload. Falls back to gpt-4o-mini.
-    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", "gpt-4o-mini")
+    # runtime override without config reload. Falls back to routine-tier default.
+    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", LLM_CHEAP_MODEL_DEFAULT)
 
     logger.debug("calling_tech_stack_llm", model=model, prompt_length=len(prompt))
 

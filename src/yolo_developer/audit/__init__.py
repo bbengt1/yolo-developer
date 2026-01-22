@@ -180,7 +180,7 @@ Example (Token/Cost Tracking):
     >>>
     >>> # Record an LLM call
     >>> record = await service.record_llm_call(
-    ...     model="gpt-4o-mini",
+    ...     model="gpt-5.2-instant",
     ...     tier="routine",
     ...     prompt_tokens=100,
     ...     completion_tokens=50,

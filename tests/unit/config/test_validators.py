@@ -10,7 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from yolo_developer.config import load_config
+from yolo_developer.config import (
+    LLM_CHEAP_MODEL_DEFAULT,
+    OPENAI_CHEAP_MODEL_DEFAULT,
+    OPENAI_CODE_MODEL_DEFAULT,
+    OPENAI_PREMIUM_MODEL_DEFAULT,
+    load_config,
+)
 from yolo_developer.config.loader import ConfigurationError
 from yolo_developer.config.schema import LLMConfig, YoloConfig
 from yolo_developer.config.validators import (
@@ -97,7 +103,7 @@ class TestRequiredFieldValidation:
     def test_missing_project_name_produces_error(self, tmp_path: Path) -> None:
         """Missing project_name raises ConfigurationError."""
         yaml_file = tmp_path / "yolo.yaml"
-        yaml_file.write_text("llm:\n  cheap_model: gpt-4o-mini\n")
+        yaml_file.write_text(f"llm:\n  cheap_model: {LLM_CHEAP_MODEL_DEFAULT}\n")
 
         with pytest.raises(ConfigurationError) as exc_info:
             load_config(yaml_file)
@@ -240,9 +246,9 @@ class TestAPIKeyValidation:
         yaml_file.write_text(
             "project_name: test\n"
             "llm:\n"
-            "  cheap_model: gpt-4o-mini\n"
-            "  premium_model: gpt-4o\n"
-            "  best_model: gpt-4o\n"
+            f"  cheap_model: {OPENAI_CHEAP_MODEL_DEFAULT}\n"
+            f"  premium_model: {OPENAI_PREMIUM_MODEL_DEFAULT}\n"
+            f"  best_model: {OPENAI_CODE_MODEL_DEFAULT}\n"
         )
 
         with caplog.at_level(logging.WARNING):
@@ -251,7 +257,12 @@ class TestAPIKeyValidation:
         # Should have logged warning about missing OpenAI key
         warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("openai" in msg.lower() for msg in warning_messages)
-        assert any("gpt-4o-mini" in msg or "gpt-4o" in msg for msg in warning_messages)
+        assert any(
+            OPENAI_CHEAP_MODEL_DEFAULT in msg
+            or OPENAI_PREMIUM_MODEL_DEFAULT in msg
+            or OPENAI_CODE_MODEL_DEFAULT in msg
+            for msg in warning_messages
+        )
 
     def test_anthropic_model_without_key_produces_warning(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
@@ -284,9 +295,9 @@ class TestAPIKeyValidation:
         yaml_file.write_text(
             "project_name: test\n"
             "llm:\n"
-            "  cheap_model: gpt-4o-mini\n"
-            "  premium_model: gpt-4o\n"
-            "  best_model: gpt-4o\n"
+            f"  cheap_model: {OPENAI_CHEAP_MODEL_DEFAULT}\n"
+            f"  premium_model: {OPENAI_PREMIUM_MODEL_DEFAULT}\n"
+            f"  best_model: {OPENAI_CODE_MODEL_DEFAULT}\n"
         )
         monkeypatch.setenv("YOLO_LLM__OPENAI_API_KEY", "sk-test-key")
 
@@ -350,7 +361,7 @@ class TestComprehensiveErrorCollection:
         yaml_file.write_text(
             "project_name: test-project\n"
             "llm:\n"
-            "  cheap_model: gpt-4o-mini\n"
+            f"  cheap_model: {LLM_CHEAP_MODEL_DEFAULT}\n"
             "  premium_model: claude-sonnet-4-20250514\n"
             "  best_model: claude-opus-4-5-20251101\n"
             "quality:\n"
@@ -367,7 +378,7 @@ class TestComprehensiveErrorCollection:
         config = load_config(yaml_file)
 
         assert config.project_name == "test-project"
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
         assert config.quality.test_coverage_threshold == 0.80
 
 
@@ -385,7 +396,7 @@ class TestValidateConfigFunction:
         config = YoloConfig(
             project_name="test",
             llm=LLMConfig(
-                cheap_model="gpt-4o-mini",
+                cheap_model=LLM_CHEAP_MODEL_DEFAULT,
                 premium_model="claude-sonnet-4-20250514",
                 best_model="claude-opus-4-5-20251101",
             ),
@@ -403,7 +414,7 @@ class TestValidateConfigFunction:
         """validate_config returns is_valid=True even with warnings."""
         config = YoloConfig(
             project_name="test",
-            llm=LLMConfig(cheap_model="gpt-4o-mini"),
+            llm=LLMConfig(cheap_model=LLM_CHEAP_MODEL_DEFAULT),
         )
         result = validate_config(config)
 

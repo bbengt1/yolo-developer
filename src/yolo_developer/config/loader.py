@@ -55,7 +55,7 @@ def load_config(config_path: Path | None = None) -> YoloConfig:
         >>> config = load_config()  # Loads from ./yolo.yaml if it exists
         >>> config = load_config(Path("/path/to/custom.yaml"))
         >>> config.llm.cheap_model
-        'gpt-4o-mini'
+        'gpt-5.2-instant'
     """
     yaml_data: dict[str, Any] = {}
 

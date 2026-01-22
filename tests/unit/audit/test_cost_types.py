@@ -105,7 +105,7 @@ class TestCostRecord:
         record = CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -114,7 +114,7 @@ class TestCostRecord:
         )
 
         assert record.id == "cost-001"
-        assert record.model == "gpt-4o-mini"
+        assert record.model == "gpt-5.2-instant"
         assert record.tier == "routine"
         assert record.cost_usd == 0.0015
         assert record.agent_name == "analyst"
@@ -150,7 +150,7 @@ class TestCostRecord:
         record = CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -167,7 +167,7 @@ class TestCostRecord:
         record = CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -180,7 +180,7 @@ class TestCostRecord:
 
         assert result["id"] == "cost-001"
         assert result["timestamp"] == "2026-01-18T12:00:00Z"
-        assert result["model"] == "gpt-4o-mini"
+        assert result["model"] == "gpt-5.2-instant"
         assert result["tier"] == "routine"
         assert result["token_usage"] == {
             "prompt_tokens": 100,
@@ -200,7 +200,7 @@ class TestCostRecord:
         CostRecord(
             id="",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -216,7 +216,7 @@ class TestCostRecord:
         CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="invalid_tier",
             token_usage=usage,
             cost_usd=0.0015,
@@ -232,7 +232,7 @@ class TestCostRecord:
         CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=-0.001,
@@ -264,7 +264,7 @@ class TestCostRecord:
         CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -280,7 +280,7 @@ class TestCostRecord:
         CostRecord(
             id="cost-001",
             timestamp="2026-01-18T12:00:00Z",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             token_usage=usage,
             cost_usd=0.0015,
@@ -302,7 +302,7 @@ class TestCostAggregation:
             total_tokens=1500,
             total_cost_usd=0.015,
             call_count=10,
-            models=("gpt-4o-mini", "claude-sonnet-4-20250514"),
+            models=("gpt-5.2-instant", "claude-sonnet-4-20250514"),
         )
 
         assert agg.total_prompt_tokens == 1000
@@ -310,7 +310,7 @@ class TestCostAggregation:
         assert agg.total_tokens == 1500
         assert agg.total_cost_usd == 0.015
         assert agg.call_count == 10
-        assert agg.models == ("gpt-4o-mini", "claude-sonnet-4-20250514")
+        assert agg.models == ("gpt-5.2-instant", "claude-sonnet-4-20250514")
         assert agg.period_start is None
         assert agg.period_end is None
 
@@ -322,7 +322,7 @@ class TestCostAggregation:
             total_tokens=1500,
             total_cost_usd=0.015,
             call_count=10,
-            models=("gpt-4o-mini",),
+            models=("gpt-5.2-instant",),
             period_start="2026-01-01T00:00:00Z",
             period_end="2026-01-18T23:59:59Z",
         )
@@ -338,7 +338,7 @@ class TestCostAggregation:
             total_tokens=1500,
             total_cost_usd=0.015,
             call_count=10,
-            models=("gpt-4o-mini",),
+            models=("gpt-5.2-instant",),
         )
 
         with pytest.raises(AttributeError):
@@ -352,7 +352,7 @@ class TestCostAggregation:
             total_tokens=1500,
             total_cost_usd=0.015,
             call_count=10,
-            models=("gpt-4o-mini", "claude-sonnet-4-20250514"),
+            models=("gpt-5.2-instant", "claude-sonnet-4-20250514"),
             period_start="2026-01-01T00:00:00Z",
             period_end="2026-01-18T23:59:59Z",
         )
@@ -365,7 +365,7 @@ class TestCostAggregation:
             "total_tokens": 1500,
             "total_cost_usd": 0.015,
             "call_count": 10,
-            "models": ["gpt-4o-mini", "claude-sonnet-4-20250514"],
+            "models": ["gpt-5.2-instant", "claude-sonnet-4-20250514"],
             "period_start": "2026-01-01T00:00:00Z",
             "period_end": "2026-01-18T23:59:59Z",
         }

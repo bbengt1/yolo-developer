@@ -13,7 +13,7 @@ Example:
     >>> store = InMemoryCostStore()
     >>> service = get_cost_tracking_service(store)
     >>> record = await service.record_llm_call(
-    ...     model="gpt-4o-mini",
+    ...     model="gpt-5.2-instant",
     ...     tier="routine",
     ...     prompt_tokens=100,
     ...     completion_tokens=50,
@@ -62,7 +62,7 @@ class CostTrackingService:
     Example:
         >>> service = CostTrackingService(cost_store)
         >>> record = await service.record_llm_call(
-        ...     model="gpt-4o-mini",
+        ...     model="gpt-5.2-instant",
         ...     tier="routine",
         ...     prompt_tokens=100,
         ...     completion_tokens=50,
@@ -105,7 +105,7 @@ class CostTrackingService:
         if tracking is enabled.
 
         Args:
-            model: LLM model identifier (e.g., "gpt-4o-mini")
+            model: LLM model identifier (e.g., "gpt-5.2-instant")
             tier: Model tier (routine, complex, critical)
             prompt_tokens: Number of prompt tokens
             completion_tokens: Number of completion tokens

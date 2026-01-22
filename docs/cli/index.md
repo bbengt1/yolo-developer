@@ -636,13 +636,13 @@ yolo config show
 project_name: my-api
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   openai_api_key: "**********" (configured)
   anthropic_api_key: "**********" (configured)
   openai:
-    code_model: gpt-4o
+    code_model: {{ site.openai_defaults.code_model }}
   hybrid:
     enabled: false
 quality:
@@ -669,7 +669,7 @@ yolo config get llm.premium_model
 
 **Output:**
 ```
-claude-sonnet-4-20250514
+{{ site.llm_defaults.premium_model }}
 ```
 
 **Validate configuration:**

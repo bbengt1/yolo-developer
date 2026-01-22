@@ -38,6 +38,7 @@ from typing import Any
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
 from yolo_developer.agents.architect.types import (
     ADR,
     DesignDecision,
@@ -369,7 +370,7 @@ async def _call_adr_llm(prompt: str) -> dict[str, Any]:
     logger.debug("adr_llm_call_start", prompt_length=len(prompt))
 
     # Use configurable model via environment variable
-    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", "gpt-4o-mini")
+    model = os.environ.get("YOLO_LLM__ROUTINE_MODEL", LLM_CHEAP_MODEL_DEFAULT)
 
     response = await litellm.acompletion(
         model=model,

@@ -12,7 +12,7 @@ Example:
     >>> from yolo_developer.audit.cost_utils import extract_token_usage, extract_cost
     >>>
     >>> # After an LLM call
-    >>> response = await acompletion(model="gpt-4o-mini", messages=[...])
+    >>> response = await acompletion(model="gpt-5.2-instant", messages=[...])
     >>> token_usage = extract_token_usage(response)
     >>> cost_usd = extract_cost(response)
     >>>
@@ -57,7 +57,7 @@ def extract_token_usage(response: Any) -> TokenUsage:
         Returns zeros if usage data is unavailable.
 
     Example:
-        >>> response = await acompletion(model="gpt-4o-mini", messages=[...])
+        >>> response = await acompletion(model="gpt-5.2-instant", messages=[...])
         >>> usage = extract_token_usage(response)
         >>> print(f"Used {usage.total_tokens} tokens")
     """
@@ -105,7 +105,7 @@ def extract_cost(response: Any) -> float:
         - Value is not a valid number
 
     Example:
-        >>> response = await acompletion(model="gpt-4o-mini", messages=[...])
+        >>> response = await acompletion(model="gpt-5.2-instant", messages=[...])
         >>> cost = extract_cost(response)
         >>> print(f"Cost: ${cost:.4f}")
     """
@@ -137,7 +137,7 @@ def calculate_cost_if_missing(response: Any) -> float:
         This function requires the litellm package to be installed.
 
     Example:
-        >>> response = await acompletion(model="gpt-4o-mini", messages=[...])
+        >>> response = await acompletion(model="gpt-5.2-instant", messages=[...])
         >>> cost = calculate_cost_if_missing(response)  # Calculates if needed
     """
     if response is None:

@@ -23,7 +23,7 @@ def _make_usage(prompt: int = 100, completion: int = 50) -> TokenUsage:
 
 def _make_record(
     cost_id: str = "cost-001",
-    model: str = "gpt-4o-mini",
+    model: str = "gpt-5.2-instant",
     tier: str = "routine",
     cost_usd: float = 0.0015,
     agent_name: str = "analyst",
@@ -63,7 +63,7 @@ class TestInMemoryCostStoreBasics:
 
         assert result is not None
         assert result.id == "cost-001"
-        assert result.model == "gpt-4o-mini"
+        assert result.model == "gpt-5.2-instant"
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_cost(self) -> None:
@@ -137,14 +137,14 @@ class TestInMemoryCostStoreFiltering:
     async def test_filter_by_model(self) -> None:
         """Test filtering costs by model."""
         store = InMemoryCostStore()
-        await store.store_cost(_make_record(cost_id="cost-001", model="gpt-4o-mini"))
+        await store.store_cost(_make_record(cost_id="cost-001", model="gpt-5.2-instant"))
         await store.store_cost(_make_record(cost_id="cost-002", model="claude-sonnet"))
 
-        filters = CostFilters(model="gpt-4o-mini")
+        filters = CostFilters(model="gpt-5.2-instant")
         costs = await store.get_costs(filters)
 
         assert len(costs) == 1
-        assert costs[0].model == "gpt-4o-mini"
+        assert costs[0].model == "gpt-5.2-instant"
 
     @pytest.mark.asyncio
     async def test_filter_by_tier(self) -> None:
@@ -223,7 +223,7 @@ class TestInMemoryCostStoreAggregation:
                 prompt_tokens=100,
                 completion_tokens=50,
                 cost_usd=0.0015,
-                model="gpt-4o-mini",
+                model="gpt-5.2-instant",
             )
         )
 
@@ -234,7 +234,7 @@ class TestInMemoryCostStoreAggregation:
         assert agg.total_tokens == 150
         assert agg.total_cost_usd == pytest.approx(0.0015)
         assert agg.call_count == 1
-        assert agg.models == ("gpt-4o-mini",)
+        assert agg.models == ("gpt-5.2-instant",)
 
     @pytest.mark.asyncio
     async def test_get_aggregation_multiple_records(self) -> None:
@@ -246,7 +246,7 @@ class TestInMemoryCostStoreAggregation:
                 prompt_tokens=100,
                 completion_tokens=50,
                 cost_usd=0.0015,
-                model="gpt-4o-mini",
+                model="gpt-5.2-instant",
             )
         )
         await store.store_cost(
@@ -264,7 +264,7 @@ class TestInMemoryCostStoreAggregation:
                 prompt_tokens=50,
                 completion_tokens=25,
                 cost_usd=0.0008,
-                model="gpt-4o-mini",
+                model="gpt-5.2-instant",
             )
         )
 
@@ -276,7 +276,7 @@ class TestInMemoryCostStoreAggregation:
         assert agg.total_cost_usd == pytest.approx(0.0173)
         assert agg.call_count == 3
         # Models should be unique
-        assert set(agg.models) == {"gpt-4o-mini", "claude-sonnet"}
+        assert set(agg.models) == {"gpt-5.2-instant", "claude-sonnet"}
 
     @pytest.mark.asyncio
     async def test_get_aggregation_with_filters(self) -> None:
@@ -361,19 +361,19 @@ class TestInMemoryCostStoreGroupedAggregation:
         """Test grouped aggregation by model."""
         store = InMemoryCostStore()
         await store.store_cost(
-            _make_record(cost_id="cost-001", model="gpt-4o-mini", cost_usd=0.001)
+            _make_record(cost_id="cost-001", model="gpt-5.2-instant", cost_usd=0.001)
         )
         await store.store_cost(
             _make_record(cost_id="cost-002", model="claude-sonnet", cost_usd=0.01)
         )
         await store.store_cost(
-            _make_record(cost_id="cost-003", model="gpt-4o-mini", cost_usd=0.002)
+            _make_record(cost_id="cost-003", model="gpt-5.2-instant", cost_usd=0.002)
         )
 
         result = await store.get_grouped_aggregation("model")
 
         assert len(result) == 2
-        assert result["gpt-4o-mini"].call_count == 2
+        assert result["gpt-5.2-instant"].call_count == 2
         assert result["claude-sonnet"].call_count == 1
 
     @pytest.mark.asyncio

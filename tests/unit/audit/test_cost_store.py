@@ -41,7 +41,7 @@ class TestCostFilters:
             story_id="1-2-user-auth",
             sprint_id="sprint-1",
             session_id="session-123",
-            model="gpt-4o-mini",
+            model="gpt-5.2-instant",
             tier="routine",
             start_time="2026-01-01T00:00:00Z",
             end_time="2026-01-18T23:59:59Z",
@@ -51,7 +51,7 @@ class TestCostFilters:
         assert filters.story_id == "1-2-user-auth"
         assert filters.sprint_id == "sprint-1"
         assert filters.session_id == "session-123"
-        assert filters.model == "gpt-4o-mini"
+        assert filters.model == "gpt-5.2-instant"
         assert filters.tier == "routine"
         assert filters.start_time == "2026-01-01T00:00:00Z"
         assert filters.end_time == "2026-01-18T23:59:59Z"

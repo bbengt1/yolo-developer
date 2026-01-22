@@ -3,10 +3,10 @@ name = "yolo-developer"
 version = "0.1.0"
 description = "Autonomous multi-agent AI development system using BMad Method"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "YOLO Developer", email = "dev@example.com"}
+    {name = "bbengt1", email = "brent.bengtson@gmail.com"}
 ]
 keywords = ["ai", "agents", "development", "automation"]
 classifiers = [
@@ -34,10 +34,6 @@ dependencies = [
     "pyyaml",
     "python-dotenv",
     "fastmcp>=2.0.0",
-    "reportlab>=4.4.9",
-    "fastapi",
-    "uvicorn",
-    "python-multipart",
 ]
 
 [project.optional-dependencies]
@@ -47,14 +43,11 @@ dev = [
     "pytest-cov",
     "ruff",
     "mypy",
-    "types-PyYAML",
     "langsmith",
-    "pre-commit",
 ]
 
 [project.scripts]
 yolo = "yolo_developer.cli.main:app"
-yolo-mcp = "yolo_developer.mcp:run_server"
 
 [build-system]
 requires = ["hatchling"]
@@ -66,61 +59,16 @@ packages = ["src/yolo_developer"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-exclude = [
-    ".git",
-    ".mypy_cache",
-    ".ruff_cache",
-    "__pycache__",
-    "*.egg-info",
-]
 
 [tool.ruff.lint]
-select = [
-    "E",    # pycodestyle errors
-    "F",    # pyflakes
-    "I",    # isort
-    "N",    # pep8-naming
-    "W",    # pycodestyle warnings
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "DTZ",  # flake8-datetimez
-    "RUF",  # ruff-specific rules
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-]
-
-[tool.ruff.lint.isort]
-known-first-party = ["yolo_developer"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
+select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-show_error_codes = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]

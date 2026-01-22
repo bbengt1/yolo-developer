@@ -7,6 +7,11 @@ from typing import get_type_hints
 import pytest
 from pydantic import ValidationError
 
+from yolo_developer.config import (
+    LLM_BEST_MODEL_DEFAULT,
+    LLM_CHEAP_MODEL_DEFAULT,
+    LLM_PREMIUM_MODEL_DEFAULT,
+)
 
 class TestLLMConfig:
     """Tests for LLMConfig nested model (Task 1)."""
@@ -23,7 +28,7 @@ class TestLLMConfig:
 
         config = LLMConfig()
         assert hasattr(config, "cheap_model")
-        assert config.cheap_model == "gpt-4o-mini"
+        assert config.cheap_model == LLM_CHEAP_MODEL_DEFAULT
 
     def test_llm_config_has_premium_model_field(self) -> None:
         """Verify LLMConfig has premium_model field with correct default."""
@@ -31,7 +36,7 @@ class TestLLMConfig:
 
         config = LLMConfig()
         assert hasattr(config, "premium_model")
-        assert config.premium_model == "claude-sonnet-4-20250514"
+        assert config.premium_model == LLM_PREMIUM_MODEL_DEFAULT
 
     def test_llm_config_has_best_model_field(self) -> None:
         """Verify LLMConfig has best_model field with correct default."""
@@ -39,7 +44,7 @@ class TestLLMConfig:
 
         config = LLMConfig()
         assert hasattr(config, "best_model")
-        assert config.best_model == "claude-opus-4-5-20251101"
+        assert config.best_model == LLM_BEST_MODEL_DEFAULT
 
     def test_llm_config_fields_have_type_hints(self) -> None:
         """Verify all LLMConfig fields have type hints."""
@@ -287,7 +292,7 @@ class TestYoloConfig:
 
         config = YoloConfig(project_name="test")
         assert hasattr(config, "llm")
-        assert config.llm.cheap_model == "gpt-4o-mini"
+        assert config.llm.cheap_model == LLM_CHEAP_MODEL_DEFAULT
 
     def test_yolo_config_has_nested_quality_config(self) -> None:
         """Verify YoloConfig has nested quality configuration."""

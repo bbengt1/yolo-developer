@@ -14,7 +14,7 @@ Example:
     >>> record = CostRecord(
     ...     id="cost-001",
     ...     timestamp="2026-01-18T12:00:00Z",
-    ...     model="gpt-4o-mini",
+    ...     model="gpt-5.2-instant",
     ...     tier="routine",
     ...     token_usage=usage,
     ...     cost_usd=0.0015,

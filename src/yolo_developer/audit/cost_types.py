@@ -141,7 +141,7 @@ class CostRecord:
     Attributes:
         id: Unique identifier for the cost record (UUID)
         timestamp: ISO 8601 timestamp when the call was made
-        model: LLM model identifier (e.g., "gpt-4o-mini")
+        model: LLM model identifier (e.g., "gpt-5.2-instant")
         tier: Model tier per ADR-003 (routine, complex, critical)
         token_usage: Token counts for this call
         cost_usd: Cost in USD for this call
@@ -156,7 +156,7 @@ class CostRecord:
         >>> record = CostRecord(
         ...     id="cost-001",
         ...     timestamp="2026-01-18T12:00:00Z",
-        ...     model="gpt-4o-mini",
+        ...     model="gpt-5.2-instant",
         ...     tier="routine",
         ...     token_usage=usage,
         ...     cost_usd=0.0015,
@@ -249,7 +249,7 @@ class CostAggregation:
         ...     total_tokens=1500,
         ...     total_cost_usd=0.015,
         ...     call_count=10,
-        ...     models=("gpt-4o-mini",),
+        ...     models=("gpt-5.2-instant",),
         ... )
         >>> agg.total_cost_usd
         0.015

@@ -345,13 +345,13 @@ YOLO Developer v0.1.0
 project_name: null
 llm:
   provider: auto
-  cheap_model: gpt-4o-mini
-  premium_model: claude-sonnet-4-20250514
-  best_model: claude-opus-4-5-20251101
+  cheap_model: {{ site.llm_defaults.cheap_model }}
+  premium_model: {{ site.llm_defaults.premium_model }}
+  best_model: {{ site.llm_defaults.best_model }}
   openai_api_key: "**********" (configured)
   anthropic_api_key: "**********" (configured)
   openai:
-    code_model: gpt-4o
+    code_model: {{ site.openai_defaults.code_model }}
   hybrid:
     enabled: false
 quality:

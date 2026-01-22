@@ -289,7 +289,7 @@ class YoloClient:
         Validation runs before applying changes.
 
         Args:
-            llm: Partial LLM configuration to update (e.g., {"cheap_model": "gpt-4o"}).
+            llm: Partial LLM configuration to update (e.g., {"cheap_model": "gpt-5.2-instant"}).
             quality: Partial quality configuration to update.
             memory: Partial memory configuration to update.
             project_name: New project name.
@@ -312,7 +312,7 @@ class YoloClient:
             >>>
             >>> # Update multiple sections
             >>> result = client.update_config(
-            ...     llm={"cheap_model": "gpt-4o"},
+            ...     llm={"cheap_model": "gpt-5.2-instant"},
             ...     quality={"confidence_threshold": 0.95}
             ... )
         """
@@ -662,7 +662,7 @@ project_name: {name}
 # LLM Provider Configuration
 llm:
   # Model for routine, low-complexity tasks
-  cheap_model: gpt-4o-mini
+  cheap_model: gpt-5.2-instant
 
   # Model for complex reasoning tasks
   premium_model: claude-sonnet-4-20250514
