@@ -53,6 +53,7 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo config`](#yolo-config) | Manage project configuration |
 | [`yolo tune`](#yolo-tune) | Adjust quality thresholds |
 | [`yolo mcp`](#yolo-mcp) | Start MCP server for Claude Code |
+| [`yolo scan`](#yolo-scan) | Scan existing project for brownfield context |
 
 ---
 
@@ -63,7 +64,7 @@ Initialize a new YOLO Developer project in the current directory.
 ### Synopsis
 
 ```bash
-yolo init [OPTIONS]
+yolo init [OPTIONS] [PATH]
 ```
 
 ### Options
@@ -71,12 +72,14 @@ yolo init [OPTIONS]
 | Option | Type | Default | Description |
 |:-------|:-----|:--------|:------------|
 | `--name, -n` | TEXT | Directory name | Project name |
-| `--language, -l` | TEXT | python | Primary programming language |
-| `--framework` | TEXT | None | Web framework (if applicable) |
-| `--test-framework` | TEXT | pytest | Test framework |
-| `--force, -f` | FLAG | False | Overwrite existing configuration |
-| `--reinit` | FLAG | False | Reinitialize memory store |
-| `--no-interactive` | FLAG | False | Skip interactive prompts |
+| `--author, -a` | TEXT | git config | Author name for pyproject.toml |
+| `--email, -e` | TEXT | git config | Author email for pyproject.toml |
+| `--interactive, -i` | FLAG | False | Prompt for project details |
+| `--no-input` | FLAG | False | Use defaults without prompting |
+| `--existing, --brownfield` | FLAG | False | Add YOLO to existing project |
+| `--scan-only` | FLAG | False | Scan existing project without changes |
+| `--non-interactive` | FLAG | False | Skip brownfield prompts |
+| `--hint` | TEXT | None | Hint about project type |
 
 ### Examples
 
@@ -90,8 +93,8 @@ yolo init
 Initializing YOLO Developer project...
 
 ? Project name: my-api
-? Primary language: Python
-? Test framework: pytest
+? Author name: Developer
+? Author email: dev@example.com
 
 Creating configuration...
   ✓ Created yolo.yaml
@@ -101,18 +104,15 @@ Creating configuration...
 Project initialized successfully!
 ```
 
-**Non-interactive initialization:**
+**Brownfield initialization:**
 ```bash
-yolo init --name my-api --language python --no-interactive
+yolo init --brownfield
 ```
 
-**Reinitialize memory (clear existing data):**
+**Scan only (no changes):**
 ```bash
-yolo init --reinit
+yolo init --brownfield --scan-only
 ```
-
-{: .warning }
-> `--reinit` will delete all existing memory data including learned patterns.
 
 ### Files Created
 
@@ -798,6 +798,38 @@ See [MCP Integration](/yolo-developer/mcp/) for detailed usage.
 
 ---
 
+## yolo scan
+
+Scan an existing repository and optionally write `.yolo/project-context.yaml`.
+
+### Synopsis
+
+```bash
+yolo scan [OPTIONS] [PATH]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|:-------|:-----|:--------|:------------|
+| `--scan-depth` | INT | 3 | Directory depth to scan |
+| `--max-files` | INT | 1000 | Maximum files to analyze |
+| `--git-history/--no-git-history` | FLAG | from config | Include git history analysis |
+| `--interactive, -i` | FLAG | False | Prompt for ambiguous findings |
+| `--hint` | TEXT | None | Hint about project type |
+| `--refresh` | FLAG | False | Overwrite existing project-context.yaml |
+| `--write-context/--no-write-context` | FLAG | True | Write project context file |
+
+### Examples
+
+```bash
+yolo scan
+yolo scan --refresh
+yolo scan --max-files 200 --scan-depth 4
+```
+
+---
+
 ## Exit Codes
 
 | Code | Description |
@@ -833,6 +865,8 @@ All configuration can be overridden via environment variables using the `YOLO_` 
 | `YOLO_MEMORY__PERSIST_PATH` | Memory storage path |
 | `YOLO_MEMORY__VECTOR_STORE_TYPE` | Vector store backend |
 | `YOLO_MEMORY__GRAPH_STORE_TYPE` | Graph store backend |
+| `YOLO_BROWNFIELD__SCAN_DEPTH` | Brownfield scan depth |
+| `YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE` | Brownfield scan file limit |
 
 ---
 

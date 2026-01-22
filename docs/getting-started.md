@@ -149,6 +149,23 @@ This creates:
 
 ---
 
+## Brownfield Option: Scan an Existing Project
+
+If you are adding YOLO Developer to an existing repository:
+
+```bash
+cd /path/to/existing/project
+uv run yolo init --brownfield
+```
+
+To scan without changing the repo:
+
+```bash
+uv run yolo init --brownfield --scan-only
+```
+
+YOLO will generate `.yolo/project-context.yaml` to capture detected language, frameworks, structure, and conventions for the agents.
+
 ## Step 4: Create Requirements
 
 Create a requirements document. YOLO Developer accepts Markdown or plain text:

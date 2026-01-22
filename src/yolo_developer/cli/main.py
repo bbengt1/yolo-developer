@@ -9,6 +9,7 @@ from rich.console import Console
 
 from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.mcp import app as mcp_app
+from yolo_developer.cli.commands.scan import scan_command
 from yolo_developer.cli.commands.seed import seed_command
 
 app = typer.Typer(
@@ -57,7 +58,23 @@ def init(
     existing: bool = typer.Option(
         False,
         "--existing",
+        "--brownfield",
         help="Add YOLO to an existing project (brownfield mode).",
+    ),
+    scan_only: bool = typer.Option(
+        False,
+        "--scan-only",
+        help="Scan brownfield project without making changes.",
+    ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        help="Skip prompts during brownfield scanning.",
+    ),
+    hint: str | None = typer.Option(
+        None,
+        "--hint",
+        help="Hint about project type (e.g., 'fastapi api').",
     ),
 ) -> None:
     """Initialize a new YOLO Developer project.
@@ -81,6 +98,65 @@ def init(
         interactive=interactive,
         no_input=no_input,
         existing=existing,
+        scan_only=scan_only,
+        non_interactive=non_interactive,
+        hint=hint,
+    )
+
+
+@app.command("scan")
+def scan(
+    path: str | None = typer.Argument(
+        None,
+        help="Directory to scan. Defaults to current directory.",
+    ),
+    scan_depth: int | None = typer.Option(
+        None,
+        "--scan-depth",
+        help="Directory depth to scan.",
+    ),
+    max_files: int | None = typer.Option(
+        None,
+        "--max-files",
+        help="Maximum files to analyze.",
+    ),
+    include_git_history: bool | None = typer.Option(
+        None,
+        "--git-history/--no-git-history",
+        help="Include git history analysis.",
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Prompt for ambiguous findings.",
+    ),
+    hint: str | None = typer.Option(
+        None,
+        "--hint",
+        help="Hint about project type (e.g., 'fastapi api').",
+    ),
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help="Overwrite existing project-context.yaml.",
+    ),
+    write_context: bool = typer.Option(
+        True,
+        "--write-context/--no-write-context",
+        help="Write project-context.yaml to .yolo directory.",
+    ),
+) -> None:
+    """Scan an existing project for brownfield context."""
+    scan_command(
+        path=path,
+        scan_depth=scan_depth,
+        max_files=max_files,
+        include_git_history=include_git_history,
+        interactive=interactive,
+        hint=hint,
+        refresh=refresh,
+        write_context=write_context,
     )
 
 

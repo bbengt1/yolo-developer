@@ -41,6 +41,9 @@ Every agent output passes through configurable quality gates that enforce standa
 ### Memory & Learning
 ChromaDB-backed vector storage enables semantic search across decisions, while pattern learning automatically detects your codebase conventions.
 
+### Brownfield Support
+Scan existing projects to detect language, frameworks, structure, and testing setup, then generate `.yolo/project-context.yaml` for agent guidance.
+
 ### Full Observability
 Complete audit trail with decision logging, token cost tracking, and requirement traceability from seed to implementation.
 
@@ -106,6 +109,9 @@ All configuration options, environment variables, and best practices.
 ### [Architecture](/yolo-developer/architecture/)
 Deep dive into agents, orchestration, memory, and quality gates.
 
+### [Brownfield Guide](/yolo-developer/guides/brownfield)
+Scan and integrate existing projects with generated context.
+
 </div>
 
 ---
@@ -129,6 +135,7 @@ Deep dive into agents, orchestration, memory, and quality gates.
 |:-----|:-------|:------------|
 | 1-13 | ✅ Complete | Core infrastructure, all agents, CLI, SDK |
 | 14 | ✅ Complete | MCP integration + Codex compatibility |
+| 2 | ✅ Complete | Brownfield project support |
 
 ### Recently Completed
 
@@ -161,7 +168,6 @@ Deep dive into agents, orchestration, memory, and quality gates.
 
 | Issue | Feature | Description |
 |:------|:--------|:------------|
-| [#2](https://github.com/bbengt1/yolo-developer/issues/2) | **Brownfield Support** | Add YOLO to existing projects with deep codebase scanning |
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | **Plugin System** | Create and integrate custom agents into the workflow |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | **Course Correction** | Mid-sprint requirement changes with impact analysis |
 | [#12](https://github.com/bbengt1/yolo-developer/issues/12) | **GitHub Management** | Full Git/GitHub workflow: commits, PRs, issues, releases |

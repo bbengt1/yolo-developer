@@ -53,6 +53,11 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Session Persistence**: Context preservation across agent handoffs
 - **Project Isolation**: Multi-tenant support with data separation
 
+### Brownfield Support
+- **Existing Project Scan**: Detect language, frameworks, build tools, and tests
+- **Context Generation**: Create `.yolo/project-context.yaml` for agent guidance
+- **Non-Interactive Mode**: Scan with defaults when CI or scripts require it
+
 ### Observability
 - **Audit Trail**: Complete decision logging with traceability
 - **Token Cost Tracking**: LLM usage monitoring per agent
@@ -100,6 +105,16 @@ yolo init
 
 # Or specify a project name
 yolo init --name my-project
+```
+
+### Brownfield: Add YOLO to Existing Project
+
+```bash
+# Scan and initialize an existing repo
+yolo init --brownfield
+
+# Scan only (no changes)
+yolo init --brownfield --scan-only
 ```
 
 ### 2. Configure API Keys
@@ -150,6 +165,7 @@ yolo logs
 | `yolo config` | Manage project configuration |
 | `yolo tune` | Adjust quality thresholds |
 | `yolo mcp` | Start MCP server for Claude Code |
+| `yolo scan` | Scan existing project for brownfield context |
 
 Run `yolo <command> --help` for detailed usage.
 
@@ -449,6 +465,7 @@ tests/
 |------|--------|-------------|
 | 1-13 | ✅ **Complete** | Core infrastructure, all agents, CLI, SDK |
 | 14 | ✅ **Complete** | MCP integration + Codex compatibility |
+| 2 | ✅ **Complete** | Brownfield project support |
 
 ### Recently Completed
 
@@ -477,7 +494,6 @@ tests/
 #### Core Enhancements
 | Issue | Feature | Labels |
 |-------|---------|--------|
-| [#2](https://github.com/bbengt1/yolo-developer/issues/2) | Brownfield Project Support | `enhancement` `epic` |
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
 | [#12](https://github.com/bbengt1/yolo-developer/issues/12) | GitHub Repository Management | `enhancement` `epic` `github-integration` |

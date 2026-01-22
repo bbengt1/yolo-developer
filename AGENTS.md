@@ -37,3 +37,4 @@
 ## Agent-Specific Instructions
 - This repo follows BMad workflows in `_bmad/bmm/workflows/`; sprint status is tracked in `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 - After completing any user story or issue, update all documentation to reflect the change, including the root `README.md` and GitHub Pages docs in `docs/`.
+- After completing any issue, close it out with comments describing what was done.

@@ -265,6 +265,34 @@ memory:
 
 ---
 
+### brownfield
+
+Brownfield scanning configuration for existing projects.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `scan_depth` | int | 3 | `YOLO_BROWNFIELD__SCAN_DEPTH` | Directory depth to scan |
+| `exclude_patterns` | list | node_modules, .git, __pycache__, .venv, venv | `YOLO_BROWNFIELD__EXCLUDE_PATTERNS` | Patterns to skip during scan |
+| `include_git_history` | bool | true | `YOLO_BROWNFIELD__INCLUDE_GIT_HISTORY` | Include git metadata |
+| `max_files_to_analyze` | int | 1000 | `YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE` | File limit for scanning |
+| `interactive` | bool | true | `YOLO_BROWNFIELD__INTERACTIVE` | Prompt for ambiguous findings |
+
+```yaml
+brownfield:
+  scan_depth: 3
+  exclude_patterns:
+    - node_modules
+    - .git
+    - __pycache__
+    - .venv
+    - venv
+  include_git_history: true
+  max_files_to_analyze: 1000
+  interactive: true
+```
+
+---
+
 ### agents
 
 Agent execution configuration.
@@ -418,6 +446,10 @@ export YOLO_ORCHESTRATOR__HUMAN_ESCALATION_ENABLED=false
 # MCP
 export YOLO_MCP__TRANSPORT=http
 export YOLO_MCP__HTTP__PORT=9000
+
+# Brownfield scanning
+export YOLO_BROWNFIELD__SCAN_DEPTH=4
+export YOLO_BROWNFIELD__INTERACTIVE=false
 ```
 
 ### List Values

@@ -9,6 +9,10 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
+
+from yolo_developer.config.schema import BrownfieldConfig
+from yolo_developer.scanner import ScannerManager
 
 console = Console()
 
@@ -58,7 +62,7 @@ llm:
   best_model: claude-opus-4-5-20251101
 
   # API keys should be set via environment variables:
-  # - YOLO_LLM__OPENAI_API_KEY
+  # - YOLO_LLM__OPENAI__API_KEY
   # - YOLO_LLM__ANTHROPIC_API_KEY
 
 # Quality Gate Configuration
@@ -514,6 +518,9 @@ def init_command(
     interactive: bool = False,
     no_input: bool = False,
     existing: bool = False,
+    scan_only: bool = False,
+    non_interactive: bool = False,
+    hint: str | None = None,
 ) -> None:
     """Initialize a new YOLO Developer project.
 
@@ -525,6 +532,9 @@ def init_command(
         interactive: If True, prompt for project details interactively.
         no_input: If True, use all defaults without prompting.
         existing: If True, add YOLO to an existing project (brownfield mode).
+        scan_only: If True, scan project without making changes.
+        non_interactive: If True, skip all prompts during scanning.
+        hint: Optional hint about project type for scanning.
     """
     import typer
 
@@ -543,6 +553,10 @@ def init_command(
     # Get defaults from git config
     git_user_name = get_git_config("user.name")
     git_user_email = get_git_config("user.email")
+
+    if non_interactive:
+        interactive = False
+        no_input = True
 
     # Determine project name
     default_name = project_path.name
@@ -580,18 +594,27 @@ def init_command(
     )
 
     if existing:
-        # Brownfield mode: add YOLO to existing project
-        pyproject_path = project_path / "pyproject.toml"
-        if not pyproject_path.exists():
-            console.print(
-                "[red]Error: No pyproject.toml found. "
-                "Use without --existing for new projects.[/red]"
-            )
-            raise SystemExit(1)
+        # Brownfield mode: scan and add YOLO to existing project
+        brownfield_config = BrownfieldConfig()
+        _run_brownfield_scan(
+            project_path=project_path,
+            project_name=project_name,
+            interactive=interactive,
+            scan_only=scan_only,
+            hint=hint,
+            config=brownfield_config,
+        )
+        if scan_only:
+            return
 
-        # Merge dependencies
-        console.print("[blue]Adding YOLO dependencies to existing project...[/blue]")
-        merge_pyproject_dependencies(project_path)
+        pyproject_path = project_path / "pyproject.toml"
+        if pyproject_path.exists():
+            console.print("[blue]Adding YOLO dependencies to existing project...[/blue]")
+            merge_pyproject_dependencies(project_path)
+        else:
+            console.print(
+                "[yellow]No pyproject.toml found. Skipping dependency merge.[/yellow]"
+            )
 
         # Create yolo.yaml (skip if already exists in brownfield mode)
         console.print("[blue]Checking yolo.yaml configuration...[/blue]")
@@ -644,3 +667,57 @@ def init_command(
             border_style="green",
         )
     )
+
+
+def _run_brownfield_scan(
+    project_path: Path,
+    project_name: str,
+    interactive: bool,
+    scan_only: bool,
+    hint: str | None,
+    config: BrownfieldConfig,
+) -> "ProjectContext | None":
+    console.print("[blue]Scanning existing project...[/blue]")
+    manager = ScannerManager()
+    report = manager.scan(
+        project_path=project_path,
+        scan_depth=config.scan_depth,
+        exclude_patterns=config.exclude_patterns,
+        max_files=config.max_files_to_analyze,
+        include_git_history=config.include_git_history,
+        hint=hint,
+    )
+    _print_scan_report(report)
+
+    if scan_only:
+        console.print("[green]Scan complete (no changes made).[/green]")
+        return None
+
+    context = manager.build_project_context(
+        report=report,
+        project_name=project_name,
+        interactive=interactive and config.interactive,
+        console=console,
+    )
+    output_path = manager.write_project_context(project_path, context)
+    console.print(f"[green]Generated project context:[/green] {output_path}")
+    return context
+
+
+def _print_scan_report(report) -> None:
+    table = Table(title="Brownfield Scan Summary")
+    table.add_column("Finding")
+    table.add_column("Value")
+    table.add_column("Confidence", justify="right")
+
+    for finding in report.findings:
+        if finding.key in {"docs", "git", "conventions"}:
+            continue
+        table.add_row(finding.key, str(finding.value), f"{finding.confidence:.0%}")
+
+    console.print(table)
+
+    if report.suggestions:
+        console.print("[yellow]Suggestions:[/yellow]")
+        for suggestion in report.suggestions:
+            console.print(f"  - {suggestion}")

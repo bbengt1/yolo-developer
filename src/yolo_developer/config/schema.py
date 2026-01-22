@@ -350,6 +350,37 @@ class MemoryConfig(BaseModel):
     )
 
 
+class BrownfieldConfig(BaseModel):
+    """Configuration for brownfield project scanning."""
+
+    scan_depth: int = Field(
+        default=3,
+        description="Directory depth to scan",
+    )
+    exclude_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "node_modules",
+            ".git",
+            "__pycache__",
+            ".venv",
+            "venv",
+        ],
+        description="Patterns to exclude from scanning",
+    )
+    include_git_history: bool = Field(
+        default=True,
+        description="Analyze git history for context",
+    )
+    max_files_to_analyze: int = Field(
+        default=1000,
+        description="Maximum files to analyze for patterns",
+    )
+    interactive: bool = Field(
+        default=True,
+        description="Prompt user for ambiguous decisions",
+    )
+
+
 class YoloConfig(BaseSettings):
     """Main configuration class for YOLO Developer.
 
@@ -369,6 +400,9 @@ class YoloConfig(BaseSettings):
         - YOLO_MEMORY__PERSIST_PATH: Override memory persistence path
         - YOLO_MEMORY__VECTOR_STORE_TYPE: Override vector store type
         - YOLO_MEMORY__GRAPH_STORE_TYPE: Override graph store type
+        - YOLO_BROWNFIELD__SCAN_DEPTH: Override brownfield scan depth
+        - YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE: Override scan file limit
+        - YOLO_BROWNFIELD__INTERACTIVE: Override brownfield interactive mode
 
     Example:
         >>> config = YoloConfig(project_name="my-project")
@@ -402,6 +436,10 @@ class YoloConfig(BaseSettings):
     memory: MemoryConfig = Field(
         default_factory=MemoryConfig,
         description="Memory and storage configuration",
+    )
+    brownfield: BrownfieldConfig = Field(
+        default_factory=BrownfieldConfig,
+        description="Brownfield scanning configuration",
     )
 
     def validate_api_keys(self) -> list[str]:

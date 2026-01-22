@@ -362,6 +362,19 @@ cd /path/to/your/project
 uv run yolo init --name my-project
 ```
 
+### Brownfield Setup (Existing Repo)
+
+```bash
+cd /path/to/existing/project
+uv run yolo init --brownfield
+```
+
+To scan without making changes:
+
+```bash
+uv run yolo init --brownfield --scan-only
+```
+
 ---
 
 ## Upgrading
