@@ -28,26 +28,29 @@ Tools available:
 
 from __future__ import annotations
 
-from yolo_developer.mcp.server import (
-    SERVER_INSTRUCTIONS,
-    TransportType,
-    mcp,
-    run_server,
-)
-from yolo_developer.mcp.tools import (
-    StoredSeed,
-    StoredSprint,
-    clear_seeds,
-    clear_sprints,
-    get_seed,
-    get_sprint,
-    store_seed,
-    store_sprint,
-    yolo_audit,
-    yolo_run,
-    yolo_seed,
-    yolo_status,
-)
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from yolo_developer.mcp.server import (  # noqa: F401
+        SERVER_INSTRUCTIONS,
+        TransportType,
+        mcp,
+        run_server,
+    )
+    from yolo_developer.mcp.tools import (  # noqa: F401
+        StoredSeed,
+        StoredSprint,
+        clear_seeds,
+        clear_sprints,
+        get_seed,
+        get_sprint,
+        store_seed,
+        store_sprint,
+        yolo_audit,
+        yolo_run,
+        yolo_seed,
+        yolo_status,
+    )
 
 # Public API exports:
 # - mcp: FastMCP server instance for direct use
@@ -75,3 +78,28 @@ __all__ = [
     "yolo_seed",
     "yolo_status",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in {"SERVER_INSTRUCTIONS", "TransportType", "mcp", "run_server"}:
+        from yolo_developer.mcp import server
+
+        return getattr(server, name)
+    if name in {
+        "StoredSeed",
+        "StoredSprint",
+        "clear_seeds",
+        "clear_sprints",
+        "get_seed",
+        "get_sprint",
+        "store_seed",
+        "store_sprint",
+        "yolo_audit",
+        "yolo_run",
+        "yolo_seed",
+        "yolo_status",
+    }:
+        from yolo_developer.mcp import tools
+
+        return getattr(tools, name)
+    raise AttributeError(f"module 'yolo_developer.mcp' has no attribute {name}")

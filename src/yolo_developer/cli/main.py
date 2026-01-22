@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+import warnings
 
 import typer
 from rich.console import Console
 
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*There is no current event loop.*",
+)
+
 from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.mcp import app as mcp_app
 from yolo_developer.cli.commands.scan import scan_command
-from yolo_developer.cli.commands.seed import seed_command
 
 app = typer.Typer(
     name="yolo",
@@ -269,6 +275,8 @@ def seed(
         yolo seed requirements.md --report-format rich
         yolo seed requirements.md --report-format rich --force  # bypass threshold rejection
     """
+    from yolo_developer.cli.commands.seed import seed_command
+
     seed_command(
         file_path=file_path,
         verbose=verbose,

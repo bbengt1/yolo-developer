@@ -30,7 +30,7 @@ from enum import Enum
 from fastmcp import FastMCP
 from fastmcp import settings as fastmcp_settings
 
-from yolo_developer import __version__
+from yolo_developer.version import __version__
 
 
 class TransportType(Enum):
@@ -143,6 +143,8 @@ def run_server(
     if isinstance(transport, str):
         transport = TransportType(transport.lower())
 
+    _register_tools()
+
     if transport == TransportType.HTTP:
         mcp.run(transport="http", port=port)
     else:
@@ -152,14 +154,19 @@ def run_server(
 __all__ = ["SERVER_INSTRUCTIONS", "TransportType", "mcp", "run_server"]
 
 
+_TOOLS_REGISTERED = False
+
+
 def _register_tools() -> None:
     """Register MCP tools with the server.
 
     This function imports the tools module to trigger tool registration
-    via the @mcp.tool decorator. It's called lazily to avoid circular imports.
+    via the @mcp.tool decorator. It's called lazily to avoid importing
+    LLM dependencies during CLI help output.
     """
+    global _TOOLS_REGISTERED
+    if _TOOLS_REGISTERED:
+        return
     from yolo_developer.mcp import tools as _tools  # noqa: F401
 
-
-# Register tools when module is fully loaded
-_register_tools()
+    _TOOLS_REGISTERED = True

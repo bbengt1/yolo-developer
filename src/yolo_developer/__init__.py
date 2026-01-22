@@ -23,22 +23,25 @@ Example:
 
 from __future__ import annotations
 
-from yolo_developer.config import YoloConfig
-from yolo_developer.sdk import (
-    AuditEntry,
-    ClientNotInitializedError,
-    InitResult,
-    ProjectNotFoundError,
-    RunResult,
-    SDKError,
-    SeedResult,
-    SeedValidationError,
-    StatusResult,
-    WorkflowExecutionError,
-    YoloClient,
-)
+from typing import TYPE_CHECKING, Any
 
-__version__ = "0.1.0"
+from yolo_developer.config import YoloConfig
+from yolo_developer.version import __version__
+
+if TYPE_CHECKING:
+    from yolo_developer.sdk import (  # noqa: F401
+        AuditEntry,
+        ClientNotInitializedError,
+        InitResult,
+        ProjectNotFoundError,
+        RunResult,
+        SDKError,
+        SeedResult,
+        SeedValidationError,
+        StatusResult,
+        WorkflowExecutionError,
+        YoloClient,
+    )
 
 __all__ = [
     # SDK Result Types
@@ -60,3 +63,23 @@ __all__ = [
     # Version
     "__version__",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in {
+        "AuditEntry",
+        "ClientNotInitializedError",
+        "InitResult",
+        "ProjectNotFoundError",
+        "RunResult",
+        "SDKError",
+        "SeedResult",
+        "SeedValidationError",
+        "StatusResult",
+        "WorkflowExecutionError",
+        "YoloClient",
+    }:
+        from yolo_developer import sdk
+
+        return getattr(sdk, name)
+    raise AttributeError(f"module 'yolo_developer' has no attribute {name}")
