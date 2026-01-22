@@ -442,6 +442,13 @@ uv python install 3.12
 uv sync
 ```
 
+If uv still selects an unsupported interpreter, pin it explicitly:
+
+```bash
+uv sync --python 3.13 --all-extras
+uv run --python 3.13 yolo --help
+```
+
 ### Permission Denied
 
 **Problem:** `Permission denied` when installing

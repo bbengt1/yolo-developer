@@ -43,6 +43,12 @@ uv sync
 uv run yolo --help
 ```
 
+If uv picks the wrong interpreter, force it explicitly:
+
+```bash
+uv run --python 3.13 yolo --help
+```
+
 **Expected output:**
 ```
 Usage: yolo [OPTIONS] COMMAND [ARGS]...
