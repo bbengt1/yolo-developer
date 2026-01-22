@@ -401,6 +401,24 @@ class AnalystConfig(BaseModel):
     gathering: AnalystGatheringConfig = Field(default_factory=AnalystGatheringConfig)
 
 
+class WebUploadConfig(BaseModel):
+    enabled: bool = Field(default=True, description="Enable uploads")
+    max_size_mb: int = Field(default=10, description="Max upload size in MB")
+    allowed_extensions: list[str] = Field(
+        default_factory=lambda: [".md", ".txt", ".pdf", ".docx"],
+        description="Allowed upload extensions",
+    )
+    storage_path: str = Field(default=".yolo/uploads", description="Upload storage path")
+
+
+class WebConfig(BaseModel):
+    enabled: bool = Field(default=True, description="Enable web UI")
+    host: str = Field(default="127.0.0.1", description="Web host")
+    port: int = Field(default=3000, description="Web port")
+    api_only: bool = Field(default=False, description="Run API only")
+    uploads: WebUploadConfig = Field(default_factory=WebUploadConfig)
+
+
 class YoloConfig(BaseSettings):
     """Main configuration class for YOLO Developer.
 
@@ -425,6 +443,8 @@ class YoloConfig(BaseSettings):
         - YOLO_BROWNFIELD__INTERACTIVE: Override brownfield interactive mode
         - YOLO_ANALYST__GATHERING__ENABLED: Toggle gathering sessions
         - YOLO_ANALYST__GATHERING__STORAGE_PATH: Session storage path
+        - YOLO_WEB__HOST: Web UI host
+        - YOLO_WEB__PORT: Web UI port
         - YOLO_GITHUB__TOKEN: GitHub token (env only)
         - YOLO_GITHUB__REPOSITORY: GitHub repo slug (owner/repo)
 
@@ -468,6 +488,10 @@ class YoloConfig(BaseSettings):
     analyst: AnalystConfig = Field(
         default_factory=AnalystConfig,
         description="Analyst interactive gathering configuration",
+    )
+    web: WebConfig = Field(
+        default_factory=WebConfig,
+        description="Web UI configuration",
     )
     github: GitHubConfig = Field(
         default_factory=GitHubConfig,

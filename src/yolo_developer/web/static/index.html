@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLO Developer Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">YOLO</span>
+          <div>
+            <div class="brand-title">Developer Dashboard</div>
+            <div class="brand-subtitle">Autonomous Sprint Control</div>
+          </div>
+        </div>
+        <div class="status-pill" id="status-pill">Idle</div>
+      </header>
+
+      <main class="layout">
+        <section class="hero">
+          <div>
+            <h1 id="project-name">Project</h1>
+            <p class="hero-copy">
+              Monitor sprint health, agent activity, and quality gates in real time.
+            </p>
+          </div>
+          <div class="hero-meta">
+            <div class="meta-item">
+              <div class="meta-label">Sprint Progress</div>
+              <div class="meta-value" id="sprint-progress">0%</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">ETA</div>
+              <div class="meta-value" id="sprint-eta">--</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Active Agent</div>
+              <div class="meta-value" id="active-agent">--</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <div class="card-title">Sprint Timeline</div>
+            <div class="progress">
+              <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="card-foot" id="story-count">0 of 0 stories</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Quality Gates</div>
+            <div class="gate-list" id="gate-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Agent Constellation</div>
+            <div class="agent-grid" id="agent-grid"></div>
+          </div>
+        </section>
+
+        <section class="two-column">
+          <div class="card">
+            <div class="card-title">Story Queue</div>
+            <ul class="story-list" id="story-list"></ul>
+          </div>
+          <div class="card">
+            <div class="card-title">Decision Stream</div>
+            <ul class="audit-list" id="audit-list"></ul>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

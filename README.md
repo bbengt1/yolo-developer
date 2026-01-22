@@ -71,6 +71,10 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Issues & Releases**: Issue management and release creation
 - **Issue Import**: Convert GitHub issues into user stories
 
+### Web Dashboard
+- **Local UI**: Browser dashboard for sprint status and agent activity
+- **Real-time Updates**: WebSocket-driven status refresh
+
 ---
 
 ## Installation
@@ -188,6 +192,7 @@ yolo logs
 | `yolo workflow` | GitHub workflow automation |
 | `yolo import` | Import GitHub issues as user stories |
 | `yolo gather` | Interactive requirements gathering |
+| `yolo web` | Launch the web dashboard |
 
 Run `yolo <command> --help` for detailed usage.
 
@@ -510,6 +515,8 @@ tests/
 - [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
 - MCP integration tools, walkthroughs, and audit access
 - [#14](https://github.com/bbengt1/yolo-developer/issues/14) Interactive requirements gathering sessions
+- [#3](https://github.com/bbengt1/yolo-developer/issues/3) Web interface with dashboard UI
+- [#7](https://github.com/bbengt1/yolo-developer/issues/7) Sprint visualization dashboard
 
 ### Planned Features
 
@@ -527,8 +534,7 @@ tests/
 #### User Interfaces
 | Issue | Feature | Labels |
 |-------|---------|--------|
-| [#3](https://github.com/bbengt1/yolo-developer/issues/3) | Web Interface | `enhancement` `epic` `frontend` |
-| [#7](https://github.com/bbengt1/yolo-developer/issues/7) | Web Dashboard for Sprint Visualization | `enhancement` `frontend` |
+| (complete) | Web UI and sprint dashboard | `frontend` |
 
 #### Core Enhancements
 | Issue | Feature | Labels |

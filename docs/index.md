@@ -56,6 +56,9 @@ Complete audit trail with decision logging, token cost tracking, and requirement
 ### Interactive Gathering
 Run guided Q&A sessions to crystallize requirements before seeding.
 
+### Web Dashboard
+Use the local web UI to monitor sprint status and agent activity.
+
 ---
 
 ## Quick Example
@@ -130,6 +133,9 @@ Import GitHub issues and generate user stories.
 ### [Interactive Gathering](/yolo-developer/guides/gathering)
 Guided requirements elicitation sessions.
 
+### [Web Dashboard](/yolo-developer/guides/web)
+Local web UI for sprint visualization.
+
 </div>
 
 ---
@@ -161,6 +167,8 @@ Guided requirements elicitation sessions.
 - [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
 - MCP integration tools, walkthroughs, and audit access
 - [#14](https://github.com/bbengt1/yolo-developer/issues/14) Interactive requirements gathering sessions
+- [#3](https://github.com/bbengt1/yolo-developer/issues/3) Web interface with dashboard UI
+- [#7](https://github.com/bbengt1/yolo-developer/issues/7) Sprint visualization dashboard
 
 ### Planned Features
 
@@ -181,8 +189,7 @@ Guided requirements elicitation sessions.
 
 | Issue | Feature | Description |
 |:------|:--------|:------------|
-| [#3](https://github.com/bbengt1/yolo-developer/issues/3) | **Web Interface** | Full web UI with REST API, WebSocket updates, document upload |
-| [#7](https://github.com/bbengt1/yolo-developer/issues/7) | **Sprint Dashboard** | Real-time visualization of sprint progress and agent activity |
+| (complete) | **Web Dashboard** | Local UI with REST API, WebSocket updates, and sprint visualization |
 
 #### Core Enhancements
 

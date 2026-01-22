@@ -313,6 +313,34 @@ analyst:
 
 ---
 
+### web
+
+Local web UI configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `enabled` | bool | true | `YOLO_WEB__ENABLED` | Enable web UI |
+| `host` | string | 127.0.0.1 | `YOLO_WEB__HOST` | Host to bind |
+| `port` | int | 3000 | `YOLO_WEB__PORT` | Port to bind |
+| `api_only` | bool | false | `YOLO_WEB__API_ONLY` | Run API only |
+| `uploads.enabled` | bool | true | `YOLO_WEB__UPLOADS__ENABLED` | Enable uploads |
+| `uploads.max_size_mb` | int | 10 | `YOLO_WEB__UPLOADS__MAX_SIZE_MB` | Max upload size |
+| `uploads.storage_path` | string | .yolo/uploads | `YOLO_WEB__UPLOADS__STORAGE_PATH` | Upload storage |
+
+```yaml
+web:
+  enabled: true
+  host: 127.0.0.1
+  port: 3000
+  api_only: false
+  uploads:
+    enabled: true
+    max_size_mb: 10
+    storage_path: .yolo/uploads
+```
+
+---
+
 ### github
 
 GitHub automation configuration for repository management.

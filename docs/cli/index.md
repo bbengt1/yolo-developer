@@ -61,6 +61,7 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo workflow`](#yolo-workflow) | GitHub workflow automation |
 | [`yolo import`](#yolo-import) | Import GitHub issues |
 | [`yolo gather`](#yolo-gather) | Interactive requirements gathering |
+| [`yolo web`](#yolo-web) | Web dashboard |
 
 ---
 
@@ -919,6 +920,17 @@ Interactive requirements gathering with the Analyst agent.
 yolo gather start my-project --description "Build a task manager"
 yolo gather list
 yolo gather export 20250122093000 --format markdown --output requirements.md
+```
+
+---
+
+## yolo web
+
+Start the local web dashboard and API.
+
+```bash
+yolo web start
+yolo web start --port 8080 --host 0.0.0.0
 ```
 
 ---

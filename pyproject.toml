@@ -35,6 +35,9 @@ dependencies = [
     "python-dotenv",
     "fastmcp>=2.0.0",
     "reportlab>=4.4.9",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
 ]
 
 [project.optional-dependencies]

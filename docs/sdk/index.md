@@ -65,6 +65,13 @@ asyncio.run(main())
 
 ---
 
+## Web API
+
+The web UI runs on top of the SDK, so the API is a thin wrapper around
+the same `YoloClient` calls.
+
+---
+
 ## YoloClient
 
 The main entry point for SDK functionality.
