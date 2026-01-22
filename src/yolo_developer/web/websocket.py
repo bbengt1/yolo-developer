@@ -36,7 +36,7 @@ def attach_websocket_routes(app: FastAPI) -> None:
         client = YoloClient()
         try:
             while True:
-                status = client.status()
+                status = await client.status_async()
                 payload = {
                     "event": "status.update",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
