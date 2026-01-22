@@ -6,7 +6,6 @@ import typer
 import uvicorn
 
 from yolo_developer.config import ConfigurationError, YoloConfig, load_config
-from yolo_developer.web.app import create_app
 
 app = typer.Typer(name="web", help="Start the YOLO Developer web UI")
 
@@ -22,6 +21,14 @@ def start(
     except ConfigurationError:
         config = YoloConfig(project_name="web")
     web_config = config.web
+    try:
+        from yolo_developer.web.app import create_app
+    except ModuleNotFoundError:
+        typer.echo(
+            "Web dependencies missing. Run `uv sync --all-extras` to install fastapi/uvicorn."
+        )
+        raise typer.Exit(code=1)
+
     uvicorn.run(
         create_app(api_only=api_only if api_only is not None else web_config.api_only),
         host=host or web_config.host,
