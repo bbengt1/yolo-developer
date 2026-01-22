@@ -16,6 +16,7 @@ warnings.filterwarnings(
 
 from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.mcp import app as mcp_app
+from yolo_developer.cli.commands.gather import app as gather_app
 from yolo_developer.cli.commands.git import app as git_app
 from yolo_developer.cli.commands.importer import app as import_app
 from yolo_developer.cli.commands.issue import app as issue_app
@@ -37,6 +38,7 @@ app.add_typer(issue_app, name="issue")
 app.add_typer(release_app, name="release")
 app.add_typer(workflow_app, name="workflow")
 app.add_typer(import_app, name="import")
+app.add_typer(gather_app, name="gather")
 
 
 @app.command("init")

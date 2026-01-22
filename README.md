@@ -40,6 +40,7 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 - **Ambiguity Detection**: Identify unclear specifications with clarification questions
 - **Contradiction Flagging**: Detect conflicting requirements automatically
 - **12-Factor Compliance**: Architecture validation against cloud-native principles
+- **Interactive Gathering**: Guided Q&A sessions to build requirements
 
 ### Quality Assurance
 - **Quality Gate Framework**: Blocking gates with confidence scoring (0.0-1.0)
@@ -186,6 +187,7 @@ yolo logs
 | `yolo release` | GitHub release operations |
 | `yolo workflow` | GitHub workflow automation |
 | `yolo import` | Import GitHub issues as user stories |
+| `yolo gather` | Interactive requirements gathering |
 
 Run `yolo <command> --help` for detailed usage.
 
@@ -282,6 +284,11 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 | `yolo_import_issue` | Import a GitHub issue as a story |
 | `yolo_import_issues` | Import multiple GitHub issues |
 | `yolo_preview_import` | Preview issue import output |
+| `yolo_gather_start` | Start a requirements gathering session |
+| `yolo_gather_respond` | Respond to a gathering question |
+| `yolo_gather_progress` | Check gathering progress |
+| `yolo_gather_export` | Export gathered requirements |
+| `yolo_gather_list` | List saved gathering sessions |
 
 ### yolo_status Walkthrough
 
@@ -502,6 +509,7 @@ tests/
 
 - [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
 - MCP integration tools, walkthroughs, and audit access
+- [#14](https://github.com/bbengt1/yolo-developer/issues/14) Interactive requirements gathering sessions
 
 ### Planned Features
 
@@ -528,7 +536,6 @@ tests/
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | Plugin System for Custom Agents | `enhancement` `epic` |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | Course Correction for Requirement Changes | `enhancement` `epic` |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | GitHub Issue to User Story Conversion | `enhancement` `epic` `github-integration` |
-| [#14](https://github.com/bbengt1/yolo-developer/issues/14) | Interactive Requirements Gathering | `enhancement` `epic` |
 
 #### Performance
 | Issue | Feature | Labels |

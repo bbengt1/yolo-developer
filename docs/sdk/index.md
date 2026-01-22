@@ -118,6 +118,31 @@ async def seed(
 | Parameter | Type | Default | Description |
 |:----------|:-----|:--------|:------------|
 | `content` | str | None | Requirements as text |
+
+---
+
+## Gathering Sessions
+
+Use the interactive gathering helpers to build requirements before seeding.
+
+```python
+import asyncio
+from yolo_developer.sdk.gathering import GatheringClient
+
+async def run():
+    client = GatheringClient()
+    session = await client.start_session(
+        "task-manager",
+        initial_description="A simple task tracking app",
+    )
+    question = await client.get_next_question()
+    print(question.text)
+    await client.submit_response("Users should create and complete tasks.")
+    document = await client.export_requirements(format="markdown")
+    print(document)
+
+asyncio.run(run())
+```
 | `file_path` | str \| Path | None | Path to requirements file |
 | `validate` | bool | True | Run validation checks |
 

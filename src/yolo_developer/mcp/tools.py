@@ -47,6 +47,7 @@ from yolo_developer.github.issue_import import IssueImporter
 from yolo_developer.github.issues import IssueManager
 from yolo_developer.github.pr import PRManager
 from yolo_developer.github.releases import ReleaseManager
+from yolo_developer.analyst import SessionManager
 from yolo_developer.audit.types import VALID_DECISION_TYPES
 from yolo_developer.mcp.server import mcp
 from yolo_developer.seed import parse_seed
@@ -831,6 +832,133 @@ async def yolo_preview_import(
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
 
+
+@mcp.tool
+async def yolo_gather_start(
+    project_name: str,
+    initial_description: str | None = None,
+    project_type: str | None = None,
+) -> dict[str, Any]:
+    """Start a requirements gathering session."""
+    try:
+        manager = SessionManager.from_config()
+        session = manager.start_session(
+            project_name=project_name,
+            initial_description=initial_description,
+            project_type=project_type,
+        )
+        question = manager.get_current_question(session.id)
+        return {
+            "status": "ok",
+            "session_id": session.id,
+            "phase": session.phase.value,
+            "question": {
+                "id": question.id,
+                "text": question.text,
+                "type": question.type.value,
+                "options": question.options,
+            }
+            if question
+            else None,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_gather_respond(
+    session_id: str,
+    response: str,
+) -> dict[str, Any]:
+    """Submit a response for a gathering session."""
+    try:
+        manager = SessionManager.from_config()
+        result = manager.process_response(session_id, response)
+        question = manager.get_current_question(session_id)
+        return {
+            "status": "ok",
+            "session_id": session_id,
+            "phase": result.session.phase.value,
+            "phase_changed": result.phase_changed,
+            "is_complete": result.is_complete,
+            "new_requirements": [
+                {
+                    "id": req.id,
+                    "description": req.description,
+                    "type": req.type,
+                    "priority": req.priority,
+                }
+                for req in result.new_requirements
+            ],
+            "next_question": {
+                "id": question.id,
+                "text": question.text,
+                "type": question.type.value,
+                "options": question.options,
+            }
+            if question
+            else None,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_gather_progress(session_id: str) -> dict[str, Any]:
+    """Get requirements gathering session progress."""
+    try:
+        manager = SessionManager.from_config()
+        progress = manager.get_progress(session_id)
+        return {
+            "status": "ok",
+            "session_id": session_id,
+            "phase": progress.phase.value,
+            "phase_progress_percent": int(progress.phase_progress * 100),
+            "questions_asked": progress.questions_asked,
+            "questions_answered": progress.questions_answered,
+            "requirements_extracted": progress.requirements_extracted,
+            "estimated_questions_remaining": progress.estimated_completion,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_gather_export(
+    session_id: str,
+    format: str = "markdown",
+) -> dict[str, Any]:
+    """Export gathered requirements from a session."""
+    try:
+        manager = SessionManager.from_config()
+        document = manager.export_requirements(session_id, format=format)
+        return {"status": "ok", "session_id": session_id, "format": format, "document": document}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@mcp.tool
+async def yolo_gather_list() -> dict[str, Any]:
+    """List saved requirements gathering sessions."""
+    try:
+        manager = SessionManager.from_config()
+        sessions = manager.list_sessions()
+        return {
+            "status": "ok",
+            "sessions": [
+                {
+                    "id": session.id,
+                    "project_name": session.project_name,
+                    "phase": session.phase.value,
+                    "requirements_count": session.requirements_count,
+                    "started_at": session.started_at.isoformat(),
+                }
+                for session in sessions
+            ],
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
 __all__ = [
     "StoredSeed",
     "StoredSprint",
@@ -852,4 +980,9 @@ __all__ = [
     "yolo_import_issue",
     "yolo_import_issues",
     "yolo_preview_import",
+    "yolo_gather_start",
+    "yolo_gather_respond",
+    "yolo_gather_progress",
+    "yolo_gather_export",
+    "yolo_gather_list",
 ]

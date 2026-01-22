@@ -293,6 +293,26 @@ brownfield:
 
 ---
 
+### analyst
+
+Interactive requirements gathering configuration.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `gathering.enabled` | bool | true | `YOLO_ANALYST__GATHERING__ENABLED` | Enable gathering sessions |
+| `gathering.storage_path` | string | .yolo/sessions | `YOLO_ANALYST__GATHERING__STORAGE_PATH` | Session storage |
+| `gathering.max_questions_per_phase` | int | 5 | `YOLO_ANALYST__GATHERING__MAX_QUESTIONS_PER_PHASE` | Question cap |
+
+```yaml
+analyst:
+  gathering:
+    enabled: true
+    storage_path: .yolo/sessions
+    max_questions_per_phase: 5
+```
+
+---
+
 ### github
 
 GitHub automation configuration for repository management.

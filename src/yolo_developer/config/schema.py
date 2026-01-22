@@ -383,6 +383,24 @@ class BrownfieldConfig(BaseModel):
     )
 
 
+class AnalystGatheringConfig(BaseModel):
+    """Configuration for interactive requirements gathering."""
+
+    enabled: bool = Field(default=True, description="Enable requirements gathering sessions")
+    storage_path: str = Field(
+        default=".yolo/sessions", description="Storage path for gathering sessions"
+    )
+    max_questions_per_phase: int = Field(
+        default=5, description="Maximum questions per phase"
+    )
+
+
+class AnalystConfig(BaseModel):
+    """Configuration for analyst features."""
+
+    gathering: AnalystGatheringConfig = Field(default_factory=AnalystGatheringConfig)
+
+
 class YoloConfig(BaseSettings):
     """Main configuration class for YOLO Developer.
 
@@ -405,6 +423,8 @@ class YoloConfig(BaseSettings):
         - YOLO_BROWNFIELD__SCAN_DEPTH: Override brownfield scan depth
         - YOLO_BROWNFIELD__MAX_FILES_TO_ANALYZE: Override scan file limit
         - YOLO_BROWNFIELD__INTERACTIVE: Override brownfield interactive mode
+        - YOLO_ANALYST__GATHERING__ENABLED: Toggle gathering sessions
+        - YOLO_ANALYST__GATHERING__STORAGE_PATH: Session storage path
         - YOLO_GITHUB__TOKEN: GitHub token (env only)
         - YOLO_GITHUB__REPOSITORY: GitHub repo slug (owner/repo)
 
@@ -444,6 +464,10 @@ class YoloConfig(BaseSettings):
     brownfield: BrownfieldConfig = Field(
         default_factory=BrownfieldConfig,
         description="Brownfield scanning configuration",
+    )
+    analyst: AnalystConfig = Field(
+        default_factory=AnalystConfig,
+        description="Analyst interactive gathering configuration",
     )
     github: GitHubConfig = Field(
         default_factory=GitHubConfig,

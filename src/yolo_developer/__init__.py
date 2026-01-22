@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from yolo_developer.sdk import (  # noqa: F401
         AuditEntry,
         ClientNotInitializedError,
+        GatheringClient,
         InitResult,
         ProjectNotFoundError,
         RunResult,
@@ -49,6 +50,7 @@ __all__ = [
     # SDK Exceptions
     "ClientNotInitializedError",
     "InitResult",
+    "GatheringClient",
     "ProjectNotFoundError",
     "RunResult",
     "SDKError",
@@ -66,9 +68,14 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
+    if name == "YoloConfig":
+        from yolo_developer import config
+
+        return getattr(config, name)
     if name in {
         "AuditEntry",
         "ClientNotInitializedError",
+        "GatheringClient",
         "InitResult",
         "ProjectNotFoundError",
         "RunResult",
@@ -78,12 +85,7 @@ def __getattr__(name: str) -> Any:
         "StatusResult",
         "WorkflowExecutionError",
         "YoloClient",
-        "YoloConfig",
     }:
-        if name == "YoloConfig":
-            from yolo_developer import config
-
-            return getattr(config, name)
         from yolo_developer import sdk
 
         return getattr(sdk, name)

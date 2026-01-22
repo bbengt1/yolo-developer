@@ -60,6 +60,7 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo release`](#yolo-release) | Release operations |
 | [`yolo workflow`](#yolo-workflow) | GitHub workflow automation |
 | [`yolo import`](#yolo-import) | Import GitHub issues |
+| [`yolo gather`](#yolo-gather) | Interactive requirements gathering |
 
 ---
 
@@ -907,6 +908,18 @@ Common options:
 - `--auto-seed`: write seed file to `.yolo/imported-issues/`
 - `--preview`: preview only
 - `--output`: export story to file
+
+---
+
+## yolo gather
+
+Interactive requirements gathering with the Analyst agent.
+
+```bash
+yolo gather start my-project --description "Build a task manager"
+yolo gather list
+yolo gather export 20250122093000 --format markdown --output requirements.md
+```
 
 ---
 

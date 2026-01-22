@@ -61,6 +61,7 @@ References:
 from __future__ import annotations
 
 from yolo_developer.sdk.client import YoloClient
+from yolo_developer.sdk.gathering import GatheringClient
 from yolo_developer.sdk.exceptions import (
     ClientNotInitializedError,
     ConfigurationAPIError,
@@ -107,6 +108,7 @@ __all__ = [
     "HookExecutionError",
     "HookRegistration",
     "HookResult",
+    "GatheringClient",
     "InitResult",
     "PostHook",
     "PreHook",

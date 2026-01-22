@@ -53,6 +53,9 @@ Convert GitHub issues into structured user stories for sprint planning.
 ### Full Observability
 Complete audit trail with decision logging, token cost tracking, and requirement traceability from seed to implementation.
 
+### Interactive Gathering
+Run guided Q&A sessions to crystallize requirements before seeding.
+
 ---
 
 ## Quick Example
@@ -124,6 +127,9 @@ Manage GitHub workflow automation from YOLO Developer.
 ### [Issue Import](/yolo-developer/guides/issue-import)
 Import GitHub issues and generate user stories.
 
+### [Interactive Gathering](/yolo-developer/guides/gathering)
+Guided requirements elicitation sessions.
+
 </div>
 
 ---
@@ -154,6 +160,7 @@ Import GitHub issues and generate user stories.
 
 - [#8](https://github.com/bbengt1/yolo-developer/issues/8) ChatGPT Codex Support (OpenAI/Codex provider + hybrid routing)
 - MCP integration tools, walkthroughs, and audit access
+- [#14](https://github.com/bbengt1/yolo-developer/issues/14) Interactive requirements gathering sessions
 
 ### Planned Features
 
@@ -184,7 +191,6 @@ Import GitHub issues and generate user stories.
 | [#6](https://github.com/bbengt1/yolo-developer/issues/6) | **Plugin System** | Create and integrate custom agents into the workflow |
 | [#11](https://github.com/bbengt1/yolo-developer/issues/11) | **Course Correction** | Mid-sprint requirement changes with impact analysis |
 | [#13](https://github.com/bbengt1/yolo-developer/issues/13) | **Issue Import** | Convert GitHub issues to user stories for development |
-| [#14](https://github.com/bbengt1/yolo-developer/issues/14) | **Requirements Gathering** | Interactive session to elicit and crystallize requirements |
 
 #### Performance
 

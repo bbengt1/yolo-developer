@@ -584,6 +584,128 @@ Preview issue import output without updating the issue.
 
 ---
 
+### yolo_gather_start
+
+Start a requirements gathering session.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `project_name` | string | Yes | Project name |
+| `initial_description` | string | No | Initial description |
+| `project_type` | string | No | Project type hint |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "session_id": "20250122093000",
+  "phase": "discovery",
+  "question": {
+    "id": "abc123",
+    "text": "What would you like to build?",
+    "type": "open_ended",
+    "options": null
+  }
+}
+```
+
+---
+
+### yolo_gather_respond
+
+Submit a response to the current gathering question.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `session_id` | string | Yes | Session ID |
+| `response` | string | Yes | Response text |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "phase": "use_cases",
+  "new_requirements": [
+    { "id": "req-20250122093000-001", "description": "Users can create tasks" }
+  ],
+  "next_question": {
+    "id": "def456",
+    "text": "Describe the primary workflow a user should complete."
+  }
+}
+```
+
+---
+
+### yolo_gather_progress
+
+Check session progress.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `session_id` | string | Yes | Session ID |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "phase": "requirements",
+  "phase_progress_percent": 42,
+  "requirements_extracted": 6
+}
+```
+
+---
+
+### yolo_gather_export
+
+Export gathered requirements.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|:----------|:-----|:---------|:------------|
+| `session_id` | string | Yes | Session ID |
+| `format` | string | No | markdown/json/yaml |
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "format": "markdown",
+  "document": "# Requirements\\n..."
+}
+```
+
+---
+
+### yolo_gather_list
+
+List saved sessions.
+
+#### Returns
+
+```json
+{
+  "status": "ok",
+  "sessions": [
+    { "id": "20250122093000", "project_name": "task-manager" }
+  ]
+}
+```
+
+---
+
 ## Transport Options
 
 ### STDIO Transport (Default)

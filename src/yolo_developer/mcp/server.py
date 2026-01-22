@@ -139,6 +139,21 @@ Import multiple GitHub issues into user stories.
 ## yolo_preview_import
 Preview the issue import output without updating the issue.
 
+## yolo_gather_start
+Start a requirements gathering session.
+
+## yolo_gather_respond
+Submit a response to the current gathering question.
+
+## yolo_gather_progress
+Check the progress of a gathering session.
+
+## yolo_gather_export
+Export gathered requirements from a session.
+
+## yolo_gather_list
+List saved gathering sessions.
+
 Use these tools to integrate YOLO Developer into your AI workflow.
 """
 
