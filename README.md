@@ -94,6 +94,13 @@ uv sync
 uv run yolo --help
 ```
 
+If uv selects an unsupported interpreter, pin it explicitly:
+
+```bash
+uv sync --python 3.13 --all-extras
+uv run --python 3.13 yolo --help
+```
+
 ### Install with Development Dependencies
 
 ```bash
