@@ -613,6 +613,17 @@ def config_show(
         show_config(json_output=json_output, no_mask=no_mask)
 
 
+@config_app.command("show")
+def config_show_command(
+    json_output: bool = typer.Option(False, "--json", help="Output config as JSON."),
+    no_mask: bool = typer.Option(False, "--no-mask", help="Show API keys unmasked."),
+) -> None:
+    """Show current project configuration."""
+    from yolo_developer.cli.commands.config import show_config
+
+    show_config(json_output=json_output, no_mask=no_mask)
+
+
 @config_app.command("set")
 def config_set(
     key: str = typer.Argument(
