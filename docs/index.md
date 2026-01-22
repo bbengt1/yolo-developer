@@ -132,7 +132,7 @@ Import GitHub issues and generate user stories.
 
 | Requirement | Minimum | Recommended |
 |:------------|:--------|:------------|
-| Python | 3.10+ | 3.12+ |
+| Python | 3.10 - 3.13 | 3.12 - 3.13 |
 | Memory | 4 GB | 8 GB |
 | Disk | 500 MB | 2 GB (with memory persistence) |
 | OS | macOS, Linux, Windows (WSL2) | macOS, Linux |

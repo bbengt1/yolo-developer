@@ -22,7 +22,7 @@ Get up and running with YOLO Developer in under 5 minutes.
 
 Before installing YOLO Developer, ensure you have:
 
-- **Python 3.10 or higher** - Check with `python --version`
+- **Python 3.10 - 3.13** - Check with `python --version`
 - **uv package manager** - Install from [astral.sh/uv](https://astral.sh/uv)
 - **API Key** - OpenAI or Anthropic API key for LLM access
 - **GitHub CLI (optional)** - Install `gh` and run `gh auth login` for GitHub automation commands

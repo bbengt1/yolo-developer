@@ -167,7 +167,7 @@ docker run -v $(pwd):/project -e YOLO_LLM__OPENAI__API_KEY=$OPENAI_API_KEY \
    xcode-select --install
    ```
 
-2. **Install Python 3.10+ (if not already installed):**
+2. **Install Python 3.10 - 3.13 (if not already installed):**
    ```bash
    # Using Homebrew
    brew install python@3.12
@@ -218,7 +218,7 @@ source ~/.zshrc
    sudo apt update && sudo apt upgrade -y
    ```
 
-2. **Install Python 3.10+:**
+2. **Install Python 3.10 - 3.13:**
    ```bash
    sudo apt install python3.12 python3.12-venv python3-pip -y
 
@@ -429,7 +429,7 @@ rm -rf ~/.cargo/bin/uv
 
 ### Python Version Issues
 
-**Problem:** `Python 3.10+ required`
+**Problem:** `Python 3.10 - 3.13 required`
 
 **Solution:**
 ```bash

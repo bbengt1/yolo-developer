@@ -1,6 +1,6 @@
 # YOLO Developer
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-6500+-brightgreen.svg)](#testing)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -76,7 +76,7 @@ Built on the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for AI-assis
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10 - 3.13
 - [uv](https://github.com/astral-sh/uv) package manager
 - [GitHub CLI (`gh`)](https://cli.github.com/) for GitHub automation commands (run `gh auth login`)
 
@@ -538,7 +538,7 @@ See all issues: [GitHub Issues](https://github.com/bbengt1/yolo-developer/issues
 
 | Component | Technology |
 |-----------|------------|
-| Runtime | Python 3.10+ |
+| Runtime | Python 3.10 - 3.13 |
 | Package Manager | uv |
 | Orchestration | LangGraph |
 | Vector Store | ChromaDB |

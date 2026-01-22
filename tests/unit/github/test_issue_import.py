@@ -4,11 +4,6 @@ from datetime import datetime, timezone
 
 import pytest
 
-from yolo_developer.github.config import GitHubImportConfig
-from yolo_developer.github.issue_import import IssueImporter
-from yolo_developer.github.issue_parser import IssueParser
-from yolo_developer.github.models import GitHubIssueInput, StoryPriority
-
 
 class FakeGitHubClient:
     def __init__(self, issue: dict, comments: list[dict] | None = None) -> None:
@@ -27,6 +22,10 @@ class FakeGitHubClient:
 
 
 def test_issue_parser_extracts_sections() -> None:
+    pytest.importorskip("pydantic")
+    from yolo_developer.github.issue_parser import IssueParser
+    from yolo_developer.github.models import GitHubIssueInput, StoryPriority
+
     issue = GitHubIssueInput(
         number=42,
         title="Add avatars",
@@ -50,6 +49,10 @@ def test_issue_parser_extracts_sections() -> None:
 
 @pytest.mark.asyncio
 async def test_issue_importer_generates_story() -> None:
+    pytest.importorskip("pydantic")
+    from yolo_developer.github.config import GitHubImportConfig
+    from yolo_developer.github.issue_import import IssueImporter
+
     issue = {
         "number": 42,
         "title": "Add avatars",

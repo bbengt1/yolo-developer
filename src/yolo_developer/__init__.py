@@ -25,7 +25,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from yolo_developer.config import YoloConfig
 from yolo_developer.version import __version__
 
 if TYPE_CHECKING:
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
         WorkflowExecutionError,
         YoloClient,
     )
+    from yolo_developer.config import YoloConfig  # noqa: F401
 
 __all__ = [
     # SDK Result Types
@@ -78,7 +78,12 @@ def __getattr__(name: str) -> Any:
         "StatusResult",
         "WorkflowExecutionError",
         "YoloClient",
+        "YoloConfig",
     }:
+        if name == "YoloConfig":
+            from yolo_developer import config
+
+            return getattr(config, name)
         from yolo_developer import sdk
 
         return getattr(sdk, name)
