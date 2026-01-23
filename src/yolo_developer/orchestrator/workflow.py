@@ -343,6 +343,7 @@ def create_workflow_with_checkpointing(
 def create_initial_state(
     starting_agent: str = "analyst",
     messages: list[BaseMessage] | None = None,
+    initialize_tools: bool = False,
 ) -> YoloState:
     """Create an initial state for workflow execution.
 
@@ -352,6 +353,8 @@ def create_initial_state(
     Args:
         starting_agent: The agent to start with (default: "analyst").
         messages: Optional initial messages to include.
+        initialize_tools: Whether to initialize the tool registry from config.
+            When True, loads tool configuration and creates a ToolRegistry.
 
     Returns:
         YoloState ready for workflow execution.
@@ -362,13 +365,61 @@ def create_initial_state(
         >>>
         >>> from langchain_core.messages import HumanMessage
         >>> state = create_initial_state(messages=[HumanMessage(content="Build app")])
+        >>>
+        >>> # With tool registry
+        >>> state = create_initial_state(initialize_tools=True)
+        >>> if state.get("tool_registry"):
+        ...     print("Tools available:", state["tool_registry"].available())
     """
-    return YoloState(
+    state = YoloState(
         messages=messages or [],
         current_agent=starting_agent,
         handoff_context=None,
         decisions=[],
     )
+
+    if initialize_tools:
+        tool_registry = _create_tool_registry()
+        if tool_registry is not None:
+            state["tool_registry"] = tool_registry
+
+    return state
+
+
+def _create_tool_registry() -> Any:
+    """Create a tool registry from configuration.
+
+    Attempts to load configuration and create a ToolRegistry.
+    Returns None if configuration is unavailable or tools are disabled.
+
+    Returns:
+        ToolRegistry instance or None if unavailable.
+    """
+    try:
+        from yolo_developer.config import load_config
+        from yolo_developer.tools import ToolRegistry
+
+        config = load_config()
+        registry = ToolRegistry(config.tools)
+
+        # Only return if at least one tool is available
+        if registry.available():
+            logger.info(
+                "tool_registry_initialized",
+                available_tools=registry.available(),
+            )
+            return registry
+
+        logger.debug("tool_registry_empty", message="No tools enabled in configuration")
+        return None
+
+    except Exception as e:
+        logger.warning(
+            "tool_registry_init_failed",
+            error=str(e),
+            message="Continuing without tool registry",
+        )
+        return None
 
 
 async def run_workflow(

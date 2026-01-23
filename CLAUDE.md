@@ -73,6 +73,38 @@ Environment variables use `YOLO_` prefix with `__` as nested delimiter:
 
 API keys (`openai_api_key`, `anthropic_api_key`) are stored as `SecretStr` and **never** included in config exports.
 
+### External CLI Tools Integration
+
+YOLO Developer can delegate tasks to external CLI tools like Claude Code and Aider. Tools are configured in `yolo.yaml`:
+
+```yaml
+tools:
+  claude_code:
+    enabled: true
+    timeout: 300  # seconds
+    output_format: json  # json or text
+    extra_args: []  # additional CLI args
+  aider:
+    enabled: false
+```
+
+Or via environment variables:
+- `YOLO_TOOLS__CLAUDE_CODE__ENABLED=true`
+- `YOLO_TOOLS__CLAUDE_CODE__TIMEOUT=600`
+- `YOLO_TOOLS__AIDER__ENABLED=true`
+
+Check tool status with:
+```bash
+uv run yolo tools           # Show tool availability
+uv run yolo tools status    # Same as above
+uv run yolo tools --json    # JSON output
+```
+
+Tool integration provides:
+- **Security**: Delegated authentication (tools use their own credentials)
+- **Features**: Access to tool-specific capabilities (Claude Code plan mode, MCP client, web search)
+- **Flexibility**: Configure tools independently per project
+
 ### Test Organization
 
 ```
