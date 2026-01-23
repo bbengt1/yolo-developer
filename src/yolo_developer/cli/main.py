@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import click
 import typer
@@ -17,17 +17,19 @@ warnings.filterwarnings(
 )
 
 import yolo_developer.cli.commands.chat as chat_commands
-from yolo_developer.cli.commands.init import init_command
-from yolo_developer.cli.commands.mcp import app as mcp_app
 from yolo_developer.cli.commands.gather import app as gather_app
 from yolo_developer.cli.commands.git import app as git_app
-from yolo_developer.cli.commands.web import app as web_app
 from yolo_developer.cli.commands.importer import app as import_app
+from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.issue import app as issue_app
+from yolo_developer.cli.commands.mcp import app as mcp_app
 from yolo_developer.cli.commands.pr import app as pr_app
 from yolo_developer.cli.commands.release import app as release_app
-from yolo_developer.cli.commands.workflow import app as workflow_app
 from yolo_developer.cli.commands.scan import scan_command
+from yolo_developer.cli.commands.tools import tools_app
+from yolo_developer.cli.commands.web import app as web_app
+from yolo_developer.cli.commands.workflow import app as workflow_app
+
 
 class YoloCLIGroup(TyperGroup):
     """Custom group that treats unknown commands as chat prompts."""
@@ -66,6 +68,7 @@ app.add_typer(workflow_app, name="workflow")
 app.add_typer(import_app, name="import")
 app.add_typer(gather_app, name="gather")
 app.add_typer(web_app, name="web")
+app.add_typer(tools_app, name="tools")
 
 
 @app.callback(invoke_without_command=True)

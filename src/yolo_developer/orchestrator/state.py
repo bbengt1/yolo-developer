@@ -49,7 +49,7 @@ from langgraph.graph.message import add_messages
 from yolo_developer.orchestrator.context import Decision, HandoffContext
 
 
-class YoloState(TypedDict):
+class YoloState(TypedDict, total=False):
     """Main state for YOLO Developer orchestration.
 
     This TypedDict defines the shape of state passed through the LangGraph
@@ -58,10 +58,13 @@ class YoloState(TypedDict):
 
     Attributes:
         messages: Accumulated messages from all agents. Uses add_messages
-            reducer to append rather than replace.
-        current_agent: Currently executing agent identifier (e.g., "analyst").
+            reducer to append rather than replace. Required.
+        current_agent: Currently executing agent identifier (e.g., "analyst"). Required.
         handoff_context: Context from most recent handoff, or None.
-        decisions: All decisions made during the current sprint.
+        decisions: All decisions made during the current sprint. Required.
+        tool_registry: Registry of external CLI tools (e.g., Claude Code).
+            Optional - when present, agents can delegate tasks to external tools.
+            Type is Any to avoid circular imports (actual type: ToolRegistry).
 
     Example:
         >>> state: YoloState = {
@@ -76,10 +79,15 @@ class YoloState(TypedDict):
         add_messages reducer automatically when state updates are applied.
     """
 
+    # Required fields
     messages: Annotated[list[BaseMessage], add_messages]
     current_agent: str
-    handoff_context: HandoffContext | None
     decisions: list[Decision]
+    # Optional fields
+    handoff_context: HandoffContext | None
+    # Type is Any to avoid circular imports at runtime (LangGraph needs runtime access)
+    # Actual type: yolo_developer.tools.ToolRegistry
+    tool_registry: Any
 
 
 def get_messages_reducer() -> Callable[[list[BaseMessage], list[BaseMessage]], list[BaseMessage]]:
