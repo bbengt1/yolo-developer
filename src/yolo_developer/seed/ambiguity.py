@@ -692,6 +692,7 @@ async def _call_llm_for_ambiguities(
     content: str,
     model: str = _DEFAULT_MODEL,
     temperature: float = _DEFAULT_TEMPERATURE,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Call LLM to detect ambiguities in content.
 
@@ -715,6 +716,7 @@ async def _call_llm_for_ambiguities(
         model=litellm_model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
+        api_key=api_key,
     )
 
     response_text = response.choices[0].message.content
@@ -853,6 +855,7 @@ async def detect_ambiguities(
     content: str,
     model: str = _DEFAULT_MODEL,
     temperature: float = _DEFAULT_TEMPERATURE,
+    api_key: str | None = None,
 ) -> AmbiguityResult:
     """Detect ambiguities in seed document content using LLM.
 
@@ -878,7 +881,7 @@ async def detect_ambiguities(
     logger.info("detect_ambiguities_started", content_length=len(content))
 
     try:
-        llm_output = await _call_llm_for_ambiguities(content, model, temperature)
+        llm_output = await _call_llm_for_ambiguities(content, model, temperature, api_key)
         ambiguities, prompts = _parse_ambiguity_response(llm_output)
         confidence = calculate_ambiguity_confidence(ambiguities)
 

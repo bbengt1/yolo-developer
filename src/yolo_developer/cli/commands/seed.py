@@ -35,6 +35,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from yolo_developer.seed import SeedParseResult, parse_seed
+from yolo_developer.seed.utils import get_api_key_for_model
 from yolo_developer.seed.ambiguity import (
     Ambiguity,
     AmbiguityResult,
@@ -676,6 +677,16 @@ def _output_json(result: SeedParseResult) -> None:
     console.print_json(json.dumps(result_dict, indent=2))
 
 
+def _persist_seed_state(result: SeedParseResult) -> None:
+    """Persist seed parse result for downstream commands like `yolo run`."""
+    seed_state_path = Path(".yolo") / "seed_state.json"
+    seed_state_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_state_path.write_text(
+        json.dumps(result.to_dict(), indent=2),
+        encoding="utf-8",
+    )
+
+
 def _load_thresholds_from_config() -> QualityThreshold:
     """Load quality thresholds from config if available (Story 4.7).
 
@@ -778,13 +789,46 @@ async def _parse_seed_async(
     Returns:
         The parsed seed result.
     """
-    return await parse_seed(
+    try:
+        from yolo_developer.config import ConfigurationError, load_config
+
+        config = load_config()
+    except (FileNotFoundError, ConfigurationError):
+        from yolo_developer.config import YoloConfig
+
+        config = YoloConfig(project_name="seed")
+
+    primary_model = config.llm.cheap_model
+    api_key = get_api_key_for_model(primary_model, config.llm)
+
+    result = await parse_seed(
         content,
         filename=filename,
+        model=primary_model,
+        api_key=api_key,
         detect_ambiguities=detect_ambiguities_flag,
         validate_sop=validate_sop_flag,
         sop_store=sop_store,
     )
+    metadata = dict(result.metadata)
+    fallback_model = config.llm.premium_model
+    if "error" in metadata and fallback_model != primary_model:
+        fallback_key = get_api_key_for_model(fallback_model, config.llm)
+        logger.warning(
+            "seed_parse_retrying_with_fallback",
+            primary_model=primary_model,
+            fallback_model=fallback_model,
+        )
+        result = await parse_seed(
+            content,
+            filename=filename,
+            model=fallback_model,
+            api_key=fallback_key,
+            detect_ambiguities=detect_ambiguities_flag,
+            validate_sop=validate_sop_flag,
+            sop_store=sop_store,
+        )
+    return result
 
 
 def _apply_resolutions_to_content(
@@ -1068,6 +1112,8 @@ def seed_command(
         if json_output:
             _output_json(result)
         raise typer.Exit(code=1)
+
+    _persist_seed_state(result)
 
     # Generate validation report if requested (Story 4.6)
     if report_format:

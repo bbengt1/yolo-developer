@@ -66,6 +66,7 @@ async def parse_seed(
     *,
     model: str = LLM_CHEAP_MODEL_DEFAULT,
     temperature: float = 0.1,
+    api_key: str | None = None,
     preprocess: bool = True,
     detect_ambiguities: bool = False,
     validate_sop: bool = False,
@@ -155,7 +156,7 @@ async def parse_seed(
         preprocessed_content = normalized_content
 
     # Create parser and parse
-    parser = LLMSeedParser(model=model, temperature=temperature)
+    parser = LLMSeedParser(model=model, temperature=temperature, api_key=api_key)
     result = await parser.parse(preprocessed_content, source)
 
     # Replace raw_content with the original input content (not preprocessed)
@@ -169,6 +170,7 @@ async def parse_seed(
             content,
             model=model,
             temperature=temperature,
+            api_key=api_key,
         )
         result = replace(
             result,
@@ -188,6 +190,7 @@ async def parse_seed(
             content,
             sop_store,
             model=model,
+            api_key=api_key,
         )
         result = replace(result, sop_validation=sop_result)
         logger.info(
