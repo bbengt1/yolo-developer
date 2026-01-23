@@ -174,6 +174,58 @@ def _validate_factor_weights(weights: dict[str, float]) -> tuple[bool, str]:
 # =============================================================================
 
 
+def _extract_code_from_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Extract code artifact from state, checking multiple locations.
+
+    Checks for code in order of preference:
+    1. state["code"] - explicit code artifact
+    2. state["implementation"] - implementation artifact
+    3. state["dev_output"] - Dev agent output (transforms to expected format)
+
+    Args:
+        state: State dictionary with potential code artifacts.
+
+    Returns:
+        Code artifact dict with "files" key, or empty dict if not found.
+    """
+    # Try explicit code/implementation keys first
+    code = state.get("code")
+    if code and isinstance(code, dict) and code.get("files"):
+        return code
+
+    impl = state.get("implementation")
+    if impl and isinstance(impl, dict) and impl.get("files"):
+        return impl
+
+    # Try dev_output and transform to expected format
+    dev_output = state.get("dev_output")
+    if dev_output and isinstance(dev_output, dict):
+        implementations = dev_output.get("implementations", [])
+        if implementations:
+            files: list[dict[str, Any]] = []
+            for impl_artifact in implementations:
+                if not isinstance(impl_artifact, dict):
+                    continue
+                # Extract code files
+                for code_file in impl_artifact.get("code_files", []):
+                    if isinstance(code_file, dict):
+                        files.append({
+                            "path": code_file.get("file_path", ""),
+                            "content": code_file.get("content", ""),
+                        })
+                # Extract test files
+                for test_file in impl_artifact.get("test_files", []):
+                    if isinstance(test_file, dict):
+                        files.append({
+                            "path": test_file.get("file_path", ""),
+                            "content": test_file.get("content", ""),
+                        })
+            if files:
+                return {"files": files}
+
+    return {}
+
+
 def _extract_functions_from_content(content: str) -> list[dict[str, Any]]:
     """Extract function information from Python source code.
 
@@ -367,7 +419,7 @@ def calculate_coverage_factor(
             description = "Coverage data present but all values are zero"
     else:
         # Estimate coverage from code analysis
-        code = state.get("code") or state.get("implementation", {})
+        code = _extract_code_from_state(state)
         score, description = _estimate_coverage_from_code(code)
 
     logger.debug("calculate_coverage_factor", score=score, description=description)
@@ -573,7 +625,7 @@ def calculate_risk_factor(
             description = "No valid risks found in risk data"
     else:
         # Estimate risks from code complexity
-        code = state.get("code") or state.get("implementation", {})
+        code = _extract_code_from_state(state)
         score, description = _estimate_risk_from_code(code)
 
     logger.debug("calculate_risk_factor", score=score)
@@ -691,7 +743,7 @@ def calculate_documentation_factor(
     factor_weights = weights or DEFAULT_FACTOR_WEIGHTS
     weight = factor_weights.get("documentation", 0.15)
 
-    code = state.get("code") or state.get("implementation", {})
+    code = _extract_code_from_state(state)
 
     if not code or not isinstance(code, dict):
         return ConfidenceFactor(

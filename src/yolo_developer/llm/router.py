@@ -205,6 +205,9 @@ class LLMRouter:
         api_key = self._api_key_for_provider(provider, allow_missing=True)
         litellm_model = _litellm_model(provider, model)
 
+        # Adjust temperature for models with constraints (e.g., gpt-5)
+        adjusted_temperature = _adjust_temperature_for_model(model, temperature)
+
         logger.info(
             "llm_call_start",
             model=litellm_model,
@@ -221,7 +224,7 @@ class LLMRouter:
             response = await acompletion(
                 model=litellm_model,
                 messages=messages,
-                temperature=temperature,
+                temperature=adjusted_temperature,
                 max_tokens=max_tokens,
                 api_key=api_key,
                 **kwargs,
@@ -311,6 +314,9 @@ class LLMRouter:
         api_key = self._api_key_for_provider(resolved_provider, allow_missing=False)
         litellm_model = _litellm_model(resolved_provider, routing.model)
 
+        # Adjust temperature for models with constraints (e.g., gpt-5)
+        adjusted_temperature = _adjust_temperature_for_model(routing.model, temperature)
+
         logger.info(
             "llm_task_call_start",
             task_type=task_type,
@@ -325,7 +331,7 @@ class LLMRouter:
             response = await acompletion(
                 model=litellm_model,
                 messages=messages,
-                temperature=temperature,
+                temperature=adjusted_temperature,
                 max_tokens=max_tokens,
                 api_key=api_key,
                 **kwargs,
@@ -441,3 +447,37 @@ def _litellm_model(provider: Literal["openai", "anthropic", "auto"], model: str)
     if provider in ("openai", "anthropic"):
         return f"{provider}/{model}"
     return model
+
+
+def _adjust_temperature_for_model(model: str, temperature: float) -> float:
+    """Adjust temperature based on model constraints.
+
+    Some models have restrictions on temperature values:
+    - gpt-5 and gpt-5-mini/codex only support temperature=1
+    - gpt-5.1+ support variable temperature with reasoning_effort='none'
+    - o1/o3 reasoning models may have similar constraints
+
+    Args:
+        model: The model identifier.
+        temperature: The requested temperature.
+
+    Returns:
+        The adjusted temperature value.
+    """
+    model_lower = model.lower()
+
+    # gpt-5 base models (not gpt-5.1, gpt-5.2, etc.) only support temperature=1
+    # Models like "gpt-5", "gpt-5-mini", "gpt-5-codex" need temperature=1
+    # But "gpt-5.1-*", "gpt-5.2-*" support variable temperature
+    if "gpt-5" in model_lower:
+        # Check if it's a versioned model (gpt-5.1, gpt-5.2, etc.)
+        import re
+
+        # Match gpt-5 followed by a dot and number (e.g., gpt-5.1, gpt-5.2)
+        if re.search(r"gpt-5\.\d", model_lower):
+            # Versioned models support variable temperature
+            return temperature
+        # Base gpt-5 models only support temperature=1
+        return 1.0
+
+    return temperature

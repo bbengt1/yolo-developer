@@ -735,8 +735,8 @@ def test_validate_code_style():
         assert result.passed is True
 
     @pytest.mark.asyncio
-    async def test_evaluator_fails_for_missing_code(self, mock_story: dict) -> None:
-        """Evaluator should fail when code is missing from state."""
+    async def test_evaluator_passes_for_missing_code(self, mock_story: dict) -> None:
+        """Evaluator should pass when code is missing (nothing to validate yet)."""
         from yolo_developer.gates.gates.definition_of_done import definition_of_done_evaluator
 
         context = GateContext(
@@ -744,8 +744,9 @@ def test_validate_code_style():
             gate_name="definition_of_done",
         )
         result = await definition_of_done_evaluator(context)
-        assert result.passed is False
-        assert "code" in result.reason.lower() or "missing" in result.reason.lower()
+        # Should pass since there's nothing to validate yet (advisory gate)
+        assert result.passed is True
+        assert "no code" in result.reason.lower() or "nothing to validate" in result.reason.lower()
 
     @pytest.mark.asyncio
     async def test_evaluator_fails_for_low_score(

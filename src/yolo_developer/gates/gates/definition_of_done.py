@@ -673,13 +673,40 @@ async def definition_of_done_evaluator(context: GateContext) -> GateResult:
     """
     state = context.state
 
-    # Extract code from state (try 'code' first, then 'implementation')
+    # Extract code from state (try multiple sources)
     code = state.get("code") or state.get("implementation")
+
+    # Also check dev_output for code produced by Dev agent
+    if not code or not isinstance(code, dict):
+        dev_output = state.get("dev_output")
+        if dev_output and isinstance(dev_output, dict):
+            implementations = dev_output.get("implementations", [])
+            if implementations:
+                files: list[dict[str, Any]] = []
+                for impl_artifact in implementations:
+                    if not isinstance(impl_artifact, dict):
+                        continue
+                    for code_file in impl_artifact.get("code_files", []):
+                        if isinstance(code_file, dict):
+                            files.append({
+                                "path": code_file.get("file_path", ""),
+                                "content": code_file.get("content", ""),
+                            })
+                    for test_file in impl_artifact.get("test_files", []):
+                        if isinstance(test_file, dict):
+                            files.append({
+                                "path": test_file.get("file_path", ""),
+                                "content": test_file.get("content", ""),
+                            })
+                if files:
+                    code = {"files": files}
+
+    # If still no code, this is expected when gate runs before Dev produces output
     if not code or not isinstance(code, dict):
         return GateResult(
-            passed=False,
+            passed=True,  # Pass since there's nothing to validate yet (advisory gate)
             gate_name=context.gate_name,
-            reason="Missing or invalid 'code' in state - cannot evaluate Definition of Done",
+            reason="No code in state yet - Definition of Done will be validated after code is generated",
         )
 
     # Extract story from state

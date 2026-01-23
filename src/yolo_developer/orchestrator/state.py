@@ -65,6 +65,14 @@ class YoloState(TypedDict, total=False):
         tool_registry: Registry of external CLI tools (e.g., Claude Code).
             Optional - when present, agents can delegate tasks to external tools.
             Type is Any to avoid circular imports (actual type: ToolRegistry).
+        analyst_output: Output from the analyst agent containing crystallized
+            requirements for downstream agents (PM, Architect, etc.). Optional.
+        pm_output: Output from the PM agent containing user stories with
+            acceptance criteria for downstream agents (Architect, Dev). Optional.
+        architect_output: Output from the architect agent containing design
+            decisions for downstream agents (Dev, TEA). Optional.
+        dev_output: Output from the dev agent containing implementation
+            artifacts for downstream agents (TEA). Optional.
 
     Example:
         >>> state: YoloState = {
@@ -88,6 +96,11 @@ class YoloState(TypedDict, total=False):
     # Type is Any to avoid circular imports at runtime (LangGraph needs runtime access)
     # Actual type: yolo_developer.tools.ToolRegistry
     tool_registry: Any
+    # Agent output fields for downstream agent consumption
+    analyst_output: dict[str, Any] | None
+    pm_output: dict[str, Any] | None
+    architect_output: dict[str, Any] | None
+    dev_output: dict[str, Any] | None
 
 
 def get_messages_reducer() -> Callable[[list[BaseMessage], list[BaseMessage]], list[BaseMessage]]:

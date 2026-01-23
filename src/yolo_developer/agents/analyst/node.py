@@ -3171,9 +3171,11 @@ async def analyst_node(state: YoloState) -> dict[str, Any]:
 
     # Return ONLY the updates, not full state
     # Story 5.7: Include escalation_needed flag for orchestrator routing
+    # Include analyst_output for downstream agents (PM needs requirements)
     result: dict[str, Any] = {
         "messages": [message],
         "decisions": [decision],
+        "analyst_output": output.to_dict(),
     }
 
     # Add escalation_needed flag for orchestrator conditional routing
