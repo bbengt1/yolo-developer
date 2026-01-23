@@ -171,6 +171,19 @@ yolo init [OPTIONS] [PATH]
 | `--scan-only` | FLAG | False | Scan existing project without changes |
 | `--non-interactive` | FLAG | False | Skip brownfield prompts |
 | `--hint` | TEXT | None | Hint about project type |
+| `--skip-git` | FLAG | False | Skip git repository prompts |
+| `--skip-github` | FLAG | False | Skip GitHub repository creation prompts |
+
+### Git Repository Features
+
+The init command automatically handles git repository setup:
+
+1. **Detection**: Checks if directory is a git repository
+2. **Initialization**: Offers to run `git init` if not initialized
+3. **Remote Detection**: Displays configured remote repositories
+4. **GitHub Creation**: Creates a new GitHub repository via `gh` CLI (if available)
+5. **Initial Commit**: Creates an initial commit with project files
+6. **Push**: Pushes initial commit to remote repository
 
 ### Examples
 
@@ -187,12 +200,47 @@ Initializing YOLO Developer project...
 ? Author name: Developer
 ? Author email: dev@example.com
 
+This directory is not a git repository. Initialize git? [Y/n] y
+Git repository initialized!
+
+           Git Repository Status
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
+┃ Property     ┃ Value               ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
+│ Git Status   │ Initialized         │
+│ Remotes      │ None configured     │
+└──────────────┴─────────────────────┘
+
+Remote Repository Options:
+  1. Create a new GitHub repository
+  2. Add an existing remote URL
+  3. Skip remote setup
+Choose an option [3]:
+
 Creating configuration...
   ✓ Created yolo.yaml
   ✓ Created .yolo/ directory
   ✓ Initialized memory store
 
+Create initial commit with project files? [Y/n] y
+Initial commit created!
+
 Project initialized successfully!
+```
+
+**Skip git prompts:**
+```bash
+yolo init --skip-git
+```
+
+**Skip GitHub prompts only:**
+```bash
+yolo init --skip-github
+```
+
+**Fully automated (no prompts):**
+```bash
+yolo init --no-input
 ```
 
 **Brownfield initialization:**

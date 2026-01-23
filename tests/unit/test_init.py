@@ -11,11 +11,21 @@ from unittest.mock import patch
 from yolo_developer.cli.commands.init import (
     PYPROJECT_TEMPLATE,
     README_TEMPLATE,
+    add_git_remote,
+    check_gh_authenticated,
+    check_gh_cli_available,
+    check_git_initialized,
     create_directory_structure,
+    create_github_repo,
+    create_initial_commit,
     create_py_typed,
     create_pyproject_toml,
     create_readme,
+    display_git_status,
+    get_git_remotes,
     init_command,
+    init_git_repository,
+    push_to_remote,
     run_uv_sync,
     validate_python_version,
 )
@@ -331,6 +341,7 @@ class TestInitCommand:
                     name="test-project",
                     author="Test Author",
                     email="test@example.com",
+                    skip_git=True,  # Skip git prompts in tests
                 )
 
             # Verify project structure
@@ -350,6 +361,7 @@ class TestInitCommand:
                     name="my-cool-project",
                     author="Test Author",
                     email="test@example.com",
+                    skip_git=True,  # Skip git prompts in tests
                 )
 
             content = (project_path / "pyproject.toml").read_text()
@@ -364,8 +376,577 @@ class TestInitCommand:
                 patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True),
                 patch("yolo_developer.cli.commands.init.get_git_config", return_value=""),
             ):
-                init_command(path=str(project_path))
+                init_command(path=str(project_path), skip_git=True)  # Skip git prompts
 
             content = (project_path / "pyproject.toml").read_text()
             assert "YOLO Developer" in content
             assert "dev@example.com" in content
+
+
+class TestCheckGitInitialized:
+    """Tests for check_git_initialized function."""
+
+    def test_returns_true_in_git_repo(self) -> None:
+        """Test that check_git_initialized returns True in a git repository."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            # Initialize a git repository
+            import subprocess
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            assert check_git_initialized(project_path) is True
+
+    def test_returns_false_in_non_git_dir(self) -> None:
+        """Test that check_git_initialized returns False in a non-git directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            assert check_git_initialized(project_path) is False
+
+    def test_returns_false_when_git_not_installed(self) -> None:
+        """Test graceful handling when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                assert check_git_initialized(project_path) is False
+
+    def test_uses_current_directory_when_path_is_none(self) -> None:
+        """Test that check_git_initialized uses cwd when path is None."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = ".git"
+            mock_run.return_value.returncode = 0
+            check_git_initialized(None)
+            # Verify cwd was None (uses current directory)
+            mock_run.assert_called_once()
+            assert mock_run.call_args.kwargs["cwd"] is None
+
+
+class TestGetGitRemotes:
+    """Tests for get_git_remotes function."""
+
+    def test_returns_empty_dict_in_non_git_dir(self) -> None:
+        """Test that get_git_remotes returns empty dict in non-git directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            assert get_git_remotes(project_path) == {}
+
+    def test_returns_empty_dict_when_no_remotes(self) -> None:
+        """Test that get_git_remotes returns empty dict when no remotes configured."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            assert get_git_remotes(project_path) == {}
+
+    def test_returns_remotes_when_configured(self) -> None:
+        """Test that get_git_remotes returns configured remotes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "origin", "https://github.com/user/repo.git"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            remotes = get_git_remotes(project_path)
+            assert "origin" in remotes
+            assert remotes["origin"] == "https://github.com/user/repo.git"
+
+    def test_returns_multiple_remotes(self) -> None:
+        """Test that get_git_remotes returns all configured remotes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "origin", "https://github.com/user/repo.git"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "upstream", "https://github.com/org/repo.git"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            remotes = get_git_remotes(project_path)
+            assert len(remotes) == 2
+            assert remotes["origin"] == "https://github.com/user/repo.git"
+            assert remotes["upstream"] == "https://github.com/org/repo.git"
+
+    def test_returns_empty_dict_when_git_not_installed(self) -> None:
+        """Test graceful handling when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                assert get_git_remotes(project_path) == {}
+
+    def test_uses_current_directory_when_path_is_none(self) -> None:
+        """Test that get_git_remotes uses cwd when path is None."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = ""
+            mock_run.return_value.returncode = 0
+            get_git_remotes(None)
+            # Verify cwd was None (uses current directory)
+            mock_run.assert_called_once()
+            assert mock_run.call_args.kwargs["cwd"] is None
+
+
+class TestInitGitRepository:
+    """Tests for init_git_repository function."""
+
+    def test_initializes_git_repo(self) -> None:
+        """Test that init_git_repository creates a git repository."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            result = init_git_repository(project_path)
+
+            assert result is True
+            assert (project_path / ".git").exists()
+
+    def test_creates_gitignore(self) -> None:
+        """Test that init_git_repository creates a .gitignore file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            init_git_repository(project_path)
+
+            gitignore_path = project_path / ".gitignore"
+            assert gitignore_path.exists()
+            content = gitignore_path.read_text()
+            assert "__pycache__/" in content
+            assert ".yolo/" in content
+            assert ".venv" in content
+
+    def test_does_not_overwrite_existing_gitignore(self) -> None:
+        """Test that init_git_repository preserves existing .gitignore."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            gitignore_path = project_path / ".gitignore"
+            existing_content = "# Custom gitignore\nnode_modules/\n"
+            gitignore_path.write_text(existing_content)
+
+            init_git_repository(project_path)
+
+            assert gitignore_path.read_text() == existing_content
+
+    def test_returns_false_when_git_not_installed(self) -> None:
+        """Test graceful handling when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                result = init_git_repository(project_path)
+                assert result is False
+
+    def test_returns_false_on_git_error(self) -> None:
+        """Test handling of git init failure."""
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = subprocess.CalledProcessError(
+                    1, "git", stderr="error"
+                )
+                result = init_git_repository(project_path)
+                assert result is False
+
+
+class TestInitCommandWithGit:
+    """Tests for init_command git integration."""
+
+    def test_skip_git_option_skips_prompts(self) -> None:
+        """Test that --skip-git prevents git initialization prompts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir) / "test-project"
+            with (
+                patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True),
+                patch("yolo_developer.cli.commands.init.init_git_repository") as mock_init_git,
+                patch("typer.confirm") as mock_confirm,
+            ):
+                init_command(path=str(project_path), skip_git=True)
+
+                # Should not call init_git_repository or prompt
+                mock_init_git.assert_not_called()
+                mock_confirm.assert_not_called()
+
+    def test_no_input_skips_git_prompts(self) -> None:
+        """Test that --no-input prevents git initialization prompts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir) / "test-project"
+            with (
+                patch("yolo_developer.cli.commands.init.run_uv_sync", return_value=True),
+                patch("yolo_developer.cli.commands.init.init_git_repository") as mock_init_git,
+                patch("typer.confirm") as mock_confirm,
+            ):
+                init_command(path=str(project_path), no_input=True)
+
+                # Should not prompt or initialize git
+                mock_confirm.assert_not_called()
+                mock_init_git.assert_not_called()
+
+
+class TestAddGitRemote:
+    """Tests for add_git_remote function."""
+
+    def test_adds_remote_successfully(self) -> None:
+        """Test that add_git_remote adds a remote to a git repository."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+
+            result = add_git_remote(
+                project_path, "origin", "https://github.com/user/repo.git"
+            )
+
+            assert result is True
+            remotes = get_git_remotes(project_path)
+            assert "origin" in remotes
+            assert remotes["origin"] == "https://github.com/user/repo.git"
+
+    def test_returns_false_when_git_not_installed(self) -> None:
+        """Test graceful handling when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                result = add_git_remote(
+                    project_path, "origin", "https://github.com/user/repo.git"
+                )
+                assert result is False
+
+    def test_returns_false_on_git_error(self) -> None:
+        """Test handling of git remote add failure."""
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = subprocess.CalledProcessError(
+                    1, "git", stderr="error"
+                )
+                result = add_git_remote(
+                    project_path, "origin", "https://github.com/user/repo.git"
+                )
+                assert result is False
+
+
+class TestDisplayGitStatus:
+    """Tests for display_git_status function."""
+
+    def test_displays_not_initialized(self, capsys) -> None:
+        """Test display when git is not initialized."""
+        display_git_status(False, {})
+        captured = capsys.readouterr()
+        assert "Not initialized" in captured.out or "not initialized" in captured.out.lower()
+
+    def test_displays_initialized_no_remotes(self, capsys) -> None:
+        """Test display when git is initialized but no remotes."""
+        display_git_status(True, {})
+        captured = capsys.readouterr()
+        assert "None configured" in captured.out or "none" in captured.out.lower()
+
+    def test_displays_initialized_with_remotes(self, capsys) -> None:
+        """Test display when git is initialized with remotes."""
+        display_git_status(True, {"origin": "https://github.com/user/repo.git"})
+        captured = capsys.readouterr()
+        assert "origin" in captured.out
+
+
+class TestCheckGhCliAvailable:
+    """Tests for check_gh_cli_available function."""
+
+    def test_returns_true_when_gh_available(self) -> None:
+        """Test returns True when gh CLI is available."""
+        with patch("shutil.which", return_value="/usr/bin/gh"):
+            assert check_gh_cli_available() is True
+
+    def test_returns_false_when_gh_not_available(self) -> None:
+        """Test returns False when gh CLI is not available."""
+        with patch("shutil.which", return_value=None):
+            assert check_gh_cli_available() is False
+
+
+class TestCheckGhAuthenticated:
+    """Tests for check_gh_authenticated function."""
+
+    def test_returns_true_when_authenticated(self) -> None:
+        """Test returns True when gh is authenticated."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            assert check_gh_authenticated() is True
+
+    def test_returns_false_when_not_authenticated(self) -> None:
+        """Test returns False when gh is not authenticated."""
+        import subprocess
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(1, "gh")
+            assert check_gh_authenticated() is False
+
+    def test_returns_false_when_gh_not_installed(self) -> None:
+        """Test returns False when gh is not installed."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("gh not found")
+            assert check_gh_authenticated() is False
+
+
+class TestCreateGithubRepo:
+    """Tests for create_github_repo function."""
+
+    def test_returns_false_when_gh_not_available(self) -> None:
+        """Test returns False when gh CLI is not available."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_cli_available",
+                return_value=False,
+            ),
+        ):
+            project_path = Path(tmpdir)
+            success, url = create_github_repo(project_path, "test-repo")
+            assert success is False
+            assert url is None
+
+    def test_returns_false_when_not_authenticated(self) -> None:
+        """Test returns False when gh is not authenticated."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_cli_available",
+                return_value=True,
+            ),
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_authenticated",
+                return_value=False,
+            ),
+        ):
+            project_path = Path(tmpdir)
+            success, url = create_github_repo(project_path, "test-repo")
+            assert success is False
+            assert url is None
+
+    def test_creates_repo_successfully(self) -> None:
+        """Test successful repository creation."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_cli_available",
+                return_value=True,
+            ),
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_authenticated",
+                return_value=True,
+            ),
+            patch("subprocess.run") as mock_run,
+            patch(
+                "yolo_developer.cli.commands.init.get_git_remotes",
+                return_value={"origin": "https://github.com/user/test-repo.git"},
+            ),
+        ):
+            mock_run.return_value.stdout = "https://github.com/user/test-repo.git"
+            mock_run.return_value.returncode = 0
+
+            project_path = Path(tmpdir)
+            success, url = create_github_repo(project_path, "test-repo")
+
+            assert success is True
+            assert url == "https://github.com/user/test-repo.git"
+
+    def test_returns_false_on_error(self) -> None:
+        """Test returns False on subprocess error."""
+        import subprocess
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_cli_available",
+                return_value=True,
+            ),
+            patch(
+                "yolo_developer.cli.commands.init.check_gh_authenticated",
+                return_value=True,
+            ),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.side_effect = subprocess.CalledProcessError(1, "gh", stderr="error")
+
+            project_path = Path(tmpdir)
+            success, url = create_github_repo(project_path, "test-repo")
+
+            assert success is False
+            assert url is None
+
+
+class TestCreateInitialCommit:
+    """Tests for create_initial_commit function."""
+
+    def test_creates_commit_successfully(self) -> None:
+        """Test successful initial commit creation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            # Initialize git repo
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+
+            # Configure git user for commit
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+
+            # Create a file to commit
+            (project_path / "README.md").write_text("# Test Project")
+
+            result = create_initial_commit(project_path, "Initial commit")
+
+            assert result is True
+
+            # Verify commit exists
+            log_result = subprocess.run(
+                ["git", "log", "--oneline", "-1"],
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+            )
+            assert "Initial commit" in log_result.stdout
+
+    def test_returns_true_when_nothing_to_commit(self) -> None:
+        """Test returns True when there's nothing to commit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            import subprocess
+
+            # Initialize git repo
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+
+            # Configure git user
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=project_path,
+                capture_output=True,
+                check=True,
+            )
+
+            # Don't create any files - nothing to commit
+            result = create_initial_commit(project_path)
+
+            # Should return True (graceful handling)
+            assert result is True
+
+    def test_returns_false_when_git_not_installed(self) -> None:
+        """Test returns False when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                result = create_initial_commit(project_path)
+                assert result is False
+
+
+class TestPushToRemote:
+    """Tests for push_to_remote function."""
+
+    def test_push_successfully(self) -> None:
+        """Test successful push to remote."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch("subprocess.run") as mock_run,
+        ):
+            # Mock git commands
+            mock_run.return_value.stdout = "main"
+            mock_run.return_value.returncode = 0
+
+            project_path = Path(tmpdir)
+            result = push_to_remote(project_path)
+
+            assert result is True
+            # Verify git push was called
+            push_call = [call for call in mock_run.call_args_list if "push" in str(call)]
+            assert len(push_call) > 0
+
+    def test_returns_false_on_error(self) -> None:
+        """Test returns False on push error."""
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                # First call for branch detection succeeds
+                mock_run.return_value.stdout = "main"
+                mock_run.return_value.returncode = 0
+                # Then fail on push
+                mock_run.side_effect = [
+                    type("Result", (), {"stdout": "main", "returncode": 0})(),
+                    subprocess.CalledProcessError(1, "git", stderr="error"),
+                ]
+                result = push_to_remote(project_path)
+                assert result is False
+
+    def test_returns_false_when_git_not_installed(self) -> None:
+        """Test returns False when git is not installed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("git not found")
+                result = push_to_remote(project_path)
+                assert result is False

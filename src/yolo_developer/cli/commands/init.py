@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import structlog
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -20,6 +21,7 @@ from yolo_developer.config.schema import BrownfieldConfig
 from yolo_developer.scanner import ScannerManager
 
 console = Console()
+logger = structlog.get_logger(__name__)
 
 # Regex to extract base package name from dependency string
 # Handles: package, package>=1.0, package==1.0, package~=1.0, package[extra], etc.
@@ -45,6 +47,67 @@ def get_git_config(key: str) -> str:
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
+
+
+def check_git_initialized(path: Path | None = None) -> bool:
+    """Check if the given path is inside a git repository.
+
+    Uses `git rev-parse --git-dir` to determine if git is initialized.
+
+    Args:
+        path: Directory to check. Defaults to current working directory.
+
+    Returns:
+        True if the path is inside a git repository, False otherwise.
+    """
+    cwd = str(path) if path else None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=cwd,
+        )
+        return bool(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def get_git_remotes(path: Path | None = None) -> dict[str, str]:
+    """Get all configured git remotes for the repository.
+
+    Uses `git remote -v` to retrieve remote URLs.
+
+    Args:
+        path: Directory to check. Defaults to current working directory.
+
+    Returns:
+        Dictionary mapping remote names to their fetch URLs.
+        Empty dict if not a git repo or no remotes configured.
+    """
+    cwd = str(path) if path else None
+    try:
+        result = subprocess.run(
+            ["git", "remote", "-v"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=cwd,
+        )
+        remotes: dict[str, str] = {}
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            # Format: "origin\thttps://github.com/user/repo.git (fetch)"
+            parts = line.split()
+            if len(parts) >= 2 and "(fetch)" in line:
+                remote_name = parts[0]
+                remote_url = parts[1]
+                remotes[remote_name] = remote_url
+        return remotes
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {}
 
 
 # yolo.yaml template with sensible defaults and comments
@@ -524,6 +587,326 @@ def merge_pyproject_dependencies(project_path: Path) -> None:
     console.print(f"[green]Added {len(new_deps)} YOLO dependencies to pyproject.toml[/green]")
 
 
+def display_git_status(git_initialized: bool, git_remotes: dict[str, str]) -> None:
+    """Display git repository status using Rich table.
+
+    Args:
+        git_initialized: Whether the directory is a git repository.
+        git_remotes: Dictionary mapping remote names to URLs.
+    """
+    table = Table(title="Git Repository Status", show_header=True, header_style="bold cyan")
+    table.add_column("Property", style="cyan")
+    table.add_column("Value")
+
+    status = "[green]Initialized[/green]" if git_initialized else "[yellow]Not initialized[/yellow]"
+    table.add_row("Git Status", status)
+
+    if git_initialized:
+        if git_remotes:
+            remotes_list = ", ".join(
+                f"[cyan]{name}[/cyan]" for name in git_remotes.keys()
+            )
+            table.add_row("Remotes", remotes_list)
+        else:
+            table.add_row("Remotes", "[dim]None configured[/dim]")
+
+    console.print(table)
+    console.print()
+
+
+def check_gh_cli_available() -> bool:
+    """Check if GitHub CLI (gh) is installed and available.
+
+    Returns:
+        True if gh CLI is available, False otherwise.
+    """
+    import shutil
+
+    return shutil.which("gh") is not None
+
+
+def check_gh_authenticated() -> bool:
+    """Check if GitHub CLI is authenticated.
+
+    Returns:
+        True if gh is authenticated, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.returncode == 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def create_github_repo(
+    project_path: Path,
+    name: str,
+    description: str | None = None,
+    private: bool = True,
+) -> tuple[bool, str | None]:
+    """Create a new GitHub repository using gh CLI.
+
+    Args:
+        project_path: Path to the project directory.
+        name: Repository name.
+        description: Optional repository description.
+        private: Whether the repository should be private (default True).
+
+    Returns:
+        Tuple of (success, repo_url). repo_url is None if creation failed.
+    """
+    if not check_gh_cli_available():
+        logger.warning("gh_cli_not_found", message="GitHub CLI (gh) not installed")
+        return False, None
+
+    if not check_gh_authenticated():
+        logger.warning("gh_not_authenticated", message="GitHub CLI not authenticated")
+        return False, None
+
+    try:
+        cmd = ["gh", "repo", "create", name]
+
+        if private:
+            cmd.append("--private")
+        else:
+            cmd.append("--public")
+
+        if description:
+            cmd.extend(["--description", description])
+
+        # Add as remote origin and don't clone
+        cmd.extend(["--source", str(project_path), "--remote", "origin"])
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Parse the repo URL from output
+        repo_url = result.stdout.strip()
+        if not repo_url:
+            # Try to get it from git remote
+            remotes = get_git_remotes(project_path)
+            repo_url = remotes.get("origin", "")
+
+        logger.info("github_repo_created", name=name, url=repo_url)
+        return True, repo_url
+
+    except subprocess.CalledProcessError as e:
+        logger.error("github_repo_creation_failed", error=str(e), stderr=e.stderr)
+        return False, None
+    except FileNotFoundError:
+        logger.warning("gh_cli_not_found", message="GitHub CLI (gh) not installed")
+        return False, None
+
+
+def create_initial_commit(project_path: Path, message: str = "Initial commit") -> bool:
+    """Create an initial git commit with all files.
+
+    Args:
+        project_path: Path to the project directory.
+        message: Commit message.
+
+    Returns:
+        True if commit was created successfully, False on error.
+    """
+    try:
+        # Stage all files
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Create commit
+        subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        logger.info("initial_commit_created", project_path=str(project_path))
+        return True
+    except subprocess.CalledProcessError as e:
+        # Empty commit is okay (nothing to commit)
+        if "nothing to commit" in e.stdout or "nothing to commit" in (e.stderr or ""):
+            logger.debug("no_changes_to_commit", project_path=str(project_path))
+            return True
+        logger.error("initial_commit_failed", error=str(e), stderr=e.stderr)
+        return False
+    except FileNotFoundError:
+        logger.warning("git_not_found", message="git command not found in PATH")
+        return False
+
+
+def push_to_remote(project_path: Path, remote: str = "origin", branch: str | None = None) -> bool:
+    """Push commits to a remote repository.
+
+    Args:
+        project_path: Path to the project directory.
+        remote: Remote name to push to.
+        branch: Branch name to push. If None, uses current branch.
+
+    Returns:
+        True if push was successful, False on error.
+    """
+    try:
+        # Get current branch if not specified
+        if branch is None:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch = result.stdout.strip()
+
+        # Push with -u to set upstream
+        subprocess.run(
+            ["git", "push", "-u", remote, branch],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        logger.info("pushed_to_remote", remote=remote, branch=branch)
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error("push_failed", error=str(e), stderr=e.stderr)
+        return False
+    except FileNotFoundError:
+        logger.warning("git_not_found", message="git command not found in PATH")
+        return False
+
+
+def add_git_remote(project_path: Path, name: str, url: str) -> bool:
+    """Add a git remote to the repository.
+
+    Args:
+        project_path: Path to the project directory.
+        name: Remote name (e.g., "origin").
+        url: Remote URL.
+
+    Returns:
+        True if remote was added successfully, False on error.
+    """
+    try:
+        subprocess.run(
+            ["git", "remote", "add", name, url],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        logger.info("git_remote_added", name=name, url=url)
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error("git_remote_add_failed", error=str(e), stderr=e.stderr)
+        return False
+    except FileNotFoundError:
+        logger.warning("git_not_found", message="git command not found in PATH")
+        return False
+
+
+def init_git_repository(project_path: Path) -> bool:
+    """Initialize a git repository with a .gitignore file.
+
+    Args:
+        project_path: Path to the project directory.
+
+    Returns:
+        True if git was initialized successfully, False on error.
+    """
+    try:
+        # Initialize git repository
+        subprocess.run(
+            ["git", "init"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Create .gitignore if it doesn't exist
+        gitignore_path = project_path / ".gitignore"
+        if not gitignore_path.exists():
+            gitignore_content = """# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# YOLO Developer
+.yolo/
+
+# OS
+.DS_Store
+Thumbs.db
+"""
+            gitignore_path.write_text(gitignore_content)
+            logger.debug("gitignore_created", path=str(gitignore_path))
+
+        logger.info("git_initialized", project_path=str(project_path))
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error("git_init_failed", error=str(e), stderr=e.stderr)
+        return False
+    except FileNotFoundError:
+        logger.warning("git_not_found", message="git command not found in PATH")
+        return False
+
+
 def init_command(
     path: str | None = None,
     name: str | None = None,
@@ -535,6 +918,8 @@ def init_command(
     scan_only: bool = False,
     non_interactive: bool = False,
     hint: str | None = None,
+    skip_git: bool = False,
+    skip_github: bool = False,
 ) -> None:
     """Initialize a new YOLO Developer project.
 
@@ -549,6 +934,8 @@ def init_command(
         scan_only: If True, scan project without making changes.
         non_interactive: If True, skip all prompts during scanning.
         hint: Optional hint about project type for scanning.
+        skip_git: If True, skip git repository initialization prompts.
+        skip_github: If True, skip GitHub repository creation prompts.
     """
     import typer
 
@@ -559,6 +946,130 @@ def init_command(
     # Resolve project path
     project_path = Path(path) if path else Path.cwd()
     project_path = project_path.resolve()
+
+    # Log git status for debugging and future prompts (Phase 1 - detection only)
+    git_initialized = check_git_initialized(project_path)
+    git_remotes = get_git_remotes(project_path) if git_initialized else {}
+    logger.debug(
+        "git_status_detected",
+        project_path=str(project_path),
+        git_initialized=git_initialized,
+        remotes=list(git_remotes.keys()) if git_remotes else [],
+    )
+
+    # Prompt for git initialization if not in a git repo (unless skipped)
+    if not git_initialized and not skip_git and not no_input:
+        if interactive or not existing:
+            should_init_git = typer.confirm(
+                "This directory is not a git repository. Initialize git?",
+                default=True,
+            )
+            if should_init_git:
+                console.print("[blue]Initializing git repository...[/blue]")
+                if init_git_repository(project_path):
+                    console.print("[green]Git repository initialized![/green]")
+                    git_initialized = True
+                else:
+                    console.print(
+                        "[yellow]Warning: Could not initialize git repository.[/yellow]"
+                    )
+
+    # Display git status if interactive and git is initialized
+    if git_initialized and not no_input and not skip_git:
+        # Refresh remotes after potential initialization
+        git_remotes = get_git_remotes(project_path)
+        display_git_status(git_initialized, git_remotes)
+
+        # Prompt for adding remote if none configured
+        if not git_remotes and (interactive or not existing):
+            # Check if GitHub CLI is available for repo creation
+            gh_available = check_gh_cli_available() and not skip_github
+
+            if gh_available:
+                console.print("\n[bold]Remote Repository Options:[/bold]")
+                console.print("  1. Create a new GitHub repository")
+                console.print("  2. Add an existing remote URL")
+                console.print("  3. Skip remote setup")
+
+                choice = typer.prompt(
+                    "Choose an option",
+                    default="3",
+                    show_default=True,
+                )
+
+                if choice == "1":
+                    # Create GitHub repository
+                    repo_name = typer.prompt(
+                        "Repository name",
+                        default=project_path.name,
+                    )
+                    repo_desc = typer.prompt(
+                        "Repository description (optional)",
+                        default="",
+                    )
+                    is_private = typer.confirm(
+                        "Make repository private?",
+                        default=True,
+                    )
+
+                    console.print("[blue]Creating GitHub repository...[/blue]")
+                    success, repo_url = create_github_repo(
+                        project_path,
+                        repo_name,
+                        description=repo_desc if repo_desc else None,
+                        private=is_private,
+                    )
+
+                    if success:
+                        console.print(
+                            f"[green]GitHub repository created: {repo_url}[/green]"
+                        )
+                        git_remotes = get_git_remotes(project_path)
+                    else:
+                        if not check_gh_authenticated():
+                            console.print(
+                                "[yellow]GitHub CLI not authenticated. "
+                                "Run 'gh auth login' first.[/yellow]"
+                            )
+                        else:
+                            console.print(
+                                "[yellow]Could not create GitHub repository.[/yellow]"
+                            )
+
+                elif choice == "2":
+                    remote_url = typer.prompt(
+                        "Enter remote URL (e.g., https://github.com/user/repo.git)"
+                    )
+                    if remote_url.strip():
+                        if add_git_remote(project_path, "origin", remote_url.strip()):
+                            console.print(
+                                f"[green]Remote 'origin' added: {remote_url}[/green]"
+                            )
+                            git_remotes = {"origin": remote_url.strip()}
+                        else:
+                            console.print(
+                                "[yellow]Warning: Could not add remote.[/yellow]"
+                            )
+            else:
+                # GitHub CLI not available, just offer manual remote addition
+                should_add_remote = typer.confirm(
+                    "No remote repository configured. Would you like to add one?",
+                    default=False,
+                )
+                if should_add_remote:
+                    remote_url = typer.prompt(
+                        "Enter remote URL (e.g., https://github.com/user/repo.git)"
+                    )
+                    if remote_url.strip():
+                        if add_git_remote(project_path, "origin", remote_url.strip()):
+                            console.print(
+                                f"[green]Remote 'origin' added: {remote_url}[/green]"
+                            )
+                            git_remotes = {"origin": remote_url.strip()}
+                        else:
+                            console.print(
+                                "[yellow]Warning: Could not add remote.[/yellow]"
+                            )
 
     # Create directory if it doesn't exist (greenfield only)
     if not existing:
@@ -670,6 +1181,38 @@ def init_command(
         console.print("[green]Dependencies installed successfully![/green]")
     else:
         console.print("[yellow]Please run 'uv sync' manually.[/yellow]")
+
+    # Offer to create initial commit if git is initialized
+    if git_initialized and not no_input and not skip_git:
+        should_commit = typer.confirm(
+            "Create initial commit with project files?",
+            default=True,
+        )
+        if should_commit:
+            console.print("[blue]Creating initial commit...[/blue]")
+            if create_initial_commit(project_path, "Initial YOLO Developer project setup"):
+                console.print("[green]Initial commit created![/green]")
+
+                # Offer to push if remote is configured
+                git_remotes = get_git_remotes(project_path)
+                if git_remotes and not skip_github:
+                    should_push = typer.confirm(
+                        "Push initial commit to remote?",
+                        default=True,
+                    )
+                    if should_push:
+                        console.print("[blue]Pushing to remote...[/blue]")
+                        if push_to_remote(project_path):
+                            console.print("[green]Pushed to remote successfully![/green]")
+                        else:
+                            console.print(
+                                "[yellow]Could not push to remote. "
+                                "You can push manually later.[/yellow]"
+                            )
+            else:
+                console.print(
+                    "[yellow]Could not create initial commit.[/yellow]"
+                )
 
     console.print(
         Panel(
