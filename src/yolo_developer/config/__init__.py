@@ -19,16 +19,6 @@ from __future__ import annotations
 from yolo_developer.config.export import export_config, import_config
 from yolo_developer.config.loader import ConfigurationError, load_config
 from yolo_developer.config.schema import (
-    GateThreshold,
-    LLMConfig,
-    LLMProvider,
-    HybridConfig,
-    HybridRoutingConfig,
-    MemoryConfig,
-    OpenAIConfig,
-    QualityConfig,
-    SeedThresholdConfig,
-    YoloConfig,
     LLM_BEST_MODEL_DEFAULT,
     LLM_CHEAP_MODEL_DEFAULT,
     LLM_PREMIUM_MODEL_DEFAULT,
@@ -36,6 +26,19 @@ from yolo_developer.config.schema import (
     OPENAI_CODE_MODEL_DEFAULT,
     OPENAI_PREMIUM_MODEL_DEFAULT,
     OPENAI_REASONING_MODEL_DEFAULT,
+    CLIToolConfig,
+    CLIToolOutputFormat,
+    GateThreshold,
+    HybridConfig,
+    HybridRoutingConfig,
+    LLMConfig,
+    LLMProvider,
+    MemoryConfig,
+    OpenAIConfig,
+    QualityConfig,
+    SeedThresholdConfig,
+    ToolsConfig,
+    YoloConfig,
 )
 from yolo_developer.config.validators import (
     ValidationIssue,
@@ -44,6 +47,8 @@ from yolo_developer.config.validators import (
 )
 
 __all__ = [
+    "CLIToolConfig",
+    "CLIToolOutputFormat",
     "ConfigurationError",
     "GateThreshold",
     "LLMConfig",
@@ -61,6 +66,7 @@ __all__ = [
     "OPENAI_REASONING_MODEL_DEFAULT",
     "QualityConfig",
     "SeedThresholdConfig",
+    "ToolsConfig",
     "ValidationIssue",
     "ValidationResult",
     "YoloConfig",

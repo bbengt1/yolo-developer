@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from yolo_developer.config import (
+    CLIToolConfig,
     LLM_BEST_MODEL_DEFAULT,
     LLM_CHEAP_MODEL_DEFAULT,
     LLM_PREMIUM_MODEL_DEFAULT,
@@ -620,3 +621,217 @@ class TestSchemaCodeQuality:
         schema_file = Path("src/yolo_developer/config/schema.py")
         content = schema_file.read_text()
         assert "from __future__ import annotations" in content
+
+
+class TestCLIToolConfig:
+    """Tests for CLIToolConfig (Issue #17 - Phase 1)."""
+
+    def test_cli_tool_config_exists(self) -> None:
+        """Verify CLIToolConfig class exists and can be imported."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        assert CLIToolConfig is not None
+
+    def test_cli_tool_config_default_values(self) -> None:
+        """Verify CLIToolConfig has correct default values."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        config = CLIToolConfig()
+        assert config.enabled is False
+        assert config.path is None
+        assert config.timeout == 300
+        assert config.output_format == "json"
+        assert config.extra_args == []
+
+    def test_cli_tool_config_custom_values(self) -> None:
+        """Verify CLIToolConfig accepts custom values."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        config = CLIToolConfig(
+            enabled=True,
+            path="/usr/local/bin/claude",
+            timeout=600,
+            output_format="text",
+            extra_args=["--verbose", "--no-color"],
+        )
+        assert config.enabled is True
+        assert config.path == "/usr/local/bin/claude"
+        assert config.timeout == 600
+        assert config.output_format == "text"
+        assert config.extra_args == ["--verbose", "--no-color"]
+
+    def test_cli_tool_config_rejects_invalid_timeout(self) -> None:
+        """Verify timeout must be positive."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            CLIToolConfig(timeout=0)
+        assert "timeout" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            CLIToolConfig(timeout=-1)
+        assert "timeout" in str(exc_info.value)
+
+    def test_cli_tool_config_rejects_invalid_output_format(self) -> None:
+        """Verify output_format only accepts json or text."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            CLIToolConfig(output_format="xml")  # type: ignore[arg-type]
+        assert "output_format" in str(exc_info.value)
+
+    def test_cli_tool_config_fields_have_descriptions(self) -> None:
+        """Verify CLIToolConfig fields have Field descriptions."""
+        from yolo_developer.config.schema import CLIToolConfig
+
+        assert CLIToolConfig.model_fields["enabled"].description is not None
+        assert CLIToolConfig.model_fields["path"].description is not None
+        assert CLIToolConfig.model_fields["timeout"].description is not None
+        assert CLIToolConfig.model_fields["output_format"].description is not None
+        assert CLIToolConfig.model_fields["extra_args"].description is not None
+
+    def test_cli_tool_config_fields_have_type_hints(self) -> None:
+        """Verify all CLIToolConfig fields have type hints."""
+        hints = get_type_hints(CLIToolConfig)
+        assert "enabled" in hints
+        assert "path" in hints
+        assert "timeout" in hints
+        assert "output_format" in hints
+        assert "extra_args" in hints
+
+
+class TestToolsConfig:
+    """Tests for ToolsConfig (Issue #17 - Phase 1)."""
+
+    def test_tools_config_exists(self) -> None:
+        """Verify ToolsConfig class exists and can be imported."""
+        from yolo_developer.config.schema import ToolsConfig
+
+        assert ToolsConfig is not None
+
+    def test_tools_config_default_values(self) -> None:
+        """Verify ToolsConfig has correct default values."""
+        from yolo_developer.config.schema import CLIToolConfig, ToolsConfig
+
+        config = ToolsConfig()
+        assert isinstance(config.claude_code, CLIToolConfig)
+        assert isinstance(config.aider, CLIToolConfig)
+        assert config.claude_code.enabled is False
+        assert config.aider.enabled is False
+
+    def test_tools_config_custom_claude_code(self) -> None:
+        """Verify ToolsConfig accepts custom Claude Code configuration."""
+        from yolo_developer.config.schema import CLIToolConfig, ToolsConfig
+
+        config = ToolsConfig(
+            claude_code=CLIToolConfig(enabled=True, timeout=600),
+        )
+        assert config.claude_code.enabled is True
+        assert config.claude_code.timeout == 600
+        assert config.aider.enabled is False  # Default
+
+    def test_tools_config_custom_aider(self) -> None:
+        """Verify ToolsConfig accepts custom Aider configuration."""
+        from yolo_developer.config.schema import CLIToolConfig, ToolsConfig
+
+        config = ToolsConfig(
+            aider=CLIToolConfig(enabled=True, path="/opt/aider/bin/aider"),
+        )
+        assert config.aider.enabled is True
+        assert config.aider.path == "/opt/aider/bin/aider"
+        assert config.claude_code.enabled is False  # Default
+
+    def test_tools_config_fields_have_descriptions(self) -> None:
+        """Verify ToolsConfig fields have Field descriptions."""
+        from yolo_developer.config.schema import ToolsConfig
+
+        assert ToolsConfig.model_fields["claude_code"].description is not None
+        assert ToolsConfig.model_fields["aider"].description is not None
+
+
+class TestYoloConfigTools:
+    """Tests for tools section in YoloConfig (Issue #17 - Phase 1)."""
+
+    def test_yolo_config_has_tools_field(self) -> None:
+        """Verify YoloConfig has tools field."""
+        from yolo_developer.config.schema import YoloConfig
+
+        config = YoloConfig(project_name="test")
+        assert hasattr(config, "tools")
+
+    def test_yolo_config_tools_default_value(self) -> None:
+        """Verify YoloConfig tools has correct default."""
+        from yolo_developer.config.schema import ToolsConfig, YoloConfig
+
+        config = YoloConfig(project_name="test")
+        assert isinstance(config.tools, ToolsConfig)
+        assert config.tools.claude_code.enabled is False
+        assert config.tools.aider.enabled is False
+
+    def test_yolo_config_tools_custom_value(self) -> None:
+        """Verify YoloConfig accepts custom tools configuration."""
+        from yolo_developer.config.schema import CLIToolConfig, ToolsConfig, YoloConfig
+
+        config = YoloConfig(
+            project_name="test",
+            tools=ToolsConfig(
+                claude_code=CLIToolConfig(enabled=True, timeout=600),
+            ),
+        )
+        assert config.tools.claude_code.enabled is True
+        assert config.tools.claude_code.timeout == 600
+
+    def test_env_override_tools_claude_code_enabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify YOLO_TOOLS__CLAUDE_CODE__ENABLED env var works."""
+        from yolo_developer.config.schema import YoloConfig
+
+        monkeypatch.setenv("YOLO_PROJECT_NAME", "test")
+        monkeypatch.setenv("YOLO_TOOLS__CLAUDE_CODE__ENABLED", "true")
+        config = YoloConfig()
+        assert config.tools.claude_code.enabled is True
+
+    def test_env_override_tools_claude_code_timeout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify YOLO_TOOLS__CLAUDE_CODE__TIMEOUT env var works."""
+        from yolo_developer.config.schema import YoloConfig
+
+        monkeypatch.setenv("YOLO_PROJECT_NAME", "test")
+        monkeypatch.setenv("YOLO_TOOLS__CLAUDE_CODE__TIMEOUT", "600")
+        config = YoloConfig()
+        assert config.tools.claude_code.timeout == 600
+
+    def test_env_override_tools_claude_code_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify YOLO_TOOLS__CLAUDE_CODE__PATH env var works."""
+        from yolo_developer.config.schema import YoloConfig
+
+        monkeypatch.setenv("YOLO_PROJECT_NAME", "test")
+        monkeypatch.setenv("YOLO_TOOLS__CLAUDE_CODE__PATH", "/custom/path/claude")
+        config = YoloConfig()
+        assert config.tools.claude_code.path == "/custom/path/claude"
+
+
+class TestConfigModuleToolsExports:
+    """Tests for tools config exports from config module."""
+
+    def test_cli_tool_config_importable_from_config_module(self) -> None:
+        """Verify CLIToolConfig can be imported from yolo_developer.config."""
+        from yolo_developer.config import CLIToolConfig
+
+        assert CLIToolConfig is not None
+
+    def test_tools_config_importable_from_config_module(self) -> None:
+        """Verify ToolsConfig can be imported from yolo_developer.config."""
+        from yolo_developer.config import ToolsConfig
+
+        assert ToolsConfig is not None
+
+    def test_cli_tool_output_format_importable_from_config_module(self) -> None:
+        """Verify CLIToolOutputFormat can be imported from yolo_developer.config."""
+        from yolo_developer.config import CLIToolOutputFormat
+
+        assert CLIToolOutputFormat is not None
