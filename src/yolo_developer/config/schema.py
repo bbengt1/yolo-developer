@@ -219,7 +219,7 @@ class LLMConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _sync_api_keys(self) -> "LLMConfig":
+    def _sync_api_keys(self) -> LLMConfig:
         """Keep legacy API key fields in sync with nested OpenAI config."""
         if self.openai.api_key is None and self.openai_api_key is not None:
             self.openai.api_key = self.openai_api_key
@@ -400,9 +400,7 @@ class AnalystGatheringConfig(BaseModel):
     storage_path: str = Field(
         default=".yolo/sessions", description="Storage path for gathering sessions"
     )
-    max_questions_per_phase: int = Field(
-        default=5, description="Maximum questions per phase"
-    )
+    max_questions_per_phase: int = Field(default=5, description="Maximum questions per phase")
 
 
 class AnalystConfig(BaseModel):
@@ -419,6 +417,87 @@ class WebUploadConfig(BaseModel):
         description="Allowed upload extensions",
     )
     storage_path: str = Field(default=".yolo/uploads", description="Upload storage path")
+
+
+CLIToolOutputFormat = Literal["json", "text"]
+
+
+class CLIToolConfig(BaseModel):
+    """Configuration for an external CLI tool.
+
+    Defines settings for integrating with external CLI-based AI development tools
+    like Claude Code, Aider, and similar utilities.
+
+    Attributes:
+        enabled: Whether this tool is enabled for use.
+        path: Custom binary path (defaults to PATH lookup if not set).
+        timeout: Maximum execution time in seconds.
+        output_format: Expected output format from the tool.
+        extra_args: Additional command-line arguments to pass.
+
+    Example:
+        >>> from yolo_developer.config.schema import CLIToolConfig
+        >>> config = CLIToolConfig(enabled=True, timeout=600)
+        >>> config.enabled
+        True
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Whether this tool is enabled for use",
+    )
+    path: str | None = Field(
+        default=None,
+        description="Custom binary path (defaults to PATH lookup if not set)",
+    )
+    timeout: int = Field(
+        default=300,
+        description="Maximum execution time in seconds",
+        gt=0,
+    )
+    output_format: CLIToolOutputFormat = Field(
+        default="json",
+        description="Expected output format from the tool (json or text)",
+    )
+    extra_args: list[str] = Field(
+        default_factory=list,
+        description="Additional command-line arguments to pass to the tool",
+    )
+
+
+class ToolsConfig(BaseModel):
+    """Configuration for external CLI tool integrations.
+
+    Defines settings for integrating YOLO Developer with external CLI-based
+    AI development tools. Each tool can be individually enabled and configured.
+
+    Attributes:
+        claude_code: Configuration for Claude Code CLI integration.
+        aider: Configuration for Aider CLI integration.
+
+    Example:
+        >>> from yolo_developer.config.schema import ToolsConfig, CLIToolConfig
+        >>> config = ToolsConfig(
+        ...     claude_code=CLIToolConfig(enabled=True, timeout=600)
+        ... )
+        >>> config.claude_code.enabled
+        True
+
+    Environment Variables:
+        - YOLO_TOOLS__CLAUDE_CODE__ENABLED: Enable Claude Code integration
+        - YOLO_TOOLS__CLAUDE_CODE__TIMEOUT: Timeout in seconds
+        - YOLO_TOOLS__CLAUDE_CODE__PATH: Custom binary path
+        - YOLO_TOOLS__AIDER__ENABLED: Enable Aider integration
+    """
+
+    claude_code: CLIToolConfig = Field(
+        default_factory=CLIToolConfig,
+        description="Configuration for Claude Code CLI integration",
+    )
+    aider: CLIToolConfig = Field(
+        default_factory=CLIToolConfig,
+        description="Configuration for Aider CLI integration",
+    )
 
 
 class WebConfig(BaseModel):
@@ -457,6 +536,10 @@ class YoloConfig(BaseSettings):
         - YOLO_WEB__PORT: Web UI port
         - YOLO_GITHUB__TOKEN: GitHub token (env only)
         - YOLO_GITHUB__REPOSITORY: GitHub repo slug (owner/repo)
+        - YOLO_TOOLS__CLAUDE_CODE__ENABLED: Enable Claude Code integration
+        - YOLO_TOOLS__CLAUDE_CODE__TIMEOUT: Claude Code timeout in seconds
+        - YOLO_TOOLS__CLAUDE_CODE__PATH: Custom Claude Code binary path
+        - YOLO_TOOLS__AIDER__ENABLED: Enable Aider integration
 
     Example:
         >>> config = YoloConfig(project_name="my-project")
@@ -506,6 +589,10 @@ class YoloConfig(BaseSettings):
     github: GitHubConfig = Field(
         default_factory=GitHubConfig,
         description="GitHub automation configuration",
+    )
+    tools: ToolsConfig = Field(
+        default_factory=ToolsConfig,
+        description="External CLI tool integrations configuration",
     )
 
     def validate_api_keys(self) -> list[str]:
