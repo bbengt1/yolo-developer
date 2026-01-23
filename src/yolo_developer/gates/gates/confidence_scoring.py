@@ -174,7 +174,7 @@ def _validate_factor_weights(weights: dict[str, float]) -> tuple[bool, str]:
 # =============================================================================
 
 
-def _extract_code_from_state(state: dict[str, Any]) -> dict[str, Any]:
+def _extract_code_from_state(state: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     """Extract code artifact from state, checking multiple locations.
 
     Checks for code in order of preference:
@@ -186,16 +186,17 @@ def _extract_code_from_state(state: dict[str, Any]) -> dict[str, Any]:
         state: State dictionary with potential code artifacts.
 
     Returns:
-        Code artifact dict with "files" key, or empty dict if not found.
+        Tuple of (code artifact dict with "files" key, is_generated_code flag).
+        is_generated_code is True if code came from dev_output (story implementation).
     """
     # Try explicit code/implementation keys first
     code = state.get("code")
     if code and isinstance(code, dict) and code.get("files"):
-        return code
+        return code, False
 
     impl = state.get("implementation")
     if impl and isinstance(impl, dict) and impl.get("files"):
-        return impl
+        return impl, False
 
     # Try dev_output and transform to expected format
     dev_output = state.get("dev_output")
@@ -221,9 +222,10 @@ def _extract_code_from_state(state: dict[str, Any]) -> dict[str, Any]:
                             "content": test_file.get("content", ""),
                         })
             if files:
-                return {"files": files}
+                # Code from dev_output is generated for a story, not a full project
+                return {"files": files}, True
 
-    return {}
+    return {}, False
 
 
 def _extract_functions_from_content(content: str) -> list[dict[str, Any]]:
@@ -419,7 +421,7 @@ def calculate_coverage_factor(
             description = "Coverage data present but all values are zero"
     else:
         # Estimate coverage from code analysis
-        code = _extract_code_from_state(state)
+        code, _ = _extract_code_from_state(state)
         score, description = _estimate_coverage_from_code(code)
 
     logger.debug("calculate_coverage_factor", score=score, description=description)
@@ -625,7 +627,7 @@ def calculate_risk_factor(
             description = "No valid risks found in risk data"
     else:
         # Estimate risks from code complexity
-        code = _extract_code_from_state(state)
+        code, _ = _extract_code_from_state(state)
         score, description = _estimate_risk_from_code(code)
 
     logger.debug("calculate_risk_factor", score=score)
@@ -743,7 +745,7 @@ def calculate_documentation_factor(
     factor_weights = weights or DEFAULT_FACTOR_WEIGHTS
     weight = factor_weights.get("documentation", 0.15)
 
-    code = _extract_code_from_state(state)
+    code, is_generated_code = _extract_code_from_state(state)
 
     if not code or not isinstance(code, dict):
         return ConfidenceFactor(
@@ -786,7 +788,7 @@ def calculate_documentation_factor(
     documented_items = 0
     missing_docs: list[str] = []
 
-    # Check for README presence (bonus points)
+    # Check for README presence (only required for full project code, not generated story code)
     has_readme = any(f.get("path", "").lower().split("/")[-1].startswith("readme") for f in files)
 
     for src_file in source_files:
@@ -811,12 +813,14 @@ def calculate_documentation_factor(
             else:
                 missing_docs.append(f"func:{func['name']}")
 
-    # Add README as a documentation item
-    total_items += 1
-    if has_readme:
-        documented_items += 1
-    else:
-        missing_docs.append("README file")
+    # Add README as a documentation item only for full project code
+    # Skip README requirement for generated story code (from dev_output)
+    if not is_generated_code:
+        total_items += 1
+        if has_readme:
+            documented_items += 1
+        else:
+            missing_docs.append("README file")
 
     if total_items == 0:
         score = 80

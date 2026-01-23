@@ -41,6 +41,7 @@ Architecture Note:
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -110,6 +111,84 @@ def _reset_llm_router() -> None:
     """
     global _llm_router
     _llm_router = None
+
+
+def _write_generated_files(
+    implementations: tuple[ImplementationArtifact, ...],
+    output_dir: Path | None = None,
+) -> dict[str, list[str]]:
+    """Write generated code and test files to disk.
+
+    Writes all code files and test files from the implementation artifacts
+    to the filesystem, creating necessary directories as needed.
+
+    Args:
+        implementations: Tuple of implementation artifacts containing files to write.
+        output_dir: Optional output directory. If None, uses current working directory.
+
+    Returns:
+        Dictionary with 'code_files' and 'test_files' lists of written paths.
+
+    Example:
+        >>> files = _write_generated_files(implementations)
+        >>> files['code_files']
+        ['src/implementations/story_001.py']
+    """
+    base_dir = output_dir or Path.cwd()
+    written_files: dict[str, list[str]] = {"code_files": [], "test_files": []}
+
+    for impl in implementations:
+        # Write code files
+        for code_file in impl.code_files:
+            file_path = base_dir / code_file.file_path
+            try:
+                # Create parent directories if they don't exist
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                # Write the file
+                file_path.write_text(code_file.content)
+                written_files["code_files"].append(str(file_path))
+                logger.info(
+                    "code_file_written",
+                    file_path=str(file_path),
+                    file_type=code_file.file_type,
+                    story_id=impl.story_id,
+                )
+            except OSError as e:
+                logger.error(
+                    "code_file_write_failed",
+                    file_path=str(file_path),
+                    error=str(e),
+                )
+
+        # Write test files
+        for test_file in impl.test_files:
+            file_path = base_dir / test_file.file_path
+            try:
+                # Create parent directories if they don't exist
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                # Write the file
+                file_path.write_text(test_file.content)
+                written_files["test_files"].append(str(file_path))
+                logger.info(
+                    "test_file_written",
+                    file_path=str(file_path),
+                    test_type=test_file.test_type,
+                    story_id=impl.story_id,
+                )
+            except OSError as e:
+                logger.error(
+                    "test_file_write_failed",
+                    file_path=str(file_path),
+                    error=str(e),
+                )
+
+    logger.info(
+        "generated_files_written",
+        code_file_count=len(written_files["code_files"]),
+        test_file_count=len(written_files["test_files"]),
+    )
+
+    return written_files
 
 
 def _get_llm_router() -> LLMRouter | None:
@@ -1367,6 +1446,11 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         artifact = await _generate_implementation(story, context, router, state_dict)
         implementations.append(artifact)
 
+    # Write generated files to disk
+    written_files: dict[str, list[str]] = {"code_files": [], "test_files": []}
+    if implementations:
+        written_files = _write_generated_files(tuple(implementations))
+
     # Build output with actual results
     total_code_files = sum(len(impl.code_files) for impl in implementations)
     total_test_files = sum(len(impl.test_files) for impl in implementations)
@@ -1382,12 +1466,20 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         router=router,
     )
 
+    # Build processing notes including written files info
+    files_written_msg = ""
+    if written_files["code_files"] or written_files["test_files"]:
+        files_written_msg = (
+            f" Wrote {len(written_files['code_files'])} code files and "
+            f"{len(written_files['test_files'])} test files to disk."
+        )
+
     output = DevOutput(
         implementations=tuple(implementations),
         processing_notes=f"Processed {len(stories)} stories, "
         f"generated {total_code_files} code files, "
         f"{total_test_files} test files. "
-        f"Generation method: {generation_method}.",
+        f"Generation method: {generation_method}.{files_written_msg}",
         suggested_commit_message=commit_message,
     )
 
@@ -1421,12 +1513,24 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
             if isinstance(usage_log, (list, tuple)):
                 llm_usage = [asdict(entry) for entry in usage_log]
 
+    # Build message content including written files info
+    written_info = ""
+    if written_files["code_files"] or written_files["test_files"]:
+        written_info = (
+            f" Wrote {len(written_files['code_files'])} code files and "
+            f"{len(written_files['test_files'])} test files to disk."
+        )
+
     message = create_agent_message(
         content=f"Dev processing complete: {total_code_files} code files, "
         f"{total_test_files} test files generated for {len(stories)} stories "
-        f"({generation_method}).",
+        f"({generation_method}).{written_info}",
         agent="dev",
-        metadata={"output": output.to_dict(), "llm_usage": llm_usage},
+        metadata={
+            "output": output.to_dict(),
+            "llm_usage": llm_usage,
+            "written_files": written_files,
+        },
     )
 
     logger.info(
@@ -1437,6 +1541,8 @@ async def dev_node(state: YoloState) -> dict[str, Any]:
         test_file_count=total_test_files,
         generation_method=generation_method,
         llm_usage_count=len(llm_usage),
+        written_code_files=len(written_files["code_files"]),
+        written_test_files=len(written_files["test_files"]),
     )
 
     # Return ONLY the updates, not full state (AC6)
