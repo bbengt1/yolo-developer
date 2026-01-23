@@ -69,6 +69,10 @@ llm:
   # API keys should be set via environment variables:
   # - YOLO_LLM__OPENAI__API_KEY
   # - YOLO_LLM__ANTHROPIC_API_KEY
+  # For local development only, you can set them here with:
+  # openai:
+  #   api_key: sk-...
+  # anthropic_api_key: sk-ant-...
 
 # Quality Gate Configuration
 quality:
