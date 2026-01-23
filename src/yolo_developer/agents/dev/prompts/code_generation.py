@@ -99,7 +99,12 @@ PROJECT_CONVENTIONS = """
 # Code Generation Template
 # =============================================================================
 
-CODE_GENERATION_TEMPLATE = """You are a senior Python developer implementing code for a YOLO Developer story.
+CODE_GENERATION_TEMPLATE = """You are a senior Python developer implementing code \
+for the YOLO Developer project.
+
+# Project Structure
+
+{project_structure}
 
 # Story Information
 
@@ -127,6 +132,15 @@ CODE_GENERATION_TEMPLATE = """You are a senior Python developer implementing cod
 
 Generate clean, maintainable Python code that implements the requirements above.
 
+**IMPORTANT:** You are implementing code for the actual yolo-developer project, \
+NOT a standalone module.
+- Place the code in the appropriate location within `src/yolo_developer/` based on the feature
+- For memory-related features, use `src/yolo_developer/memory/`
+- For agent-related features, use `src/yolo_developer/agents/`
+- For orchestration features, use `src/yolo_developer/orchestrator/`
+- For configuration features, use `src/yolo_developer/config/`
+- Create new modules/files as appropriate for the feature being implemented
+
 Requirements for the generated code:
 1. Include `from __future__ import annotations` at the top
 2. Include complete type annotations on all functions
@@ -137,8 +151,24 @@ Requirements for the generated code:
 7. Use descriptive variable names
 8. Implement ONLY what is required - no extra features
 
-Output only the Python code. Do not include explanations outside the code.
-Wrap the code in ```python and ``` markers.
+**Output Format:**
+First, specify the file path on its own line starting with `FILE_PATH:`, then the code.
+Example:
+FILE_PATH: src/yolo_developer/memory/context_manager.py
+```python
+# code here
+```
+
+You may specify multiple files if needed:
+FILE_PATH: src/yolo_developer/memory/context_manager.py
+```python
+# first file code
+```
+
+FILE_PATH: src/yolo_developer/memory/token_tracker.py
+```python
+# second file code
+```
 """
 
 
@@ -150,6 +180,7 @@ def build_code_generation_prompt(
     additional_context: str = "",
     include_maintainability: bool = True,
     include_conventions: bool = True,
+    project_structure: str = "",
 ) -> str:
     """Build a complete code generation prompt for the LLM.
 
@@ -165,6 +196,8 @@ def build_code_generation_prompt(
         include_maintainability: Whether to include maintainability guidelines.
             Defaults to True.
         include_conventions: Whether to include project conventions. Defaults to True.
+        project_structure: Description of project structure for file placement.
+            Defaults to empty.
 
     Returns:
         Formatted prompt string ready for LLM.
@@ -210,6 +243,25 @@ def build_code_generation_prompt(
     else:
         context_text = "(No additional context provided)"
 
+    # Format project structure
+    structure_text = ""
+    if project_structure:
+        structure_text = project_structure
+    else:
+        structure_text = """This is the yolo-developer project with structure:
+```
+src/yolo_developer/
+├── agents/         # Individual agent modules (analyst, pm, architect, dev, sm, tea)
+├── orchestrator/   # LangGraph graph definition, state schema, node functions
+├── memory/         # Vector store (ChromaDB) and graph store integration
+├── gates/          # Quality gate framework with blocking mechanism
+├── audit/          # Decision logging and traceability
+├── config/         # Pydantic configuration with YAML + env var support
+├── cli/            # Typer CLI interface
+├── sdk/            # Python SDK for programmatic access
+└── mcp/            # FastMCP server for external integration
+```"""
+
     # Build the complete prompt
     prompt = CODE_GENERATION_TEMPLATE.format(
         story_title=story_title,
@@ -219,6 +271,7 @@ def build_code_generation_prompt(
         maintainability_guidelines=maintainability_text,
         project_conventions=conventions_text,
         additional_context=context_text,
+        project_structure=structure_text,
     )
 
     return prompt

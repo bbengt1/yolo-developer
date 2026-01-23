@@ -103,6 +103,57 @@ logger = structlog.get_logger(__name__)
 _llm_router: LLMRouter | None = None
 
 
+def _extract_files_from_response(response: str) -> list[tuple[str, str]]:
+    """Extract file paths and code from LLM response.
+
+    Parses the LLM response to extract FILE_PATH markers and associated code blocks.
+    Falls back to extracting just code if no file paths are found.
+
+    Args:
+        response: Raw LLM response containing FILE_PATH markers and code blocks.
+
+    Returns:
+        List of (file_path, code) tuples. If no FILE_PATH markers found,
+        returns empty list (caller should use default path).
+
+    Example:
+        >>> response = '''FILE_PATH: src/yolo_developer/memory/manager.py
+        ... ```python
+        ... def foo(): pass
+        ... ```'''
+        >>> files = _extract_files_from_response(response)
+        >>> files[0][0]
+        'src/yolo_developer/memory/manager.py'
+    """
+    import re
+
+    files: list[tuple[str, str]] = []
+
+    # Pattern to match FILE_PATH followed by code block
+    pattern = r'FILE_PATH:\s*([^\n]+)\s*```python\s*(.*?)```'
+    matches = re.findall(pattern, response, re.DOTALL)
+
+    for file_path, code in matches:
+        file_path = file_path.strip()
+        code = code.strip()
+        if file_path and code:
+            files.append((file_path, code))
+            logger.debug(
+                "file_extracted_from_response",
+                file_path=file_path,
+                code_length=len(code),
+            )
+
+    if files:
+        logger.info(
+            "files_extracted_from_llm_response",
+            file_count=len(files),
+            file_paths=[f[0] for f in files],
+        )
+
+    return files
+
+
 def _reset_llm_router() -> None:
     """Reset the global LLM router for testing.
 
@@ -499,7 +550,7 @@ async def _generate_code_with_llm(
     context: dict[str, Any],
     router: LLMRouter,
     state: dict[str, Any] | None = None,
-) -> tuple[str, bool, dict[str, Any] | None]:
+) -> tuple[str, bool, dict[str, Any] | None, list[tuple[str, str]]]:
     """Generate code using LLM with maintainability guidelines (AC5, AC6, Story 8.7).
 
     Story 8.7 adds pattern following: patterns are included in the prompt,
@@ -512,13 +563,32 @@ async def _generate_code_with_llm(
         state: Optional YoloState for pattern queries.
 
     Returns:
-        Tuple of (code, is_valid, pattern_result). code is generated code string,
-        is_valid indicates if syntax validation passed, pattern_result is the
-        PatternValidationResult dict (or None if state unavailable).
+        Tuple of (code, is_valid, pattern_result, extracted_files).
+        - code: Generated code string (first file if multiple)
+        - is_valid: True if syntax validation passed
+        - pattern_result: PatternValidationResult dict (or None if state unavailable)
+        - extracted_files: List of (file_path, code) tuples for project placement
     """
     story_id = story.get("id", "unknown")
     story_title = story.get("title", "Untitled Story")
+
+    # Extract requirements from story fields
+    # Stories have action (what user wants), benefit (why), and role (who)
+    action = story.get("action", "")
+    benefit = story.get("benefit", "")
+    role = story.get("role", "user")
+
+    # Build requirements from story content
+    # First try explicit requirements/description, then construct from story fields
     requirements = story.get("requirements", story.get("description", ""))
+    if not requirements and (action or benefit):
+        requirements_parts = []
+        if action:
+            requirements_parts.append(f"As a {role}, I want to {action}")
+        if benefit:
+            requirements_parts.append(f"so that {benefit}")
+        requirements = " ".join(requirements_parts)
+
     acceptance_criteria = story.get("acceptance_criteria", [])
     design_decisions = story.get("design_decisions", {})
 
@@ -564,8 +634,15 @@ async def _generate_code_with_llm(
             max_tokens=4096,
         )
 
-        # Extract code from response
-        code = extract_code_from_response(response)
+        # Try to extract files with paths first (new format)
+        extracted_files = _extract_files_from_response(response)
+
+        # If no files with paths found, fallback to extracting code without path
+        if not extracted_files:
+            code = extract_code_from_response(response)
+        else:
+            # Use the first file's code for validation (we'll handle multiple files later)
+            code = extracted_files[0][1]
 
         # Validate syntax
         is_valid, error = validate_python_syntax(code)
@@ -603,7 +680,7 @@ async def _generate_code_with_llm(
                 code_length=len(code),
                 pattern_score=pattern_result_dict.get("score") if pattern_result_dict else None,
             )
-            return code, True, pattern_result_dict
+            return code, True, pattern_result_dict, extracted_files
         else:
             logger.warning(
                 "llm_code_generation_syntax_error",
@@ -636,14 +713,14 @@ async def _generate_code_with_llm(
                     "llm_code_generation_retry_success",
                     story_id=story_id,
                 )
-                return retry_code, True, retry_pattern_result_dict
+                return retry_code, True, retry_pattern_result_dict, []
             else:
                 logger.warning(
                     "llm_code_generation_retry_failed",
                     story_id=story_id,
                     error=retry_error,
                 )
-                return code, False, None
+                return code, False, None, []
 
     except LLMProviderError as e:
         logger.error(
@@ -651,7 +728,7 @@ async def _generate_code_with_llm(
             story_id=story_id,
             error=str(e),
         )
-        return "", False, None
+        return "", False, None, []
 
     except Exception as e:
         logger.error(
@@ -659,7 +736,7 @@ async def _generate_code_with_llm(
             story_id=story_id,
             error=str(e),
         )
-        return "", False, None
+        return "", False, None, []
 
 
 async def _enhance_documentation(
@@ -774,7 +851,7 @@ async def _generate_implementation(
 
     # Try LLM generation if router available
     if router is not None:
-        code, is_valid, pattern_result = await _generate_code_with_llm(
+        code, is_valid, pattern_result, extracted_files = await _generate_code_with_llm(
             story, context, router, state
         )
 
@@ -782,22 +859,55 @@ async def _generate_implementation(
             # LLM generation succeeded
             module_name = story_id.replace("-", "_").replace(".", "_")
 
-            # Story 8.5: Enhance code with documentation
-            documented_code = await _enhance_documentation(
-                code=code,
-                story_id=story_id,
-                story_title=story_title,
-                router=router,
-            )
+            # Create code files from extracted file paths or use default
+            code_files_list: list[CodeFile] = []
 
-            code_file = CodeFile(
-                file_path=f"src/implementations/{module_name}.py",
-                content=documented_code,
-                file_type="source",
-            )
+            if extracted_files:
+                # Use extracted file paths from LLM response
+                for file_path, file_code in extracted_files:
+                    # Story 8.5: Enhance code with documentation
+                    documented_code = await _enhance_documentation(
+                        code=file_code,
+                        story_id=story_id,
+                        story_title=story_title,
+                        router=router,
+                    )
+                    code_files_list.append(
+                        CodeFile(
+                            file_path=file_path,
+                            content=documented_code,
+                            file_type="source",
+                        )
+                    )
+                logger.info(
+                    "using_extracted_file_paths",
+                    story_id=story_id,
+                    file_count=len(code_files_list),
+                    file_paths=[cf.file_path for cf in code_files_list],
+                )
+            else:
+                # Fallback to default implementations path
+                documented_code = await _enhance_documentation(
+                    code=code,
+                    story_id=story_id,
+                    story_title=story_title,
+                    router=router,
+                )
+                code_files_list.append(
+                    CodeFile(
+                        file_path=f"src/implementations/{module_name}.py",
+                        content=documented_code,
+                        file_type="source",
+                    )
+                )
+                logger.info(
+                    "using_default_file_path",
+                    story_id=story_id,
+                    file_path=f"src/implementations/{module_name}.py",
+                )
 
             # Generate test files for the code (LLM-powered, Story 8.3)
-            test_files = await _generate_tests(story, [code_file], router)
+            test_files = await _generate_tests(story, code_files_list, router)
 
             # Story 8.7: Include pattern adherence in notes
             notes_parts = [f"LLM-generated implementation for {story_title}."]
@@ -815,7 +925,7 @@ async def _generate_implementation(
 
             artifact = ImplementationArtifact(
                 story_id=story_id,
-                code_files=(code_file,),
+                code_files=tuple(code_files_list),
                 test_files=tuple(test_files),
                 implementation_status="completed",
                 notes=" ".join(notes_parts),

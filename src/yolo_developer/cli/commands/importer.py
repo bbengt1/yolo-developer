@@ -13,10 +13,57 @@ from rich.table import Table
 
 from yolo_developer.cli.display import error_panel
 from yolo_developer.github.issue_import import IssueImporter, render_seed_markdown
-from yolo_developer.github.models import GitHubError
+from yolo_developer.github.models import GeneratedStory, GitHubError
 
 app = typer.Typer(name="import", help="Import GitHub issues as user stories")
 console = Console()
+
+
+def _persist_imported_story_as_seed(story: GeneratedStory) -> None:
+    """Persist an imported story directly to seed_state.json for yolo run.
+
+    Converts the GeneratedStory from GitHub import into the seed state format
+    expected by the orchestration workflow.
+
+    Args:
+        story: The imported story from GitHub issue.
+    """
+    seed_state = {
+        "goals": [
+            {
+                "title": story.title,
+                "description": story.description,
+                "priority": 1,
+                "rationale": f"Imported from GitHub issue #{story.github_issue}",
+            }
+        ],
+        "features": [
+            {
+                "name": story.title,
+                "description": story.description,
+                "user_value": story.description,
+                "related_goals": [story.title],
+            }
+        ],
+        "constraints": [],
+        "raw_content": story.description,
+        "source": "github_issue",
+        "metadata": {
+            "github_issue": story.github_issue,
+            "story_id": story.id,
+            "technical_notes": story.technical_notes,
+            "acceptance_criteria": story.acceptance_criteria,
+            "priority": story.priority.value,
+            "type": story.type.value,
+        },
+        "ambiguities": [],
+        "ambiguity_confidence": 1.0,
+        "sop_validation": None,
+    }
+
+    seed_state_path = Path(".yolo") / "seed_state.json"
+    seed_state_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_state_path.write_text(json.dumps(seed_state, indent=2), encoding="utf-8")
 
 
 @app.command("issue")
@@ -50,6 +97,11 @@ def import_issue(
 
     story = result.stories_generated[0]
     _display_story(story)
+
+    # Automatically update seed_state.json unless in preview mode
+    if not preview:
+        _persist_imported_story_as_seed(story)
+        console.print("[green]Seed state updated. Run 'yolo run' to start.[/green]")
 
     if output:
         _export_story(story, output, fmt)
