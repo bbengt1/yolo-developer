@@ -118,10 +118,118 @@ def _load_config(path: Path) -> dict[str, Any]:
     content = path.read_text(encoding="utf-8").strip()
     if not content:
         return {}
-    data = json.loads(content)
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        sanitized = _strip_jsonc(content)
+        data = json.loads(sanitized)
+        warning_panel(
+            f"Config at {path} appears to be JSONC. Comments will be removed when writing."
+        )
     if not isinstance(data, dict):
         raise ValueError(f"Config file must contain a JSON object: {path}")
     return data
+
+
+def _strip_jsonc(content: str) -> str:
+    return _strip_trailing_commas(_strip_jsonc_comments(content))
+
+
+def _strip_jsonc_comments(content: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escape = False
+    in_single_comment = False
+    in_multi_comment = False
+    i = 0
+    length = len(content)
+
+    while i < length:
+        ch = content[i]
+        nxt = content[i + 1] if i + 1 < length else ""
+
+        if in_single_comment:
+            if ch == "\n":
+                in_single_comment = False
+                result.append(ch)
+            i += 1
+            continue
+
+        if in_multi_comment:
+            if ch == "*" and nxt == "/":
+                in_multi_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if in_string:
+            result.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "\"":
+                in_string = False
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            in_single_comment = True
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_multi_comment = True
+            i += 2
+            continue
+
+        if ch == "\"":
+            in_string = True
+        result.append(ch)
+        i += 1
+
+    return "".join(result)
+
+
+def _strip_trailing_commas(content: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escape = False
+    i = 0
+    length = len(content)
+
+    while i < length:
+        ch = content[i]
+
+        if in_string:
+            result.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "\"":
+                in_string = False
+            i += 1
+            continue
+
+        if ch == "\"":
+            in_string = True
+            result.append(ch)
+            i += 1
+            continue
+
+        if ch == ",":
+            j = i + 1
+            while j < length and content[j].isspace():
+                j += 1
+            if j < length and content[j] in ("}", "]"):
+                i += 1
+                continue
+
+        result.append(ch)
+        i += 1
+
+    return "".join(result)
 
 
 def _apply_mcp_entry(
