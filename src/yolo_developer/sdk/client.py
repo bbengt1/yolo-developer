@@ -1222,6 +1222,7 @@ memory:
 
         Returns status information about the current project,
         including initialization state and any running workflows.
+        Reads from runtime state file for live workflow information.
 
         Returns:
             StatusResult containing project status information.
@@ -1240,15 +1241,48 @@ memory:
                 project_path=str(self._project_path),
             )
 
+        # Try to read runtime state for live workflow info
+        workflow_status = "idle"
+        active_agent: str | None = None
+        current_sprint: str | None = None
+        last_activity: datetime | None = None
+        stats: dict[str, Any] = {}
+
+        try:
+            from datetime import datetime as dt
+
+            from yolo_developer.orchestrator.runtime_state import (
+                get_runtime_state_manager,
+            )
+
+            runtime_manager = get_runtime_state_manager(self._project_path / ".yolo")
+            runtime_state = runtime_manager.get_state()
+
+            workflow_status = runtime_state.workflow_status
+            active_agent = runtime_state.active_agent
+            current_sprint = runtime_state.thread_id
+
+            if runtime_state.last_updated:
+                last_activity = dt.fromisoformat(runtime_state.last_updated)
+
+            stats = {
+                "stories_completed": runtime_state.stories_completed,
+                "stories_total": runtime_state.stories_total,
+                "eta_minutes": runtime_state.eta_minutes,
+            }
+        except Exception:
+            # Fall back to defaults if runtime state unavailable
+            pass
+
         return StatusResult(
             project_name=self._config.project_name,
             project_path=str(self._project_path),
             is_initialized=self.is_initialized,
-            current_sprint=None,  # Would query session manager
-            active_agent=None,  # Would query orchestrator
-            workflow_status="idle",
-            last_activity=None,
-            stats={},
+            current_sprint=current_sprint,
+            active_agent=active_agent,
+            workflow_status=workflow_status,
+            last_activity=last_activity,
+            stats=stats,
         )
 
     def get_audit(

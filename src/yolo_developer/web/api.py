@@ -27,43 +27,98 @@ def get_status() -> dict[str, Any]:
 
 @api_router.get("/dashboard")
 def get_dashboard() -> dict[str, Any]:
+    """Get full dashboard data including runtime state.
+
+    Returns real-time workflow status, agent states, quality gates,
+    and audit entries from the runtime state tracker.
+    """
+    from yolo_developer.orchestrator.runtime_state import get_runtime_state_manager
+
     client = YoloClient()
     status = client.status()
     audit_entries = client.get_audit(limit=20)
-    stories = [
-        {"id": entry.artifact_id or "story", "status": entry.decision_type or "unknown"}
-        for entry in audit_entries[:5]
-    ]
-    stories_total = max(len(stories), 1)
-    stories_completed = max(min(2, stories_total), 0)
-    return {
-        "sprint": {
-            "project_name": status.project_name,
-            "progress": stories_completed / stories_total,
-            "stories_completed": stories_completed,
-            "stories_total": stories_total,
-            "eta_minutes": 18,
-            "active_agent": status.active_agent or "SM",
-        },
-        "agents": [
+
+    # Get runtime state for live data
+    runtime_manager = get_runtime_state_manager()
+    runtime_state = runtime_manager.get_state()
+
+    # Build stories from runtime state or audit entries
+    stories = []
+    if runtime_state.stories:
+        stories = [
+            {"id": s.story_id, "status": s.status}
+            for s in runtime_state.stories
+        ]
+    else:
+        stories = [
+            {
+                "id": entry.entry_id or "story",
+                "status": entry.decision_type or "unknown",
+            }
+            for entry in audit_entries[:5]
+        ]
+
+    stories_total = runtime_state.stories_total or max(len(stories), 1)
+    stories_completed = runtime_state.stories_completed
+    progress = stories_completed / stories_total if stories_total > 0 else 0.0
+
+    # Build agent states from runtime state
+    agents = []
+    if runtime_state.agents:
+        for agent in runtime_state.agents:
+            # Capitalize agent name for display
+            display_name = agent.name.capitalize()
+            if display_name == "Tea":
+                display_name = "TEA"
+            elif display_name == "Pm":
+                display_name = "PM"
+            elif display_name == "Sm":
+                display_name = "SM"
+            agents.append({"name": display_name, "state": agent.state})
+    else:
+        # Default fallback
+        agents = [
             {"name": "Analyst", "state": "idle"},
             {"name": "PM", "state": "idle"},
             {"name": "Architect", "state": "idle"},
-            {"name": "Dev", "state": "active"},
-            {"name": "TEA", "state": "waiting"},
-            {"name": "SM", "state": "active"},
-        ],
+            {"name": "Dev", "state": "idle"},
+            {"name": "TEA", "state": "idle"},
+            {"name": "SM", "state": "idle"},
+        ]
+
+    # Build gates from runtime state
+    gates = []
+    if runtime_state.gates:
+        gates = [
+            {"name": g.name, "score": g.score}
+            for g in runtime_state.gates
+        ]
+    else:
+        # Default placeholder gates (no data yet)
+        gates = [
+            {"name": "Testability", "score": 0.0},
+            {"name": "Architecture", "score": 0.0},
+            {"name": "DoD", "score": 0.0},
+        ]
+
+    return {
+        "sprint": {
+            "project_name": status.project_name,
+            "progress": progress,
+            "stories_completed": stories_completed,
+            "stories_total": stories_total,
+            "eta_minutes": runtime_state.eta_minutes,
+            "active_agent": runtime_state.active_agent or status.active_agent,
+            "workflow_status": runtime_state.workflow_status,
+        },
+        "agents": agents,
         "stories": stories,
-        "gates": [
-            {"name": "Testability", "score": 0.88},
-            {"name": "Architecture", "score": 0.84},
-            {"name": "DoD", "score": 0.9},
-        ],
+        "gates": gates,
         "audit": [
             {
                 "timestamp": entry.timestamp.isoformat(),
                 "agent": entry.agent,
-                "decision": entry.decision,
+                "decision": entry.content or entry.decision_type,
             }
             for entry in audit_entries[:8]
         ],
@@ -79,8 +134,8 @@ def get_audit() -> dict[str, Any]:
             {
                 "timestamp": entry.timestamp.isoformat(),
                 "agent": entry.agent,
-                "decision": entry.decision,
-                "artifact_id": entry.artifact_id,
+                "decision": entry.content or entry.decision_type,
+                "entry_id": entry.entry_id,
             }
             for entry in entries
         ]

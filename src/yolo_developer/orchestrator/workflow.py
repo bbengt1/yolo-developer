@@ -450,6 +450,8 @@ async def run_workflow(
         >>> result = await run_workflow(state)
         >>> print(result["current_agent"])
     """
+    from yolo_developer.orchestrator.runtime_state import get_runtime_state_manager
+
     if config is None:
         config = WorkflowConfig()
 
@@ -461,6 +463,13 @@ async def run_workflow(
 
     graph = build_workflow(config=config, nodes=nodes, checkpointer=checkpointer)
 
+    # Generate thread_id for tracking
+    effective_thread_id = thread_id or str(uuid.uuid4())
+
+    # Update runtime state for dashboard
+    runtime_manager = get_runtime_state_manager()
+    runtime_manager.workflow_started(effective_thread_id)
+
     logger.info(
         "workflow_started",
         current_agent=initial_state.get("current_agent"),
@@ -470,21 +479,25 @@ async def run_workflow(
     # Build config for execution
     run_config: dict[str, Any] = {}
     if checkpointer is not None:
-        # Checkpointing requires a thread_id - auto-generate if not provided
-        effective_thread_id = thread_id or str(uuid.uuid4())
         run_config["configurable"] = {"thread_id": effective_thread_id}
     elif thread_id is not None:
         run_config["configurable"] = {"thread_id": thread_id}
 
-    result = await graph.ainvoke(initial_state, run_config or None)
+    try:
+        result = await graph.ainvoke(initial_state, run_config or None)
 
-    logger.info(
-        "workflow_completed",
-        final_agent=result.get("current_agent"),
-        decision_count=len(result.get("decisions", [])),
-    )
+        runtime_manager.workflow_completed()
+        logger.info(
+            "workflow_completed",
+            final_agent=result.get("current_agent"),
+            decision_count=len(result.get("decisions", [])),
+        )
 
-    return result  # type: ignore[no-any-return]
+        return result  # type: ignore[no-any-return]
+
+    except Exception as e:
+        runtime_manager.workflow_error(str(e))
+        raise
 
 
 async def stream_workflow(
@@ -515,6 +528,8 @@ async def stream_workflow(
         >>> async for event in stream_workflow(state):
         ...     print(f"Event: {event}")
     """
+    from yolo_developer.orchestrator.runtime_state import get_runtime_state_manager
+
     if config is None:
         config = WorkflowConfig()
 
@@ -526,6 +541,13 @@ async def stream_workflow(
 
     graph = build_workflow(config=config, nodes=nodes, checkpointer=checkpointer)
 
+    # Generate thread_id for tracking
+    effective_thread_id = thread_id or str(uuid.uuid4())
+
+    # Update runtime state for dashboard
+    runtime_manager = get_runtime_state_manager()
+    runtime_manager.workflow_started(effective_thread_id)
+
     logger.info(
         "workflow_stream_started",
         current_agent=initial_state.get("current_agent"),
@@ -534,14 +556,38 @@ async def stream_workflow(
     # Build config for execution
     run_config: dict[str, Any] = {}
     if checkpointer is not None:
-        # Checkpointing requires a thread_id - auto-generate if not provided
-        effective_thread_id = thread_id or str(uuid.uuid4())
         run_config["configurable"] = {"thread_id": effective_thread_id}
     elif thread_id is not None:
         run_config["configurable"] = {"thread_id": thread_id}
 
-    async for event in graph.astream(initial_state, run_config or None):
-        logger.debug("workflow_event", event_keys=list(event.keys()))
-        yield event
+    previous_agent: str | None = None
 
-    logger.info("workflow_stream_completed")
+    try:
+        async for event in graph.astream(initial_state, run_config or None):
+            event_keys = list(event.keys())
+            logger.debug("workflow_event", event_keys=event_keys)
+
+            # Detect agent transitions from event keys
+            # LangGraph events have the node name as key
+            for agent_name in event_keys:
+                if agent_name in ["analyst", "pm", "architect", "dev", "tea", "sm"]:
+                    # Mark previous agent as completed
+                    if previous_agent and previous_agent != agent_name:
+                        runtime_manager.agent_completed(previous_agent)
+
+                    # Mark new agent as started
+                    runtime_manager.agent_started(agent_name)
+                    previous_agent = agent_name
+
+            yield event
+
+        # Mark final agent as completed
+        if previous_agent:
+            runtime_manager.agent_completed(previous_agent)
+
+        runtime_manager.workflow_completed()
+        logger.info("workflow_stream_completed")
+
+    except Exception as e:
+        runtime_manager.workflow_error(str(e))
+        raise

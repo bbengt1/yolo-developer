@@ -235,6 +235,44 @@ def _log_gate_result(gate_name: str, result: GateResult, blocking: bool) -> None
         else:
             logger.warning("Gate evaluation failed (advisory)", **log_data)
 
+    # Update runtime state for dashboard
+    _update_runtime_state_gate(gate_name, result)
+
+
+def _update_runtime_state_gate(gate_name: str, result: GateResult) -> None:
+    """Update runtime state with gate evaluation result.
+
+    Args:
+        gate_name: Name of the evaluated gate.
+        result: The gate evaluation result.
+    """
+    try:
+        from yolo_developer.orchestrator.runtime_state import get_runtime_state_manager
+
+        # Map gate names to display names
+        display_name_map = {
+            "testability": "Testability",
+            "ac_measurability": "AC Measurability",
+            "architecture_validation": "Architecture",
+            "definition_of_done": "DoD",
+            "confidence_scoring": "Confidence",
+        }
+        display_name = display_name_map.get(gate_name, gate_name.replace("_", " ").title())
+
+        # Get score from result, defaulting to 1.0/0.0 for pass/fail
+        score = result.score if result.score is not None else (1.0 if result.passed else 0.0)
+
+        runtime_manager = get_runtime_state_manager()
+        runtime_manager.gate_evaluated(
+            gate_name=display_name,
+            score=score,
+            passed=result.passed,
+            reason=result.reason or "",
+        )
+    except Exception as e:
+        # Don't fail gate evaluation if runtime state update fails
+        logger.debug("runtime_state_gate_update_failed", error=str(e))
+
 
 def _record_metric(
     gate_name: str,
