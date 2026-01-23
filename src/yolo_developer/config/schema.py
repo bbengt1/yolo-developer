@@ -43,6 +43,7 @@ API keys (openai_api_key, openai.api_key, anthropic_api_key) are:
 - Stored as SecretStr for automatic masking in logs/repr
 - Accessible via ``.get_secret_value()`` method when needed
 - Never written to config file exports
+ - For local development only, set ``YOLO_ALLOW_YAML_SECRETS=1`` to allow YAML secrets
 
 Example Usage
 -------------

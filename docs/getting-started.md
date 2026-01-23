@@ -85,6 +85,8 @@ YOLO Developer requires an LLM API key. Set it via environment variable:
 
 {: .warning }
 > Never put API keys in configuration files. Always use environment variables.
+> For local development only, you may set `YOLO_ALLOW_YAML_SECRETS=1` to allow
+> keys in `yolo.yaml` (do not commit secrets).
 
 ### OpenAI
 

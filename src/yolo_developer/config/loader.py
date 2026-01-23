@@ -23,6 +23,12 @@ from yolo_developer.config.validators import validate_config
 
 logger = logging.getLogger(__name__)
 
+_ALLOW_YAML_SECRETS_ENV = "YOLO_ALLOW_YAML_SECRETS"
+_YAML_SECRET_FIELDS = (
+    ("llm", "openai_api_key"),
+    ("llm", "anthropic_api_key"),
+    ("llm", "openai", "api_key"),
+)
 
 class ConfigurationError(Exception):
     """Error raised when configuration loading or validation fails.
@@ -63,6 +69,7 @@ def load_config(config_path: Path | None = None) -> YoloConfig:
 
     if path.exists():
         yaml_data = _load_yaml_file(path)
+        yaml_data = _sanitize_yaml_secrets(yaml_data)
 
     # Merge with environment variables (env vars take priority)
     merged_data = _merge_with_env_vars(yaml_data)
@@ -151,6 +158,8 @@ def _merge_with_env_vars(yaml_data: dict[str, Any]) -> dict[str, Any]:
     for key, value in os.environ.items():
         if not key.startswith(env_prefix):
             continue
+        if key == _ALLOW_YAML_SECRETS_ENV:
+            continue
 
         # Remove prefix and split by nested delimiter
         config_key = key[len(env_prefix) :]
@@ -165,6 +174,62 @@ def _merge_with_env_vars(yaml_data: dict[str, Any]) -> dict[str, Any]:
         current[parts[-1]] = _convert_value(value, tuple(parts))
 
     return result
+
+
+def _sanitize_yaml_secrets(yaml_data: dict[str, Any]) -> dict[str, Any]:
+    if not yaml_data:
+        return yaml_data
+    allow_yaml_secrets = _allow_yaml_secrets()
+    found_fields = _find_yaml_secret_fields(yaml_data)
+    if not found_fields:
+        return yaml_data
+    if allow_yaml_secrets:
+        logger.warning(
+            "YAML secrets enabled via %s. Do not commit secrets to version control.",
+            _ALLOW_YAML_SECRETS_ENV,
+        )
+        return yaml_data
+    _remove_yaml_secret_fields(yaml_data)
+    logger.warning(
+        "YAML secrets ignored (%s). Set %s=1 to allow for local development only.",
+        ", ".join(found_fields),
+        _ALLOW_YAML_SECRETS_ENV,
+    )
+    return yaml_data
+
+
+def _allow_yaml_secrets() -> bool:
+    value = os.environ.get(_ALLOW_YAML_SECRETS_ENV, "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _find_yaml_secret_fields(yaml_data: dict[str, Any]) -> list[str]:
+    found: list[str] = []
+    for path in _YAML_SECRET_FIELDS:
+        if _get_nested(yaml_data, path) is not None:
+            found.append(".".join(path))
+    return found
+
+
+def _get_nested(yaml_data: dict[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = yaml_data
+    for part in path:
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def _remove_yaml_secret_fields(yaml_data: dict[str, Any]) -> None:
+    for path in _YAML_SECRET_FIELDS:
+        current: Any = yaml_data
+        for part in path[:-1]:
+            if not isinstance(current, dict):
+                break
+            current = current.get(part)
+        else:
+            if isinstance(current, dict):
+                current.pop(path[-1], None)
 
 
 def _convert_value(value: str, path: tuple[str, ...]) -> Any:

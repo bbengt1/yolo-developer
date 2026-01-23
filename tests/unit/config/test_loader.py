@@ -549,6 +549,50 @@ class TestAPIKeyLoading:
             "openai" in msg.lower() or "anthropic" in msg.lower() for msg in warning_messages
         )
 
+    def test_yaml_secrets_ignored_by_default(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """YAML secrets are ignored unless override is enabled."""
+        import logging
+
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text(
+            "project_name: test-project\nllm:\n  openai_api_key: sk-test\n"
+            "  anthropic_api_key: sk-ant-test\n"
+        )
+
+        with caplog.at_level(logging.WARNING):
+            config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is None
+        assert config.llm.anthropic_api_key is None
+        warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("yaml secrets ignored" in msg.lower() for msg in warning_messages)
+
+    def test_yaml_secrets_allowed_with_override(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """YAML secrets are allowed when override env var is set."""
+        import logging
+
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text(
+            "project_name: test-project\nllm:\n  openai_api_key: sk-test\n"
+            "  anthropic_api_key: sk-ant-test\n"
+        )
+        monkeypatch.setenv("YOLO_ALLOW_YAML_SECRETS", "true")
+
+        with caplog.at_level(logging.WARNING):
+            config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is not None
+        assert config.llm.anthropic_api_key is not None
+        warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("yaml secrets enabled" in msg.lower() for msg in warning_messages)
+
     def test_missing_openai_key_raises_when_provider_openai(
         self, tmp_path: Path
     ) -> None:

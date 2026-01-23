@@ -122,6 +122,8 @@ LLM (Large Language Model) configuration for agent reasoning.
 
 {: .warning }
 > Never put API keys in `yolo.yaml`. Always use environment variables.
+> For local development only, set `YOLO_ALLOW_YAML_SECRETS=1` to allow keys in
+> `yolo.yaml` (do not commit secrets).
 
 ```yaml
 llm:
