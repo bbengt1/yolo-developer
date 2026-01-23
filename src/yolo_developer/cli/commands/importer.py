@@ -11,7 +11,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from yolo_developer.cli.display import error_panel
 from yolo_developer.github.issue_import import IssueImporter, render_seed_markdown
+from yolo_developer.github.models import GitHubError
 
 app = typer.Typer(name="import", help="Import GitHub issues as user stories")
 console = Console()
@@ -27,15 +29,19 @@ def import_issue(
     fmt: str = typer.Option("markdown", "--format", help="Output format: markdown/json"),
 ) -> None:
     """Import a single GitHub issue."""
-    importer = IssueImporter.from_config()
-    result = asyncio.run(
-        importer.import_issue(
-            issue_number=issue_number,
-            repo=repo,
-            auto_seed=auto_seed,
-            preview=preview,
+    try:
+        importer = IssueImporter.from_config()
+        result = asyncio.run(
+            importer.import_issue(
+                issue_number=issue_number,
+                repo=repo,
+                auto_seed=auto_seed,
+                preview=preview,
+            )
         )
-    )
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
 
     if result.errors:
         for error in result.errors:
@@ -64,17 +70,21 @@ def import_issues(
     preview: bool = typer.Option(False, "--preview", help="Preview only"),
 ) -> None:
     """Import multiple GitHub issues."""
-    importer = IssueImporter.from_config()
-    result = asyncio.run(
-        importer.import_multiple(
-            issue_numbers=numbers,
-            labels=label,
-            milestone=milestone,
-            query=query,
-            auto_seed=auto_seed,
-            preview=preview,
+    try:
+        importer = IssueImporter.from_config()
+        result = asyncio.run(
+            importer.import_multiple(
+                issue_numbers=numbers,
+                labels=label,
+                milestone=milestone,
+                query=query,
+                auto_seed=auto_seed,
+                preview=preview,
+            )
         )
-    )
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
 
     _display_summary(result)
     for story in result.stories_generated:
@@ -90,8 +100,12 @@ def preview_issue(
     repo: str | None = typer.Option(None, "--repo", help="Repository owner/repo"),
 ) -> None:
     """Preview seed output for an issue."""
-    importer = IssueImporter.from_config()
-    preview = importer.preview(issue_number=issue_number, repo=repo)
+    try:
+        importer = IssueImporter.from_config()
+        preview = importer.preview(issue_number=issue_number, repo=repo)
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
     console.print(Panel(preview.seed_markdown, title=f"Issue #{issue_number} Preview"))
 
 

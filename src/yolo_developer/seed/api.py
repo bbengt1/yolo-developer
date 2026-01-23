@@ -66,7 +66,9 @@ async def parse_seed(
     *,
     model: str = LLM_CHEAP_MODEL_DEFAULT,
     temperature: float = 0.1,
+    api_key: str | None = None,
     preprocess: bool = True,
+    format_hint: str | None = None,
     detect_ambiguities: bool = False,
     validate_sop: bool = False,
     sop_store: SOPStore | None = None,
@@ -88,6 +90,7 @@ async def parse_seed(
         model: LLM model to use (default: routine-tier model).
         temperature: LLM sampling temperature (default: 0.1).
         preprocess: Whether to apply format-specific preprocessing (default: True).
+        format_hint: Optional override for preprocessing format ("auto", "markdown", "text").
         detect_ambiguities: Whether to run ambiguity detection (default: False).
         validate_sop: Whether to run SOP constraint validation (default: False).
         sop_store: Store containing SOP constraints. Required if validate_sop is True.
@@ -150,12 +153,17 @@ async def parse_seed(
 
     # Apply format-specific preprocessing
     if preprocess:
-        preprocessed_content = _preprocess_content(normalized_content, source, filename)
+        preprocessed_content = _preprocess_content(
+            normalized_content,
+            source,
+            filename,
+            format_hint=format_hint,
+        )
     else:
         preprocessed_content = normalized_content
 
     # Create parser and parse
-    parser = LLMSeedParser(model=model, temperature=temperature)
+    parser = LLMSeedParser(model=model, temperature=temperature, api_key=api_key)
     result = await parser.parse(preprocessed_content, source)
 
     # Replace raw_content with the original input content (not preprocessed)
@@ -169,6 +177,7 @@ async def parse_seed(
             content,
             model=model,
             temperature=temperature,
+            api_key=api_key,
         )
         result = replace(
             result,
@@ -188,6 +197,7 @@ async def parse_seed(
             content,
             sop_store,
             model=model,
+            api_key=api_key,
         )
         result = replace(result, sop_validation=sop_result)
         logger.info(
@@ -218,6 +228,7 @@ def _preprocess_content(
     content: str,
     source: SeedSource,
     filename: str | None = None,
+    format_hint: str | None = None,
 ) -> str:
     """Apply format-specific preprocessing to content.
 
@@ -225,10 +236,22 @@ def _preprocess_content(
         content: Normalized content to preprocess.
         source: Source type (affects preprocessing choice).
         filename: Optional filename for format detection.
+        format_hint: Optional override for preprocessing format ("auto", "markdown", "text").
 
     Returns:
         Preprocessed content with structure markers.
     """
+    if format_hint:
+        normalized_hint = format_hint.lower()
+        if normalized_hint == "markdown":
+            logger.debug("forced_markdown_preprocessing")
+            return _parse_markdown(content)
+        if normalized_hint == "text":
+            logger.debug("forced_plain_text_preprocessing")
+            return _parse_plain_text(content)
+        if normalized_hint != "auto":
+            raise ValueError(f"Unsupported format hint: {format_hint}")
+
     # Determine if content is markdown
     is_markdown = False
     if filename:

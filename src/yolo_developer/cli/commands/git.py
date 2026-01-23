@@ -39,7 +39,12 @@ def git_commit(
     if files:
         repo.stage_files(files)
     else:
-        repo.stage_files(".")
+        status = repo.status()
+        modified = status["modified"]
+        if not modified:
+            console.print("[yellow]No tracked changes to commit.[/yellow]")
+            raise typer.Exit(code=1)
+        repo.stage_files(modified)
     result = repo.commit(message)
     console.print(f"Committed {result.sha}: {result.message}")
 

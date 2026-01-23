@@ -35,12 +35,14 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 import structlog
+import yaml
 from rich.panel import Panel
 
 from yolo_developer.cli.display import (
     console,
     create_table,
     info_panel,
+    warning_panel,
 )
 
 if TYPE_CHECKING:
@@ -450,6 +452,7 @@ def status_command(
     json_output: bool = False,
     health_only: bool = False,
     sessions_only: bool = False,
+    output_format: str = "table",
 ) -> None:
     """Execute the status command.
 
@@ -460,6 +463,7 @@ def status_command(
         json_output: Output results as JSON instead of formatted display.
         health_only: Show only health metrics.
         sessions_only: Show only session list.
+        output_format: Output format: table, json, yaml.
     """
     logger.debug(
         "status_command_invoked",
@@ -481,10 +485,23 @@ def status_command(
         logger.warning("failed_to_get_status_data", error=str(e))
         active_id, metadata, all_sessions, health = None, None, [], None
 
-    # JSON output
+    normalized_format = output_format.lower()
+    if normalized_format not in {"table", "json", "yaml"}:
+        warning_panel(
+            f"Invalid format: '{output_format}'. Use 'table', 'json', or 'yaml'.",
+            title="Invalid Parameter",
+        )
+        return
+
     if json_output:
+        normalized_format = "json"
+
+    if normalized_format in {"json", "yaml"}:
         output = _build_json_output(active_id, metadata, all_sessions, health)
-        console.print_json(json.dumps(output, default=str))
+        if normalized_format == "json":
+            console.print_json(json.dumps(output, default=str))
+        else:
+            console.print(yaml.safe_dump(output, sort_keys=False))
         return
 
     # Display header

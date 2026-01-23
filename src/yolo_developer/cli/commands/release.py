@@ -7,9 +7,11 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from yolo_developer.cli.display import error_panel
 from yolo_developer.config import load_config
 from yolo_developer.github.client import GitHubClient
 from yolo_developer.github.git import GitManager
+from yolo_developer.github.models import GitHubError
 from yolo_developer.github.releases import ReleaseManager
 
 console = Console()
@@ -36,16 +38,20 @@ def release_create(
     prerelease: bool = typer.Option(False, "--prerelease"),
     path: str | None = None,
 ) -> None:
-    manager = _manager(Path(path) if path else Path.cwd())
-    release = manager.create(
-        tag=tag,
-        name=name,
-        body=body,
-        target=target,
-        draft=draft,
-        prerelease=prerelease,
-        generate_notes=True,
-    )
+    try:
+        manager = _manager(Path(path) if path else Path.cwd())
+        release = manager.create(
+            tag=tag,
+            name=name,
+            body=body,
+            target=target,
+            draft=draft,
+            prerelease=prerelease,
+            generate_notes=True,
+        )
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
     console.print(f"Created release {release.tag}: {release.url}")
 
 

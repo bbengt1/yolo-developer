@@ -41,6 +41,7 @@ from yolo_developer.config import (
     import_config,
     load_config,
 )
+from yolo_developer.config.validators import validate_config
 
 logger = structlog.get_logger(__name__)
 
@@ -220,7 +221,77 @@ def _display_config_tree(config: YoloConfig, mask_secrets: bool = True) -> None:
     memory_branch.add(f"vector_store_type: {config.memory.vector_store_type}")
     memory_branch.add(f"graph_store_type: {config.memory.graph_store_type}")
 
-    console.print(tree)
+
+def get_config_value(key: str, json_output: bool = False, no_mask: bool = False) -> None:
+    if key not in VALID_CONFIG_KEYS and key not in PROTECTED_KEYS:
+        error_panel(f"Unknown configuration key: {key}")
+        raise typer.Exit(code=1)
+
+    try:
+        config = load_config()
+    except ConfigurationError as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
+
+    data = _config_to_dict(config, mask_secrets=not no_mask)
+    try:
+        value = _get_nested_value(data, key)
+    except KeyError as exc:
+        error_panel(f"Configuration key not found: {key}")
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        console.print(json.dumps({"key": key, "value": value}, indent=2))
+    else:
+        console.print(value)
+
+
+def reset_config_command(json_output: bool = False) -> None:
+    try:
+        existing = load_config()
+        project_name = existing.project_name
+    except ConfigurationError:
+        project_name = Path.cwd().name
+
+    config = YoloConfig(project_name=project_name)
+    export_config(config, Path("yolo.yaml"))
+    if json_output:
+        console.print(json.dumps({"status": "reset", "path": "yolo.yaml"}))
+    else:
+        success_panel("Configuration reset to defaults in yolo.yaml")
+
+
+def validate_config_command(json_output: bool = False) -> None:
+    try:
+        config = load_config()
+    except ConfigurationError as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
+
+    result = validate_config(config)
+    if json_output:
+        payload = {
+            "status": "valid" if result.is_valid else "invalid",
+            "errors": [issue.__dict__ for issue in result.errors],
+            "warnings": [issue.__dict__ for issue in result.warnings],
+        }
+        console.print(json.dumps(payload, indent=2))
+        if not result.is_valid:
+            raise typer.Exit(code=1)
+        return
+
+    if result.errors:
+        warning_panel("Configuration has errors.")
+        for issue in result.errors:
+            console.print(f"[red]{issue.field}[/red]: {issue.message}")
+        raise typer.Exit(code=1)
+
+    if result.warnings:
+        warning_panel("Configuration warnings detected.")
+        for issue in result.warnings:
+            console.print(f"[yellow]{issue.field}[/yellow]: {issue.message}")
+
+    success_panel("Configuration is valid.")
 
 
 def _get_nested_value(data: dict[str, Any], key_path: str) -> Any:

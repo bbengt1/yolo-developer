@@ -71,7 +71,11 @@ def chat_command(prompt: str | None, interactive: bool = True) -> None:
 def _run_one_shot(router: LLMRouter, prompt: str) -> None:
     try:
         response = asyncio.run(
-            router.call(messages=[{"role": "user", "content": prompt}], tier="routine")
+            router.call_with_fallback(
+                messages=[{"role": "user", "content": prompt}],
+                primary_tier="routine",
+                fallback_tier="complex",
+            )
         )
     except (LLMConfigurationError, LLMProviderError) as exc:
         error_panel(str(exc))
@@ -122,7 +126,13 @@ def _run_interactive(router: LLMRouter) -> None:
 
         messages.append({"role": "user", "content": user_input})
         try:
-            response = asyncio.run(router.call(messages=messages, tier="routine"))
+            response = asyncio.run(
+                router.call_with_fallback(
+                    messages=messages,
+                    primary_tier="routine",
+                    fallback_tier="complex",
+                )
+            )
         except (LLMConfigurationError, LLMProviderError) as exc:
             error_panel(str(exc))
             return

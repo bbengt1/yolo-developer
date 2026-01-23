@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from yolo_developer.github.git import GitManager
 from yolo_developer.github.issues import IssueManager
-from yolo_developer.github.models import CommitResult
+from yolo_developer.github.models import CommitResult, GitHubError
 from yolo_developer.github.pr import PRManager
 from yolo_developer.github.releases import ReleaseManager
 
@@ -52,6 +53,14 @@ class GitHubWorkflow:
         base_branch: str,
         labels: list[str] | None = None,
     ) -> dict[str, object]:
+        if not files_changed:
+            raise GitHubError(
+                "No tracked changes to commit. Stage files or pass --file to select changes."
+            )
+        missing_files = [path for path in files_changed if not Path(path).exists()]
+        if missing_files:
+            missing_list = ", ".join(missing_files)
+            raise GitHubError(f"Unable to stage missing files: {missing_list}")
         self.git.stage_files(files_changed)
         commit = self.git.commit(message=commit_message)
         self.git.push(set_upstream=True)

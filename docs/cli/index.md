@@ -398,82 +398,33 @@ yolo run [OPTIONS]
 
 | Option | Type | Default | Description |
 |:-------|:-----|:--------|:------------|
-| `--seed-id` | TEXT | Latest | Specific seed ID to use |
-| `--agents` | TEXT | All | Comma-separated list of agents to run |
-| `--max-iterations` | INT | 10 | Maximum iterations per agent |
-| `--timeout` | INT | 300 | Timeout in seconds per agent |
-| `--dry-run` | FLAG | False | Simulate without making changes |
-| `--continue` | FLAG | False | Continue from last checkpoint |
-| `--watch` | FLAG | False | Watch mode with live updates |
-| `--output-dir` | PATH | . | Output directory for artifacts |
+| `--dry-run, -d` | FLAG | False | Validate configuration and seed without running |
+| `--verbose, -v` | FLAG | False | Show detailed output |
+| `--json, -j` | FLAG | False | Output JSON summary |
+| `--resume, -r` | FLAG | False | Resume from last checkpoint |
+| `--thread-id, -t` | TEXT | None | Use specific checkpoint thread ID |
+| `--continue` | FLAG | False | Continue from last checkpoint (alias for `--resume`) |
+| `--agents` | TEXT | None | Comma-separated list of agents to run (accepted but not yet enforced) |
+| `--max-iterations` | INT | None | Maximum iterations per agent (accepted but not yet enforced) |
+| `--timeout` | INT | None | Timeout in seconds per agent (accepted but not yet enforced) |
+| `--watch` | FLAG | False | Watch mode (accepted but not yet enforced) |
+| `--output-dir` | PATH | None | Output directory for artifacts (accepted but not yet enforced) |
 
 ### Examples
-
-**Basic run:**
-```bash
-yolo run
-```
-
-**Output:**
-```
-Starting autonomous development sprint...
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[ANALYST] Analyzing requirements...
-  → Crystallizing 12 requirements
-  ✓ Completed in 2m 34s
-
-[PM] Generating user stories...
-  → Creating stories from requirements
-  ✓ Generated 8 stories in 1m 12s
-
-[ARCHITECT] Designing system...
-  → Validating 12-Factor compliance
-  → Generating ADRs
-  ✓ Completed in 3m 45s
-
-[DEV] Implementing stories...
-  → US-001: User Registration
-  → US-002: User Authentication
-  ...
-  ✓ Completed 8 stories in 15m 22s
-
-[TEA] Validating tests...
-  → Running test suite
-  → Analyzing coverage
-  ✓ Coverage: 87% in 2m 10s
-
-[SM] Finalizing sprint...
-  ✓ Sprint complete!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Sprint Summary:
-  Duration: 25m 03s
-  Stories: 8/8 completed
-  Coverage: 87%
-  Quality Gates: 4/4 passing
-  Tokens: 145,230 ($1.42)
-```
-
-**Run specific agents only:**
-```bash
-yolo run --agents analyst,pm,architect
-```
 
 **Dry run (no changes):**
 ```bash
 yolo run --dry-run
 ```
 
-**Continue from checkpoint:**
+**Resume from checkpoint:**
 ```bash
-yolo run --continue
+yolo run --resume
 ```
 
-**Watch mode with live updates:**
+**Use a specific thread ID:**
 ```bash
-yolo run --watch
+yolo run --thread-id my-session
 ```
 
 ### Agent Execution Order
@@ -502,11 +453,12 @@ yolo status [OPTIONS]
 | Option | Type | Default | Description |
 |:-------|:-----|:--------|:------------|
 | `--format, -f` | CHOICE | table | Output format: table, json, yaml |
-| `--agents` | FLAG | False | Show detailed agent status |
-| `--gates` | FLAG | False | Show quality gate details |
-| `--stories` | FLAG | False | Show story breakdown |
-| `--watch, -w` | FLAG | False | Live updating status |
-| `--refresh` | INT | 5 | Refresh interval for watch mode |
+| `--json, -j` | FLAG | False | Output JSON (alias for `--format json`) |
+| `--health, -H` | FLAG | False | Show only health metrics |
+| `--sessions, -s` | FLAG | False | Show only session list |
+| `--verbose, -v` | FLAG | False | Show detailed health metrics |
+
+Note: `--agents`, `--gates`, `--stories`, `--watch`, and `--refresh` are accepted but currently ignored (a warning is shown).
 
 ### Examples
 
@@ -515,132 +467,9 @@ yolo status [OPTIONS]
 yolo status
 ```
 
-**Output:**
-```
-Sprint Status: IN_PROGRESS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Progress: ████████████░░░░░░░░ 60%
-
-Stories: 5/8 completed
-  ✓ US-001: User Registration
-  ✓ US-002: User Authentication
-  ✓ US-003: Profile View
-  ✓ US-004: Profile Update
-  ✓ US-005: Password Reset
-  → US-006: Admin User List (in progress)
-  ○ US-007: Admin User Edit
-  ○ US-008: Admin User Delete
-
-Current Agent: DEV
-  Task: Implementing US-006 Admin User List
-  Duration: 3m 42s
-
-Quality Gates: 4/4 passing
-Token Usage: 89,450 tokens ($0.87)
-```
-
-**Detailed agent status:**
-```bash
-yolo status --agents
-```
-
-**Output:**
-```
-Agent Status:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ANALYST
-  Status: COMPLETED
-  Duration: 2m 34s
-  Output: 12 crystallized requirements
-  Tokens: 12,340
-
-PM
-  Status: COMPLETED
-  Duration: 1m 12s
-  Output: 8 user stories
-  Tokens: 8,920
-
-ARCHITECT
-  Status: COMPLETED
-  Duration: 3m 45s
-  Output: 3 ADRs, 2 risk reports
-  Tokens: 15,670
-
-DEV
-  Status: IN_PROGRESS
-  Duration: 8m 22s (ongoing)
-  Current: US-006 Admin User List
-  Completed: 5/8 stories
-  Tokens: 45,230
-
-TEA
-  Status: PENDING
-  Waiting for: DEV completion
-
-SM
-  Status: MONITORING
-  Health: HEALTHY
-  Iterations: 12
-  Escalations: 0
-```
-
-**Quality gate details:**
-```bash
-yolo status --gates
-```
-
-**Output:**
-```
-Quality Gates:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✓ TESTABILITY
-  Score: 0.89 (threshold: 0.70)
-  Details: All stories have testable acceptance criteria
-
-✓ AC_MEASURABILITY
-  Score: 0.92 (threshold: 0.70)
-  Details: 95% of ACs have measurable outcomes
-
-✓ ARCHITECTURE_VALIDATION
-  Score: 0.85 (threshold: 0.70)
-  Details: 12-Factor compliant, no circular dependencies
-
-✓ DEFINITION_OF_DONE
-  Score: 0.88 (threshold: 0.70)
-  Details: All completed stories meet DoD criteria
-```
-
 **JSON output for scripting:**
 ```bash
 yolo status --format json
-```
-
-**Output:**
-```json
-{
-  "status": "IN_PROGRESS",
-  "progress": 0.6,
-  "stories": {
-    "total": 8,
-    "completed": 5,
-    "in_progress": 1,
-    "pending": 2
-  },
-  "current_agent": "DEV",
-  "quality_gates": {
-    "testability": {"score": 0.89, "passing": true},
-    "ac_measurability": {"score": 0.92, "passing": true},
-    "architecture_validation": {"score": 0.85, "passing": true},
-    "definition_of_done": {"score": 0.88, "passing": true}
-  },
-  "tokens": {
-    "total": 89450,
-    "cost_usd": 0.87
-  }
-}
 ```
 
 ---
@@ -660,13 +489,14 @@ yolo logs [OPTIONS]
 | Option | Type | Default | Description |
 |:-------|:-----|:--------|:------------|
 | `--agent, -a` | TEXT | All | Filter by agent name |
-| `--level, -l` | CHOICE | info | Log level: debug, info, warn, error |
-| `--since` | TEXT | None | Show logs since time (e.g., 1h, 30m) |
-| `--until` | TEXT | None | Show logs until time |
-| `--limit, -n` | INT | 100 | Maximum number of entries |
-| `--follow, -f` | FLAG | False | Follow log output in real-time |
-| `--export` | PATH | None | Export logs to file |
-| `--format` | CHOICE | text | Output format: text, json |
+| `--since, -s` | TEXT | None | Show logs since time (e.g., 1h, 30m) |
+| `--type, -t` | TEXT | None | Filter by decision type |
+| `--limit, -n` | INT | 20 | Maximum number of entries |
+| `--all, -A` | FLAG | False | Show all entries |
+| `--verbose, -v` | FLAG | False | Show full details |
+| `--json, -j` | FLAG | False | Output JSON to stdout |
+| `--format` | CHOICE | text | Output format: text or json |
+| `--export` | PATH | None | Export JSON output to a file |
 
 ### Examples
 
@@ -692,11 +522,6 @@ yolo logs
 **Filter by agent:**
 ```bash
 yolo logs --agent dev
-```
-
-**Follow logs in real-time:**
-```bash
-yolo logs --follow
 ```
 
 **Export to JSON:**
@@ -754,6 +579,8 @@ yolo config [COMMAND] [OPTIONS]
 | `get` | Get a specific configuration value |
 | `reset` | Reset to default configuration |
 | `validate` | Validate configuration file |
+| `export` | Export configuration to a YAML file |
+| `import` | Import configuration from a YAML file |
 
 ### Examples
 
@@ -817,6 +644,16 @@ Validating yolo.yaml...
   ✓ All settings valid
 
 Configuration is valid.
+```
+
+**Export configuration:**
+```bash
+yolo config export -o yolo-config-export.yaml
+```
+
+**Import configuration:**
+```bash
+yolo config import yolo-config-export.yaml
 ```
 
 ---
@@ -921,68 +758,50 @@ export YOLO_TOOLS__AIDER__ENABLED=true
 
 ## yolo tune
 
-Adjust quality thresholds interactively or via options.
+Customize agent templates and behaviors.
 
 ### Synopsis
 
 ```bash
-yolo tune [OPTIONS]
+yolo tune [AGENT_NAME] [OPTIONS]
 ```
 
 ### Options
 
 | Option | Type | Default | Description |
 |:-------|:-----|:--------|:------------|
-| `--coverage` | FLOAT | None | Set test coverage threshold (0.0-1.0) |
-| `--gate-pass` | FLOAT | None | Set gate pass threshold (0.0-1.0) |
-| `--interactive, -i` | FLAG | True | Interactive tuning mode |
-| `--preset` | CHOICE | None | Use preset: strict, balanced, relaxed |
+| `--list, -l` | FLAG | False | List all configurable agents |
+| `--edit, -e` | FLAG | False | Edit the agent template in `$EDITOR` |
+| `--reset, -r` | FLAG | False | Reset the agent template to defaults |
+| `--export` | PATH | None | Export the agent template to a file |
+| `--import` | PATH | None | Import the agent template from a file |
+| `--json, -j` | FLAG | False | Output template as JSON |
+
+Note: quality threshold tuning is not yet supported in this command. Use
+`yolo config set quality.*` to adjust thresholds.
 
 ### Examples
 
-**Interactive tuning:**
+**List agents:**
 ```bash
-yolo tune
+yolo tune --list
 ```
 
-**Output:**
-```
-Quality Threshold Tuning
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Current thresholds:
-  Test Coverage: 0.80 (80%)
-  Gate Pass: 0.70 (70%)
-
-? Adjust test coverage threshold?
-  Current: 0.80
-  [←/→] to adjust, [Enter] to confirm
-  ████████████████████░░░░░ 0.80
-
-? Adjust gate pass threshold?
-  Current: 0.70
-  [←/→] to adjust, [Enter] to confirm
-  ██████████████░░░░░░░░░░░ 0.70
-
-Updated thresholds saved to yolo.yaml
-```
-
-**Direct threshold setting:**
+**Show an agent template:**
 ```bash
-yolo tune --coverage 0.9 --gate-pass 0.8
+yolo tune analyst
 ```
 
-**Use preset:**
+**Edit an agent template:**
 ```bash
-yolo tune --preset strict
+yolo tune analyst --edit
 ```
 
-**Presets:**
-| Preset | Coverage | Gate Pass |
-|:-------|:---------|:----------|
-| strict | 0.95 | 0.90 |
-| balanced | 0.80 | 0.70 |
-| relaxed | 0.60 | 0.50 |
+**Export/import templates:**
+```bash
+yolo tune analyst --export analyst.yaml
+yolo tune analyst --import analyst.yaml
+```
 
 ---
 

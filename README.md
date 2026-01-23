@@ -84,6 +84,15 @@ Full command list:
 yolo --help
 ```
 
+Agent template tuning:
+
+```bash
+yolo tune --list
+yolo tune analyst --edit
+```
+
+Quality thresholds are configured via `yolo config set quality.*`.
+
 ## Development
 
 ```bash

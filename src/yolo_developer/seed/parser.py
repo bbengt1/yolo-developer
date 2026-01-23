@@ -566,6 +566,7 @@ class LLMSeedParser:
         self,
         model: str = LLM_CHEAP_MODEL_DEFAULT,
         temperature: float = 0.1,
+        api_key: str | None = None,
     ) -> None:
         """Initialize the LLM seed parser.
 
@@ -575,6 +576,7 @@ class LLMSeedParser:
         """
         self.model = model
         self.temperature = temperature
+        self.api_key = api_key
         logger.info(
             "llm_seed_parser_initialized",
             model=model,
@@ -608,6 +610,7 @@ class LLMSeedParser:
             model=litellm_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=self.temperature,
+            api_key=self.api_key,
         )
 
         response_text = response.choices[0].message.content

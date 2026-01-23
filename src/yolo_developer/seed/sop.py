@@ -517,6 +517,7 @@ async def _validate_with_llm(
     seed_content: str,
     constraints: list[SOPConstraint],
     model: str,
+    api_key: str | None = None,
 ) -> list[dict[str, Any]]:
     """Validate seed against constraints using LLM.
 
@@ -556,6 +557,7 @@ async def _validate_with_llm(
         ],
         temperature=0.3,
         response_format={"type": "json_object"},
+        api_key=api_key,
     )
 
     result = _parse_json_response(response.choices[0].message.content)
@@ -614,6 +616,7 @@ async def validate_against_sop(
     seed_content: str,
     sop_store: SOPStore,
     model: str = LLM_CHEAP_MODEL_DEFAULT,
+    api_key: str | None = None,
 ) -> SOPValidationResult:
     """Validate seed content against SOP constraints.
 
@@ -648,7 +651,7 @@ async def validate_against_sop(
     constraints_by_id = {c.id: c for c in constraints}
 
     # Validate with LLM
-    raw_conflicts = await _validate_with_llm(seed_content, constraints, model)
+    raw_conflicts = await _validate_with_llm(seed_content, constraints, model, api_key)
 
     # Build conflict objects
     conflicts: list[SOPConflict] = []
