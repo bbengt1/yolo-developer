@@ -29,6 +29,12 @@ _YAML_SECRET_FIELDS = (
     ("llm", "anthropic_api_key"),
     ("llm", "openai", "api_key"),
 )
+_YAML_SECRET_ENV_KEYS = {
+    "YOLO_LLM__OPENAI__API_KEY": ("openai", "api_key"),
+    "YOLO_LLM__OPENAI_API_KEY": ("openai_api_key",),
+    "YOLO_LLM__ANTHROPIC_API_KEY": ("anthropic_api_key",),
+}
+_YAML_ALLOW_KEY = "YOLO_ALLOW_YAML_SECRETS"
 
 class ConfigurationError(Exception):
     """Error raised when configuration loading or validation fails.
@@ -184,6 +190,7 @@ def _sanitize_yaml_secrets(yaml_data: dict[str, Any]) -> dict[str, Any]:
     if not found_fields:
         return yaml_data
     if allow_yaml_secrets:
+        _normalize_yaml_env_secrets(yaml_data)
         logger.warning(
             "YAML secrets enabled via %s. Do not commit secrets to version control.",
             _ALLOW_YAML_SECRETS_ENV,
@@ -208,6 +215,11 @@ def _find_yaml_secret_fields(yaml_data: dict[str, Any]) -> list[str]:
     for path in _YAML_SECRET_FIELDS:
         if _get_nested(yaml_data, path) is not None:
             found.append(".".join(path))
+    llm_data = yaml_data.get("llm")
+    if isinstance(llm_data, dict):
+        for key in _YAML_SECRET_ENV_KEYS:
+            if key in llm_data:
+                found.append(f"llm.{key}")
     return found
 
 
@@ -230,6 +242,43 @@ def _remove_yaml_secret_fields(yaml_data: dict[str, Any]) -> None:
         else:
             if isinstance(current, dict):
                 current.pop(path[-1], None)
+    llm_data = yaml_data.get("llm")
+    if isinstance(llm_data, dict):
+        for key in _YAML_SECRET_ENV_KEYS:
+            llm_data.pop(key, None)
+        llm_data.pop(_YAML_ALLOW_KEY, None)
+
+
+def _normalize_yaml_env_secrets(yaml_data: dict[str, Any]) -> None:
+    llm_data = yaml_data.get("llm")
+    if not isinstance(llm_data, dict):
+        return
+    mapped: list[str] = []
+    for env_key, target in _YAML_SECRET_ENV_KEYS.items():
+        if env_key in llm_data:
+            value = llm_data.pop(env_key)
+            _set_nested(llm_data, target, value)
+            mapped.append(env_key)
+    if _YAML_ALLOW_KEY in llm_data:
+        llm_data.pop(_YAML_ALLOW_KEY, None)
+        logger.warning(
+            "YAML key %s is ignored. Set it as an environment variable instead.",
+            _YAML_ALLOW_KEY,
+        )
+    if mapped:
+        logger.warning(
+            "Mapped YAML env-style keys (%s) to config fields. Prefer llm.openai_api_key or llm.openai.api_key.",
+            ", ".join(mapped),
+        )
+
+
+def _set_nested(target: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    current = target
+    for part in path[:-1]:
+        if part not in current or not isinstance(current[part], dict):
+            current[part] = {}
+        current = current[part]
+    current[path[-1]] = value
 
 
 def _convert_value(value: str, path: tuple[str, ...]) -> Any:

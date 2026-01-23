@@ -593,6 +593,31 @@ class TestAPIKeyLoading:
         warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("yaml secrets enabled" in msg.lower() for msg in warning_messages)
 
+    def test_yaml_env_style_keys_mapped_when_allowed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Env-style YAML keys are mapped to config fields when allowed."""
+        import logging
+
+        yaml_file = tmp_path / "yolo.yaml"
+        yaml_file.write_text(
+            "project_name: test-project\nllm:\n"
+            "  YOLO_LLM__OPENAI__API_KEY: sk-test\n"
+            "  YOLO_LLM__ANTHROPIC_API_KEY: sk-ant-test\n"
+        )
+        monkeypatch.setenv("YOLO_ALLOW_YAML_SECRETS", "1")
+
+        with caplog.at_level(logging.WARNING):
+            config = load_config(yaml_file)
+
+        assert config.llm.openai_api_key is not None
+        assert config.llm.anthropic_api_key is not None
+        warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("env-style keys" in msg.lower() for msg in warning_messages)
+
     def test_missing_openai_key_raises_when_provider_openai(
         self, tmp_path: Path
     ) -> None:
