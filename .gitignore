@@ -84,4 +84,5 @@ dmypy.json
 *.local
 .DS_Store
 yolo.yaml
+.yolo/
 .yolo/project-context.yaml

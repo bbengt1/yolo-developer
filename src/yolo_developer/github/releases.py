@@ -32,8 +32,8 @@ class ReleaseManager:
                 "tag_name": tag,
                 "name": name,
                 "body": body,
-                "draft": str(draft).lower(),
-                "prerelease": str(prerelease).lower(),
+                "draft": draft,
+                "prerelease": prerelease,
                 "target_commitish": target,
             },
         )

@@ -32,6 +32,7 @@ import asyncio
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -381,6 +382,8 @@ def logs_command(
     show_all: bool = False,
     verbose: bool = False,
     json_output: bool = False,
+    output_format: str = "text",
+    export_path: Path | None = None,
 ) -> None:
     """Execute the logs command.
 
@@ -394,6 +397,8 @@ def logs_command(
         show_all: Show all entries without pagination.
         verbose: Show detailed output including rationale.
         json_output: Output results as JSON.
+        output_format: Output format: text or json.
+        export_path: Optional path to export JSON output.
     """
     logger.debug(
         "logs_command_invoked",
@@ -404,7 +409,19 @@ def logs_command(
         show_all=show_all,
         verbose=verbose,
         json_output=json_output,
+        output_format=output_format,
+        export_path=str(export_path) if export_path else None,
     )
+
+    normalized_format = output_format.lower()
+    if normalized_format not in {"text", "json"}:
+        warning_panel(
+            f"Invalid format: '{output_format}'. Use 'text' or 'json'.",
+            title="Invalid Parameter",
+        )
+        return
+    if normalized_format == "json":
+        json_output = True
 
     # Normalize agent name to lowercase for case-insensitive filtering
     normalized_agent = agent.lower() if agent else None
@@ -484,6 +501,9 @@ def logs_command(
             total_count=total_count,
             showing=len(decisions),
         )
+        if export_path:
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            export_path.write_text(json.dumps(output, indent=2, default=str) + "\n")
         console.print_json(json.dumps(output, default=str))
         return
 

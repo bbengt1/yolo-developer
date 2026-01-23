@@ -772,7 +772,8 @@ def _read_seed_file(file_path: Path) -> str:
 
 async def _parse_seed_async(
     content: str,
-    filename: str,
+    filename: str | None,
+    format_hint: str | None = None,
     detect_ambiguities_flag: bool = False,
     validate_sop_flag: bool = False,
     sop_store: SOPStore | None = None,
@@ -781,7 +782,8 @@ async def _parse_seed_async(
 
     Args:
         content: The seed document content.
-        filename: The original filename for format detection.
+        filename: Optional filename for format detection.
+        format_hint: Optional override for preprocessing format.
         detect_ambiguities_flag: Whether to run ambiguity detection.
         validate_sop_flag: Whether to run SOP validation (Story 4.5).
         sop_store: SOP store for validation (Story 4.5).
@@ -806,6 +808,7 @@ async def _parse_seed_async(
         filename=filename,
         model=primary_model,
         api_key=api_key,
+        format_hint=format_hint,
         detect_ambiguities=detect_ambiguities_flag,
         validate_sop=validate_sop_flag,
         sop_store=sop_store,
@@ -824,6 +827,7 @@ async def _parse_seed_async(
             filename=filename,
             model=fallback_model,
             api_key=fallback_key,
+            format_hint=format_hint,
             detect_ambiguities=detect_ambiguities_flag,
             validate_sop=validate_sop_flag,
             sop_store=sop_store,
@@ -869,12 +873,16 @@ def seed_command(
     verbose: bool = False,
     json_output: bool = False,
     interactive: bool = False,
+    validate_only: bool = False,
+    skip_validation: bool = False,
     validate_sop: bool = False,
     sop_store_path: Path | None = None,
     override_soft: bool = False,
     report_format: str | None = None,
     report_output: Path | None = None,
     force: bool = False,
+    format_hint: str | None = None,
+    source_is_inline: bool = False,
 ) -> None:
     """Parse a seed document and display structured results.
 
@@ -890,24 +898,46 @@ def seed_command(
         verbose: If True, show additional details in output.
         json_output: If True, output results as JSON instead of tables.
         interactive: If True, detect ambiguities and prompt for resolution.
+        validate_only: If True, validate without persisting seed state.
+        skip_validation: If True, skip ambiguity detection and SOP validation.
         validate_sop: If True, validate against SOP constraints (Story 4.5).
         sop_store_path: Path to SOP store JSON file (Story 4.5).
         override_soft: If True, auto-override all SOFT conflicts (Story 4.5).
         report_format: Output format for validation report (json, markdown, rich).
         report_output: File path to write report to (optional).
         force: If True, bypass quality threshold rejection (Story 4.7).
+        format_hint: Optional override for preprocessing format ("auto", "markdown", "text").
+        source_is_inline: If True, treat content as inline text without filename hints.
     """
+    if format_hint:
+        normalized_hint = format_hint.lower()
+        if normalized_hint not in {"auto", "markdown", "text"}:
+            console.print(
+                f"[red]Error:[/red] Invalid format '{format_hint}'. "
+                "Use 'auto', 'markdown', or 'text'."
+            )
+            raise typer.Exit(code=1)
+        format_hint = normalized_hint
+
+    if skip_validation:
+        interactive = False
+        validate_sop = False
+
     logger.info(
         "seed_command_started",
         file_path=str(file_path),
         verbose=verbose,
         json_output=json_output,
         interactive=interactive,
+        validate_only=validate_only,
+        skip_validation=skip_validation,
         validate_sop=validate_sop,
         override_soft=override_soft,
         report_format=report_format,
         report_output=str(report_output) if report_output else None,
         force=force,
+        format_hint=format_hint,
+        source_is_inline=source_is_inline,
     )
 
     # Read the seed file
@@ -1014,11 +1044,13 @@ def seed_command(
     try:
         # In interactive mode, we already did ambiguity detection separately
         # In normal mode with verbose, we can show ambiguities inline
-        detect_flag = verbose and not interactive
+        detect_flag = verbose and not interactive and not skip_validation
+        parse_filename = None if source_is_inline and format_hint == "auto" else file_path.name
         result = asyncio.run(
             _parse_seed_async(
                 content,
-                file_path.name,
+                parse_filename,
+                format_hint,
                 detect_flag,
                 validate_sop_flag=validate_sop,
                 sop_store=sop_store,
@@ -1113,7 +1145,8 @@ def seed_command(
             _output_json(result)
         raise typer.Exit(code=1)
 
-    _persist_seed_state(result)
+    if not validate_only:
+        _persist_seed_state(result)
 
     # Generate validation report if requested (Story 4.6)
     if report_format:

@@ -257,10 +257,32 @@ def version() -> None:
 
 @app.command("seed")
 def seed(
-    file_path: Path = typer.Argument(  # noqa: B008
-        ...,
+    file_path: Path | None = typer.Argument(  # noqa: B008
+        None,
         help="Path to the seed document file to parse.",
         exists=False,  # We handle existence check in command for better error messages
+    ),
+    text: str | None = typer.Option(
+        None,
+        "--text",
+        "-t",
+        help="Provide requirements as inline text.",
+    ),
+    format_hint: str = typer.Option(
+        "auto",
+        "--format",
+        "-f",
+        help="Input format: auto, markdown, text.",
+    ),
+    validate_only: bool = typer.Option(
+        False,
+        "--validate-only",
+        help="Validate without persisting seed state.",
+    ),
+    skip_validation: bool = typer.Option(
+        False,
+        "--skip-validation",
+        help="Skip ambiguity and SOP validation checks.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -310,7 +332,6 @@ def seed(
     force: bool = typer.Option(
         False,
         "--force",
-        "-f",
         help="Force processing even if quality thresholds are not met.",
     ),
 ) -> None:
@@ -358,18 +379,42 @@ def seed(
     """
     from yolo_developer.cli.commands.seed import seed_command
 
-    seed_command(
-        file_path=file_path,
-        verbose=verbose,
-        json_output=json_output,
-        interactive=interactive,
-        validate_sop=validate_sop,
-        sop_store_path=sop_store,
-        override_soft=override_soft,
-        report_format=report_format,
-        report_output=report_output,
-        force=force,
-    )
+    if file_path and text:
+        raise typer.BadParameter("Provide either FILE_PATH or --text, not both.")
+    if not file_path and not text:
+        raise typer.BadParameter("Provide FILE_PATH or --text.")
+
+    inline_seed = text is not None
+    temp_path: Path | None = None
+    if inline_seed:
+        import tempfile
+
+        temp_suffix = ".md" if format_hint.lower() == "markdown" else ".txt"
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=temp_suffix) as temp_file:
+            temp_file.write(text or "")
+            temp_path = Path(temp_file.name)
+        file_path = temp_path
+
+    try:
+        seed_command(
+            file_path=file_path,
+            verbose=verbose,
+            json_output=json_output,
+            interactive=interactive,
+            validate_only=validate_only,
+            skip_validation=skip_validation,
+            validate_sop=validate_sop,
+            sop_store_path=sop_store,
+            override_soft=override_soft,
+            report_format=report_format,
+            report_output=report_output,
+            force=force,
+            format_hint=format_hint,
+            source_is_inline=inline_seed,
+        )
+    finally:
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
 
 
 @app.command("run")
@@ -379,6 +424,36 @@ def run(
         "--dry-run",
         "-d",
         help="Validate configuration and seed without executing the workflow.",
+    ),
+    agents: str | None = typer.Option(
+        None,
+        "--agents",
+        help="Comma-separated list of agents to run.",
+    ),
+    max_iterations: int | None = typer.Option(
+        None,
+        "--max-iterations",
+        help="Maximum iterations per agent.",
+    ),
+    timeout: int | None = typer.Option(
+        None,
+        "--timeout",
+        help="Timeout in seconds per agent.",
+    ),
+    continue_run: bool = typer.Option(
+        False,
+        "--continue",
+        help="Continue from the last checkpoint.",
+    ),
+    watch: bool = typer.Option(
+        False,
+        "--watch",
+        help="Watch mode with live updates.",
+    ),
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output-dir",
+        help="Output directory for artifacts.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -423,17 +498,58 @@ def run(
     """
     from yolo_developer.cli.commands.run import run_command
 
+    agent_list = [item.strip() for item in agents.split(",")] if agents else None
+    if continue_run:
+        resume = True
+
     run_command(
         dry_run=dry_run,
         verbose=verbose,
         json_output=json_output,
         resume=resume,
         thread_id=thread_id,
+        agents=agent_list,
+        max_iterations=max_iterations,
+        timeout=timeout,
+        watch=watch,
+        output_dir=output_dir,
     )
 
 
 @app.command("status")
 def status(
+    output_format: str = typer.Option(
+        "table",
+        "--format",
+        "-f",
+        help="Output format: table, json, yaml.",
+    ),
+    agents: bool = typer.Option(
+        False,
+        "--agents",
+        help="Show detailed agent status (not yet supported).",
+    ),
+    gates: bool = typer.Option(
+        False,
+        "--gates",
+        help="Show quality gate details (not yet supported).",
+    ),
+    stories: bool = typer.Option(
+        False,
+        "--stories",
+        help="Show story breakdown (not yet supported).",
+    ),
+    watch: bool = typer.Option(
+        False,
+        "--watch",
+        "-w",
+        help="Watch mode with live updates (not yet supported).",
+    ),
+    refresh: int | None = typer.Option(
+        None,
+        "--refresh",
+        help="Refresh interval for watch mode (not yet supported).",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -477,17 +593,52 @@ def status(
         yolo status --sessions         # Show only session list
     """
     from yolo_developer.cli.commands.status import status_command
+    from yolo_developer.cli.display import warning_panel
+
+    if any([agents, gates, stories, watch, refresh]):
+        warning_panel(
+            "Some status options are not yet supported and will be ignored: "
+            "--agents, --gates, --stories, --watch, --refresh."
+        )
 
     status_command(
         verbose=verbose,
         json_output=json_output,
         health_only=health_only,
         sessions_only=sessions_only,
+        output_format=output_format,
     )
 
 
 @app.command("logs")
 def logs(
+    output_format: str = typer.Option(
+        "text",
+        "--format",
+        help="Output format: text or json.",
+    ),
+    export: Path | None = typer.Option(
+        None,
+        "--export",
+        help="Export logs to a file (JSON format).",
+    ),
+    level: str | None = typer.Option(
+        None,
+        "--level",
+        "-l",
+        help="Log level filter (not yet supported).",
+    ),
+    until: str | None = typer.Option(
+        None,
+        "--until",
+        help="Show decisions until a time (not yet supported).",
+    ),
+    follow: bool = typer.Option(
+        False,
+        "--follow",
+        "-f",
+        help="Follow log output in real-time (not yet supported).",
+    ),
     agent: str | None = typer.Option(
         None,
         "--agent",
@@ -509,7 +660,7 @@ def logs(
     limit: int = typer.Option(
         20,
         "--limit",
-        "-l",
+        "-n",
         help="Maximum number of entries to display. Default: 20.",
     ),
     show_all: bool = typer.Option(
@@ -551,6 +702,13 @@ def logs(
         yolo logs --json                   # Output as JSON
     """
     from yolo_developer.cli.commands.logs import logs_command
+    from yolo_developer.cli.display import warning_panel
+
+    if any([level, until, follow]):
+        warning_panel(
+            "Some log options are not yet supported and will be ignored: "
+            "--level, --until, --follow."
+        )
 
     logs_command(
         agent=agent,
@@ -560,6 +718,8 @@ def logs(
         show_all=show_all,
         verbose=verbose,
         json_output=json_output,
+        output_format=output_format,
+        export_path=export,
     )
 
 
@@ -568,6 +728,27 @@ def tune(
     agent_name: str | None = typer.Argument(
         None,
         help="Agent to view/modify (analyst, pm, architect, dev, sm, tea).",
+    ),
+    coverage: float | None = typer.Option(
+        None,
+        "--coverage",
+        help="Set test coverage threshold (not yet supported).",
+    ),
+    gate_pass: float | None = typer.Option(
+        None,
+        "--gate-pass",
+        help="Set gate pass threshold (not yet supported).",
+    ),
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        help="Use preset thresholds (not yet supported).",
+    ),
+    interactive_mode: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Interactive tuning mode (not yet supported).",
     ),
     list_agents: bool = typer.Option(
         False,
@@ -622,6 +803,14 @@ def tune(
         yolo tune analyst --json            # Output as JSON
     """
     from yolo_developer.cli.commands.tune import tune_command
+    from yolo_developer.cli.display import warning_panel
+
+    if any([coverage is not None, gate_pass is not None, preset, interactive_mode]):
+        warning_panel(
+            "Quality threshold tuning is not yet supported in this command. "
+            "Use `yolo config set quality.*` to adjust thresholds."
+        )
+        return
 
     tune_command(
         agent_name=agent_name,
@@ -719,6 +908,38 @@ def config_set(
     from yolo_developer.cli.commands.config import set_config_value
 
     set_config_value(key=key, value=value, json_output=json_output)
+
+
+@config_app.command("get")
+def config_get(
+    key: str = typer.Argument(..., help="Configuration key to read."),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+    no_mask: bool = typer.Option(False, "--no-mask", help="Show API keys unmasked."),
+) -> None:
+    """Get a configuration value."""
+    from yolo_developer.cli.commands.config import get_config_value
+
+    get_config_value(key=key, json_output=json_output, no_mask=no_mask)
+
+
+@config_app.command("reset")
+def config_reset(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Reset configuration to defaults."""
+    from yolo_developer.cli.commands.config import reset_config_command
+
+    reset_config_command(json_output=json_output)
+
+
+@config_app.command("validate")
+def config_validate(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Validate configuration."""
+    from yolo_developer.cli.commands.config import validate_config_command
+
+    validate_config_command(json_output=json_output)
 
 
 @config_app.command("export")

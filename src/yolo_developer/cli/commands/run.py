@@ -34,7 +34,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from yolo_developer.cli.activity import ActivityDisplay
-from yolo_developer.cli.display import error_panel, info_panel, success_panel
+from yolo_developer.cli.display import error_panel, info_panel, success_panel, warning_panel
 from yolo_developer.config import ConfigurationError, load_config
 
 logger = structlog.get_logger(__name__)
@@ -385,6 +385,11 @@ def run_command(
     json_output: bool = False,
     resume: bool = False,
     thread_id: str | None = None,
+    agents: list[str] | None = None,
+    max_iterations: int | None = None,
+    timeout: int | None = None,
+    watch: bool = False,
+    output_dir: Path | None = None,
 ) -> None:
     """Execute the run command.
 
@@ -397,6 +402,11 @@ def run_command(
         json_output: Output as JSON.
         resume: Resume from checkpoint.
         thread_id: Specific thread ID for checkpointing.
+        agents: Optional list of agents to run (currently informational only).
+        max_iterations: Optional maximum iterations override (not yet enforced).
+        timeout: Optional timeout override in seconds (not yet enforced).
+        watch: Enable watch mode (currently a no-op; live output is default).
+        output_dir: Optional output directory (not yet enforced).
     """
     global _interrupted
     _interrupted = False
@@ -408,7 +418,27 @@ def run_command(
         json_output=json_output,
         resume=resume,
         thread_id=thread_id,
+        agents=agents,
+        max_iterations=max_iterations,
+        timeout=timeout,
+        watch=watch,
+        output_dir=str(output_dir) if output_dir else None,
     )
+
+    if any([agents, max_iterations, timeout, watch, output_dir]):
+        logger.warning(
+            "run_options_not_supported",
+            agents=agents,
+            max_iterations=max_iterations,
+            timeout=timeout,
+            watch=watch,
+            output_dir=str(output_dir) if output_dir else None,
+        )
+        if not json_output:
+            warning_panel(
+                "Some options are not yet supported and will be ignored: "
+                "--agents, --max-iterations, --timeout, --watch, --output-dir."
+            )
 
     # Load configuration
     try:
@@ -438,6 +468,11 @@ def run_command(
                 "seed_exists": check_seed_exists(),
                 "config_loaded": True,
                 "project_name": config.project_name,
+                "agents": agents or [],
+                "max_iterations": max_iterations,
+                "timeout": timeout,
+                "watch": watch,
+                "output_dir": str(output_dir) if output_dir else None,
             }
             console.print(json.dumps(output, indent=2))
         else:

@@ -24,11 +24,13 @@ class GitHubClient:
         payload = data or {}
         args = ["gh", "api", f"-X", method, endpoint]
         for key, value in payload.items():
+            if value is None:
+                continue
             if isinstance(value, list):
                 for item in value:
-                    args.extend(["-f", f"{key}[]={item}"])
+                    _append_field(args, f"{key}[]", item)
             else:
-                args.extend(["-f", f"{key}={value}"])
+                _append_field(args, key, value)
         output = self._run(args)
         if not output:
             return {}
@@ -53,3 +55,10 @@ class GitHubClient:
         if result.returncode != 0:
             raise GitHubError(result.stderr.strip() or result.stdout.strip())
         return result.stdout.strip()
+
+
+def _append_field(args: list[str], key: str, value: Any) -> None:
+    if isinstance(value, bool):
+        args.extend(["-F", f"{key}={str(value).lower()}"])
+    else:
+        args.extend(["-f", f"{key}={value}"])

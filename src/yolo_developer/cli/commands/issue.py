@@ -7,10 +7,12 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from yolo_developer.cli.display import error_panel
 from yolo_developer.config import load_config
 from yolo_developer.github.client import GitHubClient
 from yolo_developer.github.git import GitManager
 from yolo_developer.github.issues import IssueManager
+from yolo_developer.github.models import GitHubError
 
 console = Console()
 app = typer.Typer(help="Issue operations")
@@ -32,8 +34,12 @@ def issue_create(
     body: str = typer.Option(..., "--body"),
     path: str | None = None,
 ) -> None:
-    manager = _manager(Path(path) if path else Path.cwd())
-    issue = manager.create(title=title, body=body)
+    try:
+        manager = _manager(Path(path) if path else Path.cwd())
+        issue = manager.create(title=title, body=body)
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
     console.print(f"Created issue #{issue.number}: {issue.url}")
 
 
@@ -43,8 +49,12 @@ def issue_close(
     comment: str | None = typer.Option(None, "--comment"),
     path: str | None = None,
 ) -> None:
-    manager = _manager(Path(path) if path else Path.cwd())
-    issue = manager.close(issue_number=number, comment=comment)
+    try:
+        manager = _manager(Path(path) if path else Path.cwd())
+        issue = manager.close(issue_number=number, comment=comment)
+    except (GitHubError, RuntimeError) as exc:
+        error_panel(str(exc))
+        raise typer.Exit(code=1) from exc
     console.print(f"Closed issue #{issue.number}")
 
 

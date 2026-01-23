@@ -29,7 +29,7 @@ class GitManager:
         )
         if result.returncode != 0:
             raise GitHubError(result.stderr.strip() or result.stdout.strip())
-        return result.stdout.strip()
+        return result.stdout.rstrip()
 
     def _get_upstream(self, branch: str) -> str | None:
         try:
