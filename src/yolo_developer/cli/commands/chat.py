@@ -79,6 +79,7 @@ def _run_one_shot(router: LLMRouter, prompt: str) -> None:
 
 
 def _run_interactive(router: LLMRouter) -> None:
+    console.clear()
     console.print(
         Panel(
             "Interactive session started. Type /exit or press Ctrl+D to quit.",
