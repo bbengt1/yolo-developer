@@ -21,6 +21,7 @@ from yolo_developer.llm.router import (
 console = Console()
 
 _EXIT_COMMANDS = {"/exit", "/quit", "exit", "quit"}
+_HELP_COMMANDS = {"/help", "help", "?"}
 
 
 def read_piped_input() -> str | None:
@@ -87,6 +88,9 @@ def _run_interactive(router: LLMRouter) -> None:
             border_style="cyan",
         )
     )
+    console.print(
+        "[dim]Type /help for local help or run `yolo --help` for CLI commands.[/dim]"
+    )
     messages: list[dict[str, str]] = []
 
     while True:
@@ -97,6 +101,20 @@ def _run_interactive(router: LLMRouter) -> None:
             return
         stripped = user_input.strip()
         if not stripped:
+            continue
+        if stripped in _HELP_COMMANDS:
+            console.print(
+                Panel(
+                    "Commands:\n"
+                    "  /help    Show this help\n"
+                    "  /exit    Exit the session\n\n"
+                    "Tips:\n"
+                    "  - Run `yolo --help` for the full CLI command list.\n"
+                    "  - Use `yolo \"<prompt>\"` for one-shot prompts.",
+                    title="YOLO Chat Help",
+                    border_style="green",
+                )
+            )
             continue
         if stripped in _EXIT_COMMANDS:
             console.print("[dim]Session ended.[/dim]")
