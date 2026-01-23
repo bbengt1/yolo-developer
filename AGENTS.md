@@ -38,3 +38,26 @@
 - This repo follows BMad workflows in `_bmad/bmm/workflows/`; sprint status is tracked in `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 - After completing any user story or issue, update all documentation to reflect the change, including the root `README.md` and GitHub Pages docs in `docs/`.
 - After completing any issue, close it out with comments describing what was done.
+
+## GitHub Issue Workflow
+When implementing work from a GitHub issue, follow these practices:
+
+### Starting Work
+1. **Check current branch** - If on `main`, create a feature branch before starting work
+   - Branch naming: `feat/issue-{number}-short-description` or `fix/issue-{number}-short-description`
+   - Example: `feat/issue-17-cli-tool-integration`
+2. **Follow issue tasks explicitly** - Use the actionable steps/checklist in the issue as your implementation guide
+3. **Reference the issue** - Include `#issue-number` in commit messages
+
+### During Implementation
+- Complete tasks in the order specified in the issue when dependencies exist
+- Mark checkboxes in the issue as tasks are completed (if you have write access)
+- If scope changes or blockers arise, comment on the issue before deviating
+
+### Completing Work
+1. **Run all checks** before committing
+2. **Create PR** referencing the issue with `Closes #issue-number` or `Fixes #issue-number`
+3. **After merge** - Issue auto-closes if using closing keywords
+4. **Delete feature branch** after successful merge
+
+This ensures a consistent git workflow when implementing GitHub issues.
