@@ -29,6 +29,26 @@ The YOLO Developer CLI (`yolo`) provides commands for initializing projects, see
 yolo [OPTIONS] COMMAND [ARGS]...
 ```
 
+### Interactive Mode
+
+Run `yolo` with no arguments to start an interactive chat session:
+
+```bash
+yolo
+```
+
+Or explicitly:
+
+```bash
+yolo chat
+```
+
+For one-shot prompts:
+
+```bash
+yolo "Summarize the current sprint status"
+```
+
 ### Global Options
 
 | Option | Description |
@@ -46,6 +66,7 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 |:--------|:------------|
 | [`yolo init`](#yolo-init) | Initialize a new YOLO project |
+| [`yolo chat`](#yolo-chat) | Start interactive chat or run one-shot prompts |
 | [`yolo seed`](#yolo-seed) | Seed requirements for development |
 | [`yolo run`](#yolo-run) | Execute autonomous development sprint |
 | [`yolo status`](#yolo-status) | Display current sprint status |
@@ -62,6 +83,35 @@ yolo [OPTIONS] COMMAND [ARGS]...
 | [`yolo import`](#yolo-import) | Import GitHub issues |
 | [`yolo gather`](#yolo-gather) | Interactive requirements gathering |
 | [`yolo web`](#yolo-web) | Web dashboard |
+
+---
+
+## yolo chat
+
+Start an interactive chat session or run a one-shot prompt.
+
+### Synopsis
+
+```bash
+yolo chat [PROMPT...]
+```
+
+### Examples
+
+**Interactive mode:**
+```bash
+yolo chat
+```
+
+**One-shot prompt:**
+```bash
+yolo chat "Summarize the current sprint status"
+```
+
+**Pipe input:**
+```bash
+echo "Draft release notes" | yolo chat
+```
 
 ---
 

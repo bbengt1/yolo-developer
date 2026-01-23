@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 import warnings
 
+import click
 import typer
 from rich.console import Console
+from typer.core import TyperGroup
 
 warnings.filterwarnings(
     "ignore",
@@ -14,6 +16,7 @@ warnings.filterwarnings(
     message=r".*There is no current event loop.*",
 )
 
+import yolo_developer.cli.commands.chat as chat_commands
 from yolo_developer.cli.commands.init import init_command
 from yolo_developer.cli.commands.mcp import app as mcp_app
 from yolo_developer.cli.commands.gather import app as gather_app
@@ -26,10 +29,32 @@ from yolo_developer.cli.commands.release import app as release_app
 from yolo_developer.cli.commands.workflow import app as workflow_app
 from yolo_developer.cli.commands.scan import scan_command
 
+class YoloCLIGroup(TyperGroup):
+    """Custom group that treats unknown commands as chat prompts."""
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if not args and self.no_args_is_help and not ctx.resilient_parsing:
+            raise click.NoArgsIsHelpError(ctx)
+        rest = click.Command.parse_args(self, ctx, args)
+        if self.chain:
+            ctx._protected_args = rest
+            ctx.args = []
+        elif rest:
+            cmd = self.get_command(ctx, rest[0])
+            if cmd is None:
+                ctx._protected_args = []
+                ctx.args = rest
+                return ctx.args
+            ctx._protected_args, ctx.args = rest[:1], rest[1:]
+        return ctx.args
+
+
 app = typer.Typer(
     name="yolo",
     help="YOLO Developer - Autonomous multi-agent AI development system",
-    no_args_is_help=True,
+    no_args_is_help=False,
+    context_settings={"ignore_unknown_options": True},
+    cls=YoloCLIGroup,
 )
 console = Console()
 
@@ -41,6 +66,28 @@ app.add_typer(workflow_app, name="workflow")
 app.add_typer(import_app, name="import")
 app.add_typer(gather_app, name="gather")
 app.add_typer(web_app, name="web")
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+    stdin_text = chat_commands.read_piped_input()
+    prompt, interactive = chat_commands.resolve_prompt(ctx.args, stdin_text)
+    chat_commands.chat_command(prompt=prompt, interactive=interactive)
+
+
+@app.command("chat")
+def chat(
+    message: list[str] | None = typer.Argument(
+        None,
+        help="Optional prompt to run in one-shot mode.",
+    ),
+) -> None:
+    """Start an interactive chat session (default) or run a one-shot prompt."""
+    stdin_text = chat_commands.read_piped_input()
+    prompt, interactive = chat_commands.resolve_prompt(message, stdin_text)
+    chat_commands.chat_command(prompt=prompt, interactive=interactive)
 
 
 @app.command("init")

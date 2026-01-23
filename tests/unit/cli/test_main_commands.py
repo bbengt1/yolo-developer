@@ -152,6 +152,7 @@ class TestAppCommands:
 
         # Commands registered directly
         expected_commands = [
+            "chat",
             "init",
             "version",
             "seed",
@@ -174,8 +175,64 @@ class TestAppCommands:
 
         assert result.exit_code == 0
         # Check all commands appear in help
-        for cmd in ["init", "version", "seed", "run", "status", "logs", "tune", "config"]:
+        for cmd in ["chat", "init", "version", "seed", "run", "status", "logs", "tune", "config"]:
             assert cmd in result.output
+
+
+class TestChatCommand:
+    """Tests for chat command routing."""
+
+    @patch("yolo_developer.cli.commands.chat.read_piped_input", return_value=None)
+    @patch("yolo_developer.cli.commands.chat.chat_command")
+    def test_chat_command_invokes_function(
+        self,
+        mock_chat_command: MagicMock,
+        _mock_read: MagicMock,
+    ) -> None:
+        """Test yolo chat invokes chat_command function."""
+        result = runner.invoke(app, ["chat"])
+
+        mock_chat_command.assert_called_once_with(prompt=None, interactive=True)
+        assert result.exit_code == 0
+
+    @patch("yolo_developer.cli.commands.chat.read_piped_input", return_value=None)
+    @patch("yolo_developer.cli.commands.chat.chat_command")
+    def test_root_no_args_starts_chat(
+        self,
+        mock_chat_command: MagicMock,
+        _mock_read: MagicMock,
+    ) -> None:
+        """Test yolo (no args) starts interactive chat."""
+        result = runner.invoke(app, [])
+
+        mock_chat_command.assert_called_once_with(prompt=None, interactive=True)
+        assert result.exit_code == 0
+
+    @patch("yolo_developer.cli.commands.chat.read_piped_input", return_value=None)
+    @patch("yolo_developer.cli.commands.chat.chat_command")
+    def test_root_args_run_one_shot(
+        self,
+        mock_chat_command: MagicMock,
+        _mock_read: MagicMock,
+    ) -> None:
+        """Test yolo <prompt> runs one-shot chat."""
+        result = runner.invoke(app, ["summarize", "this"])
+
+        mock_chat_command.assert_called_once_with(prompt="summarize this", interactive=False)
+        assert result.exit_code == 0
+
+    @patch("yolo_developer.cli.commands.chat.read_piped_input", return_value="from-pipe")
+    @patch("yolo_developer.cli.commands.chat.chat_command")
+    def test_root_piped_input_runs_one_shot(
+        self,
+        mock_chat_command: MagicMock,
+        _mock_read: MagicMock,
+    ) -> None:
+        """Test piped stdin runs one-shot chat."""
+        result = runner.invoke(app, [])
+
+        mock_chat_command.assert_called_once_with(prompt="from-pipe", interactive=False)
+        assert result.exit_code == 0
 
 
 class TestCLIModuleExports:

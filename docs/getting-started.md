@@ -60,6 +60,7 @@ Options:
   --help     Show this message and exit.
 
 Commands:
+  chat    Start interactive chat or run one-shot prompts.
   config  Manage project configuration.
   init    Initialize a new YOLO project.
   logs    View agent activity logs.
@@ -68,6 +69,12 @@ Commands:
   seed    Seed requirements for development.
   status  Display current sprint status.
   tune    Adjust quality thresholds.
+```
+
+To launch the interactive interface directly:
+
+```bash
+uv run yolo
 ```
 
 ---

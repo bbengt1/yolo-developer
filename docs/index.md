@@ -56,6 +56,9 @@ Complete audit trail with decision logging, token cost tracking, and requirement
 ### Interactive Gathering
 Run guided Q&A sessions to crystallize requirements before seeding.
 
+### Interactive Chat
+Start a conversational CLI session by running `yolo` with no arguments.
+
 ### Web Dashboard
 Use the local web UI to monitor sprint status and agent activity.
 

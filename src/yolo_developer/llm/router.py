@@ -203,10 +203,11 @@ class LLMRouter:
         model = self.get_model_for_tier(tier)
         provider = _provider_from_model(model)
         api_key = self._api_key_for_provider(provider, allow_missing=True)
+        litellm_model = _litellm_model(provider, model)
 
         logger.info(
             "llm_call_start",
-            model=model,
+            model=litellm_model,
             tier=tier,
             provider=provider,
             message_count=len(messages),
@@ -218,7 +219,7 @@ class LLMRouter:
             from litellm import acompletion
 
             response = await acompletion(
-                model=model,
+                model=litellm_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -308,12 +309,13 @@ class LLMRouter:
             else routing.provider
         )
         api_key = self._api_key_for_provider(resolved_provider, allow_missing=False)
+        litellm_model = _litellm_model(resolved_provider, routing.model)
 
         logger.info(
             "llm_task_call_start",
             task_type=task_type,
             provider=resolved_provider,
-            model=routing.model,
+            model=litellm_model,
             tier=routing.tier,
         )
 
@@ -321,7 +323,7 @@ class LLMRouter:
             from litellm import acompletion
 
             response = await acompletion(
-                model=routing.model,
+                model=litellm_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -431,3 +433,11 @@ def _provider_from_model(model: str) -> Literal["openai", "anthropic", "auto"]:
     if model.startswith(("gpt-", "o1-", "o3-")):
         return "openai"
     return "auto"
+
+
+def _litellm_model(provider: Literal["openai", "anthropic", "auto"], model: str) -> str:
+    if model.startswith(("openai/", "anthropic/")):
+        return model
+    if provider in ("openai", "anthropic"):
+        return f"{provider}/{model}"
+    return model
