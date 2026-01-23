@@ -45,6 +45,11 @@ dev = [
     "mypy",
     "langsmith",
 ]
+web = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "websockets>=12.0",
+]
 
 [project.scripts]
 yolo = "yolo_developer.cli.main:app"
