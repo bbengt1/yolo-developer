@@ -102,3 +102,25 @@ Sprint status is tracked in `_bmad-output/implementation-artifacts/sprint-status
 - Include full paths in error messages for debugging
 - Run `ruff check`, `ruff format`, and `mypy` before committing
 - mypy is configured with `strict = true`
+
+## GitHub Issue Workflow
+
+When implementing work from a GitHub issue, follow these practices:
+
+### Starting Work
+1. **Check current branch** - If on `main`, create a feature branch before starting work
+   - Branch naming: `feat/issue-{number}-short-description` or `fix/issue-{number}-short-description`
+   - Example: `feat/issue-17-cli-tool-integration`
+2. **Follow issue tasks explicitly** - Use the actionable steps/checklist in the issue as your implementation guide
+3. **Reference the issue** - Include `#issue-number` in commit messages
+
+### During Implementation
+- Complete tasks in the order specified in the issue when dependencies exist
+- Mark checkboxes in the issue as tasks are completed (if you have write access)
+- If scope changes or blockers arise, comment on the issue before deviating
+
+### Completing Work
+1. **Run all checks** before committing: `uv run ruff check src tests && uv run ruff format src tests && uv run mypy src/yolo_developer && uv run pytest`
+2. **Create PR** referencing the issue with `Closes #issue-number` or `Fixes #issue-number` in the PR description
+3. **After merge** - The issue will auto-close if using closing keywords; otherwise close manually
+4. **Delete feature branch** after successful merge to keep the repository clean
