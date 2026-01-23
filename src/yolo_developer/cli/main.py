@@ -151,6 +151,16 @@ def init(
         "--hint",
         help="Hint about project type (e.g., 'fastapi api').",
     ),
+    skip_git: bool = typer.Option(
+        False,
+        "--skip-git",
+        help="Skip git repository initialization prompts.",
+    ),
+    skip_github: bool = typer.Option(
+        False,
+        "--skip-github",
+        help="Skip GitHub repository creation prompts.",
+    ),
 ) -> None:
     """Initialize a new YOLO Developer project.
 
@@ -176,6 +186,8 @@ def init(
         scan_only=scan_only,
         non_interactive=non_interactive,
         hint=hint,
+        skip_git=skip_git,
+        skip_github=skip_github,
     )
 
 

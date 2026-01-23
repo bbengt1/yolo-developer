@@ -20,6 +20,27 @@ Starts an interactive chat session. For one-shot prompts:
 yolo "Summarize the current sprint status"
 ```
 
+### Project Initialization
+
+Create a new YOLO project with `yolo init`:
+
+```bash
+yolo init my-project
+```
+
+The init command automatically:
+- Detects existing git repositories
+- Offers to initialize git if not present
+- Displays remote repository status
+- Creates GitHub repositories via `gh` CLI (if available)
+- Creates an initial commit with project files
+- Pushes to remote if configured
+
+Options:
+- `--skip-git` - Skip git repository prompts
+- `--skip-github` - Skip GitHub repository creation prompts
+- `--no-input` - Use all defaults without prompting
+
 ### External Tool Integration
 
 YOLO can delegate tasks to external CLI tools like Claude Code and Aider for enhanced capabilities:
