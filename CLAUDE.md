@@ -153,6 +153,11 @@ When implementing work from a GitHub issue, follow these practices:
 
 ### Completing Work
 1. **Run all checks** before committing: `uv run ruff check src tests && uv run ruff format src tests && uv run mypy src/yolo_developer && uv run pytest`
-2. **Create PR** referencing the issue with `Closes #issue-number` or `Fixes #issue-number` in the PR description
-3. **After merge** - The issue will auto-close if using closing keywords; otherwise close manually
-4. **Delete feature branch** after successful merge to keep the repository clean
+2. **Update documentation** - Any user-facing changes must update relevant docs:
+   - `README.md` - For major features or usage changes
+   - `docs/cli/index.md` - For new or modified CLI commands
+   - `docs/configuration/index.md` - For new configuration options
+   - `CLAUDE.md` - For development workflow changes
+3. **Create PR** referencing the issue with `Closes #issue-number` or `Fixes #issue-number` in the PR description
+4. **After merge** - The issue will auto-close if using closing keywords; otherwise close manually
+5. **Delete feature branch** after successful merge to keep the repository clean

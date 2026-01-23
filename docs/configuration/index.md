@@ -517,6 +517,62 @@ mcp:
 
 ---
 
+### tools
+
+External CLI tool integration configuration. YOLO can delegate tasks to external tools like Claude Code and Aider.
+
+| Option | Type | Default | Env Var | Description |
+|:-------|:-----|:--------|:--------|:------------|
+| `claude_code.enabled` | bool | false | `YOLO_TOOLS__CLAUDE_CODE__ENABLED` | Enable Claude Code integration |
+| `claude_code.path` | string | None | `YOLO_TOOLS__CLAUDE_CODE__PATH` | Custom binary path |
+| `claude_code.timeout` | int | 300 | `YOLO_TOOLS__CLAUDE_CODE__TIMEOUT` | Execution timeout (seconds) |
+| `claude_code.output_format` | string | json | `YOLO_TOOLS__CLAUDE_CODE__OUTPUT_FORMAT` | Output format (json, text) |
+| `claude_code.extra_args` | list | [] | - | Additional CLI arguments |
+| `aider.enabled` | bool | false | `YOLO_TOOLS__AIDER__ENABLED` | Enable Aider integration |
+| `aider.path` | string | None | `YOLO_TOOLS__AIDER__PATH` | Custom binary path |
+| `aider.timeout` | int | 300 | `YOLO_TOOLS__AIDER__TIMEOUT` | Execution timeout (seconds) |
+| `aider.output_format` | string | json | `YOLO_TOOLS__AIDER__OUTPUT_FORMAT` | Output format (json, text) |
+| `aider.extra_args` | list | [] | - | Additional CLI arguments |
+
+```yaml
+tools:
+  claude_code:
+    enabled: true
+    path: null  # Use PATH lookup
+    timeout: 300
+    output_format: json
+    extra_args: []
+  aider:
+    enabled: false
+    path: null
+    timeout: 300
+    output_format: json
+    extra_args: []
+```
+
+**Environment Variables:**
+```bash
+export YOLO_TOOLS__CLAUDE_CODE__ENABLED=true
+export YOLO_TOOLS__CLAUDE_CODE__TIMEOUT=600
+export YOLO_TOOLS__AIDER__ENABLED=true
+```
+
+#### Benefits of External Tool Integration
+
+- **Security**: Tools use their own authentication (no API key sharing)
+- **Features**: Access tool-specific capabilities (Claude Code plan mode, MCP client, web search)
+- **Flexibility**: Configure tools independently per project
+
+#### Checking Tool Status
+
+```bash
+yolo tools           # Show tool availability
+yolo tools status    # Same as above
+yolo tools --json    # JSON output for scripting
+```
+
+---
+
 ## Environment Variables
 
 All configuration can be overridden via environment variables using the `YOLO_` prefix with `__` as the nested delimiter.

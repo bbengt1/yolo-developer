@@ -73,6 +73,7 @@ yolo "Summarize the current sprint status"
 | [`yolo status`](#yolo-status) | Display current sprint status |
 | [`yolo logs`](#yolo-logs) | View agent activity logs |
 | [`yolo config`](#yolo-config) | Manage project configuration |
+| [`yolo tools`](#yolo-tools) | Manage external CLI tool integrations |
 | [`yolo tune`](#yolo-tune) | Adjust quality thresholds |
 | [`yolo mcp`](#yolo-mcp) | Start MCP server for Claude Code |
 | [`yolo scan`](#yolo-scan) | Scan existing project for brownfield context |
@@ -768,6 +769,104 @@ Validating yolo.yaml...
   ✓ All settings valid
 
 Configuration is valid.
+```
+
+---
+
+## yolo tools
+
+Manage external CLI tool integrations like Claude Code and Aider.
+
+### Synopsis
+
+```bash
+yolo tools [OPTIONS] [COMMAND]
+```
+
+### Commands
+
+| Command | Description |
+|:--------|:------------|
+| `status` | Show tool availability and configuration |
+
+### Options
+
+| Option | Type | Default | Description |
+|:-------|:-----|:--------|:------------|
+| `--json, -j` | FLAG | False | Output as JSON |
+
+### Examples
+
+**Show tool status:**
+```bash
+yolo tools
+```
+
+**Output:**
+```
+                    External CLI Tools
+┏━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃ Tool         ┃ Enabled ┃ Available ┃ Binary              ┃ Timeout ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ claude_code  │   Yes   │    Yes    │ /usr/local/bin/claude │  300s │
+│ aider        │   No    │    No     │ aider (not found)     │  300s │
+└──────────────┴─────────┴───────────┴─────────────────────┴─────────┘
+```
+
+**JSON output:**
+```bash
+yolo tools --json
+```
+
+**Output:**
+```json
+{
+  "tools": [
+    {
+      "name": "claude_code",
+      "enabled": true,
+      "binary": "claude",
+      "available": true,
+      "path": "/usr/local/bin/claude",
+      "timeout": 300,
+      "output_format": "json"
+    },
+    {
+      "name": "aider",
+      "enabled": false,
+      "binary": "aider",
+      "available": false,
+      "path": null,
+      "timeout": 300,
+      "output_format": "json"
+    }
+  ],
+  "status": "success"
+}
+```
+
+### Configuration
+
+Tools are configured in `yolo.yaml`:
+
+```yaml
+tools:
+  claude_code:
+    enabled: true
+    path: /custom/path/to/claude  # optional
+    timeout: 300
+    output_format: json
+    extra_args: []
+  aider:
+    enabled: false
+```
+
+Or via environment variables:
+
+```bash
+export YOLO_TOOLS__CLAUDE_CODE__ENABLED=true
+export YOLO_TOOLS__CLAUDE_CODE__TIMEOUT=600
+export YOLO_TOOLS__AIDER__ENABLED=true
 ```
 
 ---
