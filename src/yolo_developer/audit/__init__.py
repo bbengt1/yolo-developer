@@ -389,8 +389,11 @@ from yolo_developer.audit.logger import (
 # In-memory implementation
 from yolo_developer.audit.memory_store import InMemoryDecisionStore
 
-# PDF exporter
-from yolo_developer.audit.pdf_exporter import PdfAuditExporter
+# PDF exporter (optional dependency)
+try:
+    from yolo_developer.audit.pdf_exporter import PdfAuditExporter
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    PdfAuditExporter = None  # type: ignore[assignment]
 
 # Plain text formatter
 from yolo_developer.audit.plain_formatter import PlainAuditFormatter

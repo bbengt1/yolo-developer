@@ -57,7 +57,10 @@ from yolo_developer.audit.export_types import (
     ExportOptions,
 )
 from yolo_developer.audit.json_exporter import JsonAuditExporter
-from yolo_developer.audit.pdf_exporter import PdfAuditExporter
+try:
+    from yolo_developer.audit.pdf_exporter import PdfAuditExporter
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    PdfAuditExporter = None  # type: ignore[assignment]
 from yolo_developer.audit.traceability_types import TraceableArtifact, TraceLink
 
 if TYPE_CHECKING:
@@ -115,8 +118,14 @@ class AuditExportService:
             self._exporters = {
                 "json": JsonAuditExporter(),
                 "csv": CsvAuditExporter(),
-                "pdf": PdfAuditExporter(),
             }
+            if PdfAuditExporter is not None:
+                self._exporters["pdf"] = PdfAuditExporter()
+            else:
+                _logger.warning(
+                    "pdf_exporter_unavailable",
+                    reason="reportlab not installed",
+                )
 
         _logger.debug(
             "AuditExportService initialized",

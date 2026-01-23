@@ -423,7 +423,7 @@ def run_uv_sync(project_path: Path) -> bool:
     """Run uv sync to install dependencies."""
     try:
         subprocess.run(
-            ["uv", "sync", "--all-extras"],
+            ["uv", "sync", "--all-extras", "--python", sys.executable],
             cwd=project_path,
             capture_output=True,
             text=True,

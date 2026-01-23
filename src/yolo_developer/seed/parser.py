@@ -49,6 +49,7 @@ from yolo_developer.seed.types import (
     SeedParseResult,
     SeedSource,
 )
+from yolo_developer.seed.utils import resolve_litellm_model
 
 logger = structlog.get_logger(__name__)
 
@@ -598,12 +599,13 @@ class LLMSeedParser:
         Raises:
             json.JSONDecodeError: If LLM response is not valid JSON.
         """
-        logger.info("llm_call_started", model=self.model, content_length=len(content))
+        litellm_model = resolve_litellm_model(self.model)
+        logger.info("llm_call_started", model=litellm_model, content_length=len(content))
 
         prompt = SEED_ANALYSIS_PROMPT.format(content=content)
 
         response = await litellm.acompletion(
-            model=self.model,
+            model=litellm_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=self.temperature,
         )

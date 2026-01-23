@@ -44,6 +44,7 @@ from tenacity import (
 )
 
 from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
+from yolo_developer.seed.utils import resolve_litellm_model
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -705,12 +706,13 @@ async def _call_llm_for_ambiguities(
     Raises:
         json.JSONDecodeError: If LLM response is not valid JSON.
     """
-    logger.info("ambiguity_llm_call_started", model=model, content_length=len(content))
+    litellm_model = resolve_litellm_model(model)
+    logger.info("ambiguity_llm_call_started", model=litellm_model, content_length=len(content))
 
     prompt = AMBIGUITY_DETECTION_PROMPT.format(content=content)
 
     response = await litellm.acompletion(
-        model=model,
+        model=litellm_model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
     )

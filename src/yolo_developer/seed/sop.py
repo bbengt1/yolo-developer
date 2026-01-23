@@ -57,6 +57,7 @@ from tenacity import (
 )
 
 from yolo_developer.config.schema import LLM_CHEAP_MODEL_DEFAULT
+from yolo_developer.seed.utils import resolve_litellm_model
 
 logger = structlog.get_logger(__name__)
 
@@ -546,8 +547,9 @@ async def _validate_with_llm(
         seed_length=len(seed_content),
     )
 
+    litellm_model = resolve_litellm_model(model)
     response = await litellm.acompletion(
-        model=model,
+        model=litellm_model,
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": "Analyze the seed against these constraints."},
