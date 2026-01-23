@@ -67,6 +67,7 @@ yolo "Summarize the current sprint status"
 |:--------|:------------|
 | [`yolo init`](#yolo-init) | Initialize a new YOLO project |
 | [`yolo chat`](#yolo-chat) | Start interactive chat or run one-shot prompts |
+| [`yolo integrate`](#yolo-integrate) | Integrate MCP clients (Codex, Claude Code, Cursor, VS Code) |
 | [`yolo seed`](#yolo-seed) | Seed requirements for development |
 | [`yolo run`](#yolo-run) | Execute autonomous development sprint |
 | [`yolo status`](#yolo-status) | Display current sprint status |
@@ -111,6 +112,37 @@ yolo chat "Summarize the current sprint status"
 **Pipe input:**
 ```bash
 echo "Draft release notes" | yolo chat
+```
+
+---
+
+## yolo integrate
+
+Configure MCP client settings for external AI tools.
+
+### Synopsis
+
+```bash
+yolo integrate <client> [OPTIONS]
+```
+
+### Options
+
+| Option | Description |
+|:-------|:------------|
+| `--config-path, -c` | Override default config path |
+| `--project-dir, -p` | Project directory for `uv run` fallback |
+| `--dry-run` | Show JSON without writing |
+| `--force` | Overwrite existing MCP entry |
+| `--yes, -y` | Skip confirmation prompt |
+
+### Examples
+
+```bash
+yolo integrate claude-code
+yolo integrate codex --dry-run
+yolo integrate cursor --config-path /custom/settings.json --yes
+yolo integrate vscode --force
 ```
 
 ---

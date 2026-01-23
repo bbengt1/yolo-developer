@@ -15,11 +15,13 @@ from typing import Literal
 
 import typer
 
+from yolo_developer.cli.commands.integrate import app as integrate_app
 from yolo_developer.mcp.server import TransportType, run_server
 
 # Create a Typer app for the mcp command
 # This allows it to be registered as a subcommand
 app = typer.Typer(help="MCP server commands")
+app.add_typer(integrate_app, name="integrate")
 
 
 def mcp_command(

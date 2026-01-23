@@ -89,6 +89,19 @@ PY
 
 ## Client Configuration
 
+### Quick Setup (Recommended)
+
+Use the CLI helper to install or update MCP config entries:
+
+```bash
+yolo integrate claude-code
+yolo integrate codex
+yolo integrate cursor
+yolo integrate vscode
+```
+
+Add `--dry-run` to preview changes or `--config-path` to target a custom file.
+
 ### Claude Code / Claude Desktop
 
 Add to your configuration file:

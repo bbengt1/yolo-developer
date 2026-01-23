@@ -20,6 +20,12 @@ Starts an interactive chat session. For one-shot prompts:
 yolo "Summarize the current sprint status"
 ```
 
+Integrate with external AI CLIs (Codex, Claude Code, Cursor, VS Code):
+
+```bash
+yolo integrate claude-code
+```
+
 Full command list:
 
 ```bash
