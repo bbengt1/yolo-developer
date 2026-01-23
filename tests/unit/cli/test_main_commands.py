@@ -166,6 +166,7 @@ class TestAppCommands:
 
         # Commands registered as groups (sub-apps)
         expected_groups = ["config"]
+        expected_groups.append("integrate")
         for grp in expected_groups:
             assert grp in group_names, f"Command group '{grp}' not registered"
 
@@ -175,7 +176,18 @@ class TestAppCommands:
 
         assert result.exit_code == 0
         # Check all commands appear in help
-        for cmd in ["chat", "init", "version", "seed", "run", "status", "logs", "tune", "config"]:
+        for cmd in [
+            "chat",
+            "init",
+            "version",
+            "seed",
+            "run",
+            "status",
+            "logs",
+            "tune",
+            "config",
+            "integrate",
+        ]:
             assert cmd in result.output
 
 

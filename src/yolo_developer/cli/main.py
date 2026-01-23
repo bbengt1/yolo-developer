@@ -17,6 +17,7 @@ warnings.filterwarnings(
 )
 
 import yolo_developer.cli.commands.chat as chat_commands
+from yolo_developer.cli.commands.integrate import app as integrate_app
 from yolo_developer.cli.commands.gather import app as gather_app
 from yolo_developer.cli.commands.git import app as git_app
 from yolo_developer.cli.commands.importer import app as import_app
@@ -68,6 +69,7 @@ app.add_typer(workflow_app, name="workflow")
 app.add_typer(import_app, name="import")
 app.add_typer(gather_app, name="gather")
 app.add_typer(web_app, name="web")
+app.add_typer(integrate_app, name="integrate")
 app.add_typer(tools_app, name="tools")
 
 

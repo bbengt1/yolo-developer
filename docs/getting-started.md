@@ -127,6 +127,18 @@ quality:
 
 ---
 
+## Optional: Integrate with External CLI Tools
+
+Configure MCP clients (Codex CLI, Claude Code, Cursor, VS Code) automatically:
+
+```bash
+uv run yolo integrate claude-code
+```
+
+Use `--dry-run` to preview or `--config-path` to target a custom config file.
+
+---
+
 ## Step 3: Initialize a Project
 
 Navigate to your project directory and initialize:
