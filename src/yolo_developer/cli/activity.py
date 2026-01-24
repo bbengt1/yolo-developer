@@ -113,7 +113,7 @@ class ActivityDisplay:
         refresh_rate: Display updates per second.
         current_agent: Currently executing agent name.
         current_description: Description of current activity.
-        elapsed_time: Total elapsed time in seconds.
+        elapsed_time: Total elapsed time in seconds (updated dynamically).
         event_count: Total number of events processed.
         transitions: List of agent transitions.
 
@@ -134,6 +134,7 @@ class ActivityDisplay:
     _live: Live | None = field(default=None, repr=False)
     _last_update: float = field(default=0.0, repr=False)
     _last_event: str = field(default="", repr=False)
+    _start_time: float = field(default=0.0, repr=False)
 
     def __post_init__(self) -> None:
         """Initialize console if not provided."""
@@ -217,6 +218,11 @@ class ActivityDisplay:
         """
         elements: list[Text | str] = []
 
+        # Calculate elapsed time dynamically for live updates
+        current_elapsed = (
+            time.time() - self._start_time if self._start_time > 0 else self.elapsed_time
+        )
+
         # Header with spinner and agent name
         if self.current_agent:
             header = Text()
@@ -229,10 +235,10 @@ class ActivityDisplay:
             if self.current_description:
                 elements.append(Text(self.current_description, style="dim"))
 
-            # Elapsed time
+            # Elapsed time - use dynamically calculated value
             time_text = Text()
             time_text.append("Elapsed: ", style="cyan")
-            time_text.append(format_elapsed_time(self.elapsed_time), style="bold")
+            time_text.append(format_elapsed_time(current_elapsed), style="bold")
             elements.append(time_text)
 
         # Verbose mode additions
@@ -274,6 +280,9 @@ class ActivityDisplay:
         """Start the live display."""
         if self._console is None:
             self._console = Console()
+
+        # Record start time for dynamic elapsed time calculation
+        self._start_time = time.time()
 
         self._live = Live(
             self.render(),
